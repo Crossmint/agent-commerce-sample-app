@@ -83,10 +83,9 @@ export function SaveCard({
         },
       };
       try {
-        const resolvedEmail = email ?? (await api.me()).email;
-        if (!resolvedEmail) throw new Error("No email on this account. Pass `email` to SaveCard.");
+        // The server fills in the email from the token or a Stytch lookup when none is given.
         const registered = await api.registerPaymentMethod(paymentMethod.paymentMethodId, {
-          email: resolvedEmail,
+          email,
           countryCode,
           languageCode,
         });

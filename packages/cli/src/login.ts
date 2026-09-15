@@ -55,7 +55,8 @@ export async function login(ctx: CliContext, opts: LoginOptions): Promise<GoatCo
   const clientId = oauth?.cliClientId;
   if (!oauth?.authorizationEndpoint || !oauth.tokenEndpoint || !clientId) {
     throw fail(
-      "This GOAT server has no CLI OAuth client configured (auth.oauth.cliClientId is missing in /v1/config).",
+      "This GOAT server is not set up for CLI login. It needs STYTCH_PROJECT_DOMAIN and STYTCH_CLI_CLIENT_ID " +
+        "(auth.oauth.authorizationEndpoint, tokenEndpoint, or cliClientId is missing in /v1/config).",
     );
   }
 

@@ -176,7 +176,9 @@ export function registerAgentCardCommands(program: Command, ctx: CliContext): vo
   withJson(
     ac
       .command("reveal <id>")
-      .description("mint a scoped card number from an active agent card")
+      .description(
+        "mint a scoped card number from an active agent card. Name the merchant (--merchant-*) unless the card is locked to one",
+      )
       .option(
         "--amount <n>",
         "cap for this credential; defaults to the card's budget",

@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import type { AgentCard, PaymentMethod } from "@goat-wallet/core";
-import { hasUsableRail, pendingVerificationRails } from "@goat-wallet/core";
+import { pendingVerificationRails } from "@goat-wallet/core";
 import { Clock, Lock, TriangleAlert } from "lucide-react";
 import { errorMessage } from "../api/client.js";
 import type { AgentCardRequest } from "../api/types.js";
@@ -94,7 +94,7 @@ export function ApproveAgentCard({
         const card = await api.getAgentCard(req.agentCardId as string);
         if (cancelled) return;
         setAgentCard(card);
-        if (pendingVerificationRails(card).length && !hasUsableRail(card)) {
+        if (pendingVerificationRails(card).length) {
           setPhase({ kind: "verifying", agentCard: card });
         } else {
           setPhase({ kind: "confirming", agentCard: card });
@@ -226,6 +226,26 @@ export function ApproveAgentCard({
   const limitCurrency = agentCard?.amount.currency ?? req.amount.currency;
   const limit = formatAmount(limitValue, limitCurrency);
   const until = formatDate(agentCard?.expiresAt ?? req.expiresAt);
+
+  // Defensive: if the record says active but the network rail still needs the user,
+  // keep them on the verification step instead of showing success.
+  const stillPending = agentCard ? pendingVerificationRails(agentCard).length > 0 : false;
+  if (req.status === "active" && stillPending && agentCard) {
+    return (
+      <Shell className={cn("goat-backdrop", className)}>
+        <h1 className="text-2xl font-semibold tracking-tight">One more step</h1>
+        <p className="text-sm text-muted-foreground">
+          Confirm with your card network so {req.requester} can get a card number.
+        </p>
+        <VerifyAgentCard
+          agentCard={agentCard}
+          displayName={req.requester}
+          appearance={verificationAppearance}
+          onComplete={() => void verified(agentCard)}
+        />
+      </Shell>
+    );
+  }
 
   if (req.status === "active") {
     return (

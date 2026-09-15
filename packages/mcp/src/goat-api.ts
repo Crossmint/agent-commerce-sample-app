@@ -87,7 +87,7 @@ export interface MintCredentialInput {
 
 export interface CredentialResult {
   agentCardId: string;
-  rail: "agentic-token" | "spt" | "encrypted-card";
+  rail: "agentic-token" | "encrypted-card";
   provider?: "vic" | "agentpay" | "stripe";
   /** `false` means Crossmint does not cap this rail. The limit is advisory. */
   enforced: boolean;

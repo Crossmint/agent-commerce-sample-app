@@ -40,7 +40,7 @@ The command prints an approval URL. **Show that URL to the user verbatim.** They
 - Exit 1: denied or expired. Tell the user. Do not retry without asking.
 - Exit 2: still pending when the timeout hit. Show the URL again and resume with `goat agent-card status <requestId> --wait`.
 
-Lock the card to one shop when you know it: `--merchant-name "Nike" --merchant-url https://nike.com --merchant-country US`.
+Lock the card to one shop when you know it: `--merchant-name "Nike" --merchant-url https://nike.com --merchant-country US`. If you leave the card open, you must name the merchant later at `reveal` time. Card networks issue a number per merchant.
 
 Use `--json` when you need to read fields programmatically.
 
@@ -72,7 +72,7 @@ Check on any checkout later with `goat checkout get <id> --wait`.
 Use this only when a checkout is not possible, for example a phone order or a form Crossmint cannot drive.
 
 ```sh
-goat agent-card reveal <id> --amount 25
+goat agent-card reveal <id> --merchant-name <store> --merchant-url <https://store> --merchant-country <CC> --amount 25
 ```
 
 Rules:

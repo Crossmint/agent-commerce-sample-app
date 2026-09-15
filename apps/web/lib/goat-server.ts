@@ -21,10 +21,12 @@ async function buildHandlers(): Promise<Handlers> {
   const projectId = serverEnv.required("STYTCH_PROJECT_ID");
   const stytchEnv = inferStytchEnvironment(projectId);
 
+  const projectDomain = serverEnv.optional("STYTCH_PROJECT_DOMAIN");
   const userAuth = createStytchUserAuth({
     projectId,
     secret: serverEnv.optional("STYTCH_SECRET"),
     environment: stytchEnv,
+    projectDomain,
   });
 
   const store = await buildStore();
@@ -49,6 +51,8 @@ async function buildHandlers(): Promise<Handlers> {
       environment: stytchEnv,
       cliClientId: serverEnv.optional("STYTCH_CLI_CLIENT_ID"),
       mcpClientId: serverEnv.optional("STYTCH_MCP_CLIENT_ID"),
+      projectDomain,
+      authorizationUrl: `${serverEnv.webBaseUrl()}/oauth/authorize`,
     },
     defaultRequester: "Agent",
   });

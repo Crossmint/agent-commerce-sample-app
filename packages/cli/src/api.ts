@@ -270,6 +270,7 @@ async function parseResponse<T>(res: Response): Promise<T> {
 export async function withFetch<T>(fetchImpl: typeof fetch, fn: () => Promise<T>): Promise<T> {
   const original = globalThis.fetch;
   if (fetchImpl === original) return fn();
+  if (fetchImpl === original) return fn();
   globalThis.fetch = fetchImpl;
   try {
     return await fn();

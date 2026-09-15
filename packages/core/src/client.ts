@@ -38,6 +38,12 @@ export interface CrossmintClientOptions {
    * Set this to a different base if Crossmint gives you one.
    */
   checkoutsBaseUrl?: string;
+  /**
+   * Sent as the `Origin` header on client-key calls. Crossmint locks client keys to
+   * whitelisted origins and rejects server-side calls without one. Use your wallet's
+   * public URL, e.g. `https://wallet.example.com`, and whitelist it in the console.
+   */
+  origin?: string;
   fetch?: typeof fetch;
 }
 
@@ -59,6 +65,7 @@ export class CrossmintClient {
   private readonly checkoutsBaseUrl: string;
   private readonly clientApiKey: string | undefined;
   private readonly serverApiKey: string | undefined;
+  private readonly origin: string | undefined;
   private readonly fetchImpl: typeof fetch;
 
   constructor(opts: CrossmintClientOptions) {
@@ -67,6 +74,7 @@ export class CrossmintClient {
     this.checkoutsBaseUrl = (opts.checkoutsBaseUrl ?? BASE_URLS.production).replace(/\/$/, "");
     this.clientApiKey = opts.clientApiKey;
     this.serverApiKey = opts.serverApiKey;
+    this.origin = opts.origin?.replace(/\/$/, "");
     this.fetchImpl = opts.fetch ?? globalThis.fetch.bind(globalThis);
     if (!this.clientApiKey && !this.serverApiKey) {
       throw new Error("CrossmintClient needs a clientApiKey, a serverApiKey, or both.");
@@ -223,13 +231,17 @@ export class CrossmintClient {
       throw new Error("This call needs a clientApiKey (ck_...) plus a user JWT.");
     }
     if (!user.jwt) throw new Error("This call needs a user JWT.");
-    return { "X-API-KEY": this.clientApiKey, Authorization: `Bearer ${user.jwt}` };
+    return this.withOrigin({ "X-API-KEY": this.clientApiKey, Authorization: `Bearer ${user.jwt}` });
+  }
+
+  private withOrigin(headers: Record<string, string>): Record<string, string> {
+    return this.origin ? { ...headers, Origin: this.origin } : headers;
   }
 
   private checkoutAuth(ctx: CheckoutContext): Record<string, string> {
     if ("jwt" in ctx) {
       if (!this.clientApiKey) throw new Error("Checkout with a JWT needs a clientApiKey.");
-      return { "X-API-KEY": this.clientApiKey, Authorization: `Bearer ${ctx.jwt}` };
+      return this.withOrigin({ "X-API-KEY": this.clientApiKey, Authorization: `Bearer ${ctx.jwt}` });
     }
     if (!this.serverApiKey) throw new Error("Checkout with a userId needs a serverApiKey.");
     return { "X-API-KEY": this.serverApiKey, "x-crossmint-user-id": ctx.userId };

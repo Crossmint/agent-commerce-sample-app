@@ -171,7 +171,11 @@ export function registerGoatTools(server: McpServer, ctx: GoatToolsContext): voi
         id: z.string().describe("Agent card id."),
         amount: amountSchema.optional().describe("Amount for this payment. Default: the agent card's available balance."),
         currency: currencySchema.optional().describe("Currency for amount. Default: the agent card's currency."),
-        merchant: merchantSchema.optional().describe("Required if the agent card was created without a merchant."),
+        merchant: merchantSchema
+          .optional()
+          .describe(
+            "The store you are about to pay: name, url, countryCode. Required when the agent card has no merchant lock. Card networks issue a number per merchant.",
+          ),
       },
       annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true },
     },

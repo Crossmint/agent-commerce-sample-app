@@ -4,10 +4,10 @@ import { useEffect, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 import { OAuthProviders, Products, StytchLogin, useStytchSession, type StytchLoginConfig } from "@stytch/nextjs";
 import { Spinner } from "@goat-wallet/ui";
+import { SESSION_MINUTES } from "@/lib/stytch-client";
 
 export const NEXT_COOKIE = "goat_next";
 
-const THIRTY_DAYS_MINUTES = 60 * 24 * 30;
 
 const noop = () => () => {};
 /** window.location.origin on the client, null during server rendering. */
@@ -59,7 +59,7 @@ export function LoginForm({ next }: { next: string }) {
       loginRedirectURL: redirectURL,
       signupRedirectURL: redirectURL,
     },
-    sessionOptions: { sessionDurationMinutes: THIRTY_DAYS_MINUTES },
+    sessionOptions: { sessionDurationMinutes: SESSION_MINUTES },
   };
 
   return (

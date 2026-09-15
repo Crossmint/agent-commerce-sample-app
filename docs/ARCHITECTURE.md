@@ -120,7 +120,7 @@ Rules:
   - `checkouts.create / get / submitAction / createBuyerProfile`
   - `AgentCard` is exported as a type alias of `OrderIntent`. The rename to "agent card" happens in `@goat-wallet/server`.
 - Types that mirror Crossmint responses: `OrderIntent`, `OrderIntentRail` (the `agentic-token` / `encrypted-card` / `spt` discriminated union), `Credential`, `Checkout`, `PendingUserAction`.
-- `selectRail(orderIntent, preference)`: picks the rail to use. Default order: `agentic-token` if active, then `spt`, then `encrypted-card`.
+- `selectRail(orderIntent, preference)`: picks the rail to use. Fixed order: `agentic-token` (VIC or Agent Pay) if active, then `encrypted-card`. The Stripe `spt` rail is never used or shown.
 - `EncryptedCardRail` helpers: generate an RSA-2048 JWK pair, pass the public key, decrypt the response with the private key.
 - `EncryptedCardRail` fallback is best effort. Crossmint enforces the amount on network rails. It does **not** enforce it on `encrypted-card`. GOAT passes the amount through, marks the response `enforced: false`, and documents this.
 - `renderPendingAction(responseSchema)`: walks the JSON Schema of a checkout `pendingUserAction` into a neutral field list. UI and CLI both render from it.
@@ -157,10 +157,12 @@ That is the whole contract. The browser, the CLI, and the MCP client all send `A
 
 Both the CLI and MCP clients log in with **OAuth 2.1 against Stytch Connected Apps**. Connected Apps turns the Stytch project into an OAuth authorization server. GOAT writes no auth code and stores no auth state.
 
-- **CLI.** `goat login` reads `GET /v1/config`, then runs the PKCE flow with a loopback redirect, the same as `gh auth login`. It opens the browser to the Stytch-hosted consent screen, the user logs in as normal, and Stytch redirects to `http://127.0.0.1:<port>/callback` with the code. The CLI exchanges it for an access token and a refresh token. For a remote shell with no local browser, `goat login --code` uses the redirect `<webBaseUrl>/cli-callback`, a public page that shows the code with a copy button, and the user pastes it back.
+- **CLI.** `goat login` reads `GET /v1/config`, then runs the PKCE flow with a loopback redirect, the same as `gh auth login`. It opens the browser to the wallet's `/oauth/authorize` page, the Authorization URL registered in Stytch. The user logs in as normal, Stytch's `IdentityProvider` component shows the consent screen, and Stytch redirects to `http://127.0.0.1:<port>/callback` with the code. The token endpoint is `https://test.stytch.com/v1/public/<project id>/oauth2/token`, or your custom Stytch domain. The CLI exchanges it for an access token and a refresh token. For a remote shell with no local browser, `goat login --code` uses the redirect `<webBaseUrl>/cli-callback`, a public page that shows the code with a copy button, and the user pastes it back.
 - **MCP.** The MCP host discovers the authorization server from the GOAT MCP endpoint metadata and runs the same OAuth flow itself. It manages refresh on its own.
 
-Every connected CLI or MCP host is a Stytch session on the user. The wallet's "Connected agents" list reads Stytch sessions and revokes them through Stytch. No table in GOAT.
+Crossmint verifies **session JWTs** against the Stytch session JWKS. Connected Apps access tokens are signed under a different key set, so the GOAT server does not forward them. On first sight of an access token it calls Stytch's access token exchange, gets a session token plus a session JWT, and stores them in `agent_sessions` keyed by a hash of the access token. Later requests reuse the stored JWT and refresh it through the session token. Stytch only allows the exchange for **first-party** clients with full access, within five minutes of issuance, once per token. So both the CLI and the MCP Connected Apps must be created as **First-party, Public**, with "Enable full access" on. MCP hosts therefore see no Stytch consent screen; the approval screen in GOAT is where the user consents to spending.
+
+Every connected CLI or MCP host is a Stytch session on the user. The wallet's "Connected agents" list reads Stytch sessions and revokes them through Stytch.
 
 **Settled.** Crossmint accepts any JWT it can verify against the configured JWKS, with the user id in `sub`. Stytch signs Connected Apps access tokens with the same project keys as session JWTs, so the MCP path should work with the access token as is. If a call rejects it, `@goat-wallet/auth/stytch` exchanges the access token for a session with the Stytch `sessions.exchange_access_token` endpoint and forwards the session JWT instead. The MCP server never sees this detail.
 
@@ -224,6 +226,8 @@ interface RequestStore {
 ```
 
 `agent_card_requests`: id, user id (Stytch subject), requester label, amount, currency, description, merchant, expires at, status, crossmint order intent id, created at, updated at.
+
+`agent_sessions`: access token hash, user id, Stytch session token, current session JWT, JWT expiry. Written when an agent's access token is exchanged. `checkouts`: checkout id, user id, agent card id.
 
 `@goat-wallet/server/drizzle` ships the Postgres schema and the Drizzle implementation. `memoryRequestStore()` is for tests and for a first `pnpm dev` without a database. The web app points both the chat template and this table at the same Postgres.
 
@@ -306,6 +310,7 @@ apps/web/app/
 │   ├── approve/[requestId]/     approve an agent card request (the link agents send)
 │   └── checkouts/[id]/          watch a checkout, answer actions
 ├── login/, authenticate/        Stytch login and redirect callback
+├── oauth/authorize/             Stytch IdentityProvider consent page, the Connected Apps Authorization URL
 ├── cli-callback/                shows the OAuth code for `goat login --code`
 ├── .well-known/oauth-protected-resource/  RFC 9728 metadata so MCP hosts find Stytch
 ├── (chat)/
@@ -393,10 +398,9 @@ No approval URL and no polling. The model's `request_agent_card` tool call strea
 ### 4.4 Rail fallback inside `POST /agent-cards/:id/credentials`
 
 1. Fetch the order intent. Read `rails[]`. Ignore the top-level status.
-2. If an `agentic-token` rail is `active`: mint with `provider`, `amount`, `merchant` if the intent has none. Return the card. Crossmint enforces the limit.
-3. Else if `spt` is active and the caller asked for it: return the Stripe shared payment token.
-4. Else use `encrypted-card`. Mint with the RSA public key, decrypt with the private key, return the card. Crossmint does not enforce the amount on this rail. GOAT does not either. The response carries `enforced: false` so the agent and the skill know the limit is advisory. Prefer `checkout create` on this rail, since the checkout's `maxCost` is enforced by Crossmint.
-5. Log rail, amount, merchant, agent card id. Never the PAN.
+2. If an `agentic-token` rail is `active`: mint with `provider`, `amount`, and `merchant`. Card networks issue a number per merchant, so when the agent card is not locked to one the caller must name the store. Checkouts derive it from the target URL. Return the card. Crossmint enforces the limit.
+3. Else use `encrypted-card`. Mint with the RSA public key, decrypt with the private key, return the card. Crossmint does not enforce the amount on this rail. GOAT does not either. The response carries `enforced: false` so the agent and the skill know the limit is advisory. Prefer `checkout create` on this rail, since the checkout's `maxCost` is enforced by Crossmint.
+4. Log rail, amount, merchant, agent card id. Never the PAN.
 
 ---
 
@@ -427,8 +431,8 @@ The reference deployment is one Vercel project, one Postgres, and one Blob store
 | `apps/web` | Vercel | Serves the wallet pages, the chat, `/api/goat`, `/api/mcp`. Custom domain with HTTPS. Verification requires HTTPS. |
 | Postgres | Neon | One database. Drizzle migrations for the chat template tables and `agent_card_requests`. |
 | Vercel Blob | Vercel | Chat attachments, from the template. |
-| Stytch project | Stytch | Live environment. Redirect URLs on the wallet domain. Connected Apps enabled, with one OAuth client for the CLI (public, PKCE, loopback redirect) and one for MCP. Session duration set long enough for agents, for example 30 days. |
-| Crossmint project | Crossmint console, production | One **client** key with scopes `payment-methods.*`, `order-intents.create/read/credentials/revoke`. One **server** key for `agent-checkouts`. Register **Stytch as the third-party auth provider** with the project id and `sub` as the verifier. |
+| Stytch project | Stytch | Live environment. Redirect URLs on the wallet domain. Connected Apps enabled, with two first-party public clients (PKCE, full access on): one for the CLI with a loopback redirect, one for MCP with the hosts' redirect URLs. Session duration set long enough for agents, for example 30 days. |
+| Crossmint project | Crossmint console, production | One **client** key with scopes `payment-methods.*`, `order-intents.create/read/credentials/revoke`. One **server** key for `agent-checkouts`. Under JWT authentication choose Custom tokens with JWKS `https://test.stytch.com/v1/sessions/jwks/<stytch project id>`, issuer `stytch.com/<stytch project id>`, verifier `sub`. Or pick the Stytch preset with the project id. |
 | RSA key pair | Env var or KMS | 2048-bit, for the `encrypted-card` fallback. Private key never leaves the server. |
 
 Environment variables, all in `.env.example`:

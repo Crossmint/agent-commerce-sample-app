@@ -81,6 +81,31 @@ export interface CheckoutStore {
 }
 
 // ---------------------------------------------------------------------------
+// Agent sessions
+// ---------------------------------------------------------------------------
+
+/**
+ * A Stytch session obtained by exchanging an agent's OAuth access token.
+ * Keyed by a hash of the access token, never the token itself.
+ */
+export interface AgentSession {
+  accessTokenHash: string;
+  userId: string;
+  /** Long-lived opaque Stytch session token. Treat as a secret. */
+  sessionToken: string;
+  /** Current short-lived session JWT, forwarded to Crossmint. */
+  jwt: string;
+  jwtExpiresAt: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SessionStore {
+  getSession(accessTokenHash: string): Promise<AgentSession | null>;
+  putSession(session: AgentSession): Promise<void>;
+}
+
+// ---------------------------------------------------------------------------
 // Server config
 // ---------------------------------------------------------------------------
 
@@ -98,6 +123,8 @@ export interface GoatCrossmintConfig {
   checkoutsBaseUrl?: string;
   /** Custom fetch. Tests inject a fake here. */
   fetch?: typeof fetch;
+  /** `Origin` header for client-key calls. Defaults to `webBaseUrl`. Whitelist it in the Crossmint console. */
+  origin?: string;
 }
 
 export interface GoatAuthConfig {
@@ -106,15 +133,22 @@ export interface GoatAuthConfig {
   environment: "test" | "live";
   cliClientId?: string;
   mcpClientId?: string;
-  /** Custom Stytch domain, without scheme. Optional. */
+  /** Custom Stytch domain, if any. Defaults to Stytch's public project base. */
+  projectDomain?: string;
+  /** @deprecated Use `projectDomain`. */
   customDomain?: string;
+  /** The hosted consent page. Default `${webBaseUrl}/oauth/authorize`. */
+  authorizationUrl?: string;
 }
 
 export interface GoatServerConfig {
   crossmint: GoatCrossmintConfig;
   userAuth: UserAuth;
-  /** Request store. Add the `CheckoutStore` methods to persist checkout links too. */
-  store: RequestStore & Partial<CheckoutStore>;
+  /**
+   * Request store. Add the `CheckoutStore` methods to persist checkout links and the
+   * `SessionStore` methods to persist exchanged agent sessions. Both fall back to memory.
+   */
+  store: RequestStore & Partial<CheckoutStore> & Partial<SessionStore>;
   /** Enables the encrypted-card rail. */
   encryptedCardPrivateJwk?: PrivateJwk;
   /** For `approvalUrl`. No trailing slash. */
@@ -144,8 +178,10 @@ export interface PublicConfig {
     provider: "stytch";
     projectId: string;
     environment: "test" | "live";
+    /** The OAuth authorization server base. MCP hosts discover metadata under it. */
+    authorizationServer: string;
     oauth: {
-      authorizationEndpoint: string;
+      authorizationEndpoint?: string;
       tokenEndpoint: string;
       cliClientId?: string;
       mcpClientId?: string;
@@ -156,11 +192,12 @@ export interface PublicConfig {
 
 export interface CredentialResponse {
   agentCardId: string;
-  rail: RailKind;
-  provider?: "vic" | "agentpay" | "stripe";
+  rail: "agentic-token" | "encrypted-card";
+  provider?: "vic" | "agentpay";
   /** False when Crossmint does not cap this rail. The limit is then advisory. */
   enforced: boolean;
   card?: { number: string; expirationMonth: string; expirationYear: string; cvc: string };
+  /** Network token, when the caller asked for the network-token format. */
   token?: string;
   expiresAt?: string;
 }

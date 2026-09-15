@@ -49,6 +49,9 @@ export function WalletHome({ sessions, sessionsNote, revokeSession }: WalletHome
             agentCards={agentCards.data}
             loading={agentCards.loading}
             onRevoke={(id) => agentCards.revoke(id)}
+            onVerified={async () => {
+              await agentCards.refetch();
+            }}
           />
         )}
       </Section>

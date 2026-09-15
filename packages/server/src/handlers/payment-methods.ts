@@ -1,4 +1,4 @@
-import { parseBody, requireUser, type Ctx } from "../context.js";
+import { parseBody, requireUser, resolveEmail, type Ctx } from "../context.js";
 import { json, noContent } from "../errors.js";
 import type { Params } from "../router.js";
 import { registerCardSchema } from "../schemas.js";
@@ -18,10 +18,11 @@ export async function registerPaymentMethod(
 ): Promise<Response> {
   const user = await requireUser(req, ctx);
   const body = await parseBody(req, registerCardSchema);
+  const email = await resolveEmail(user, ctx, body.email);
   const result = await ctx.crossmint.paymentMethods.registerForOrderIntents(
     { jwt: user.jwt },
     params.id!,
-    body,
+    { email, countryCode: body.countryCode, languageCode: body.languageCode },
   );
   return json(result);
 }

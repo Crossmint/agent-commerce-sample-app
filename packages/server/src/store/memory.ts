@@ -1,16 +1,19 @@
 import type {
   AgentCardRequest,
   AgentCardRequestPatch,
+  AgentSession,
   CheckoutLink,
   CheckoutStore,
   NewAgentCardRequest,
   RequestStore,
+  SessionStore,
 } from "../types.js";
 
 /** In-memory request store. For tests and a first `pnpm dev` without a database. */
-export function memoryRequestStore(): RequestStore & CheckoutStore {
+export function memoryRequestStore(): RequestStore & CheckoutStore & SessionStore {
   const requests = new Map<string, AgentCardRequest>();
   const checkouts = memoryCheckoutStore();
+  const sessions = memorySessionStore();
   return {
     async create(req: NewAgentCardRequest) {
       const now = new Date().toISOString();
@@ -37,6 +40,22 @@ export function memoryRequestStore(): RequestStore & CheckoutStore {
     },
     linkCheckout: checkouts.linkCheckout,
     getCheckout: checkouts.getCheckout,
+    getSession: sessions.getSession,
+    putSession: sessions.putSession,
+  };
+}
+
+/** In-memory exchanged agent sessions. Lost on restart, which forces a new agent login. */
+export function memorySessionStore(): SessionStore {
+  const sessions = new Map<string, AgentSession>();
+  return {
+    async getSession(hash) {
+      const row = sessions.get(hash);
+      return row ? { ...row } : null;
+    },
+    async putSession(session) {
+      sessions.set(session.accessTokenHash, { ...session });
+    },
   };
 }
 

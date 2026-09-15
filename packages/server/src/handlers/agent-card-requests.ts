@@ -1,6 +1,6 @@
 import type { AuthenticatedUser } from "@goat-wallet/auth";
-import { expiresInHours, pendingVerificationRails, selectRail } from "@goat-wallet/core";
-import { parseBody, requireUser, type Ctx } from "../context.js";
+import { expiresInHours, isReadyForAgent, pendingVerificationRails, withAgentRails } from "@goat-wallet/core";
+import { parseBody, requireUser, type Ctx, resolveEmail } from "../context.js";
 import { forbidden, HttpError, invalidRequest, json, notFound } from "../errors.js";
 import { agentCardRequestId } from "../ids.js";
 import type { Params } from "../router.js";
@@ -32,7 +32,21 @@ export async function createRequest(req: Request, ctx: Ctx): Promise<Response> {
 /** GET /v1/agent-card-requests/:id */
 export async function getRequest(req: Request, ctx: Ctx, params: Params): Promise<Response> {
   const user = await requireUser(req, ctx);
-  const request = await loadOwnedRequest(ctx, user, params.id!);
+  let request = await loadOwnedRequest(ctx, user, params.id!);
+  // An "approved" card may have been verified from the wallet list rather than the
+  // approval page. Check Crossmint so a polling agent sees it turn active.
+  if (request.status === "approved" && request.agentCardId) {
+    try {
+      const agentCard = await ctx.crossmint.orderIntents.get({ jwt: user.jwt }, request.agentCardId);
+      if (agentCard.status !== "active") {
+        request = await ctx.store.update(request.id, { status: "failed", failureReason: `agent card ${agentCard.status}` });
+      } else if (isReadyForAgent(agentCard)) {
+        request = await ctx.store.update(request.id, { status: "active" });
+      }
+    } catch (e) {
+      console.warn("[goat] could not reconcile request", request.id, e instanceof Error ? e.message : e);
+    }
+  }
   return json(request);
 }
 
@@ -43,8 +57,7 @@ export async function approveRequest(req: Request, ctx: Ctx, params: Params): Pr
   const request = await loadOwnedRequest(ctx, user, params.id!);
   assertPending(request);
 
-  const email = body.email ?? user.email;
-  if (!email) throw invalidRequest("`email` is required. The token carries no email.");
+  const email = await resolveEmail(user, ctx, body.email);
   const jwt = { jwt: user.jwt };
 
   // Idempotent. Turns on the network rails the card supports.
@@ -61,14 +74,15 @@ export async function approveRequest(req: Request, ctx: Ctx, params: Params): Pr
     ...(request.merchant ? { merchant: request.merchant } : {}),
   });
 
-  const active = selectRail(agentCard, ctx.railPreference) !== null;
+  // Active means an agent can pay with it: a card rail is live, or nothing is left to verify.
+  const active = isReadyForAgent(agentCard);
   const updated = await ctx.store.update(request.id, {
     status: active ? "active" : "approved",
     agentCardId: agentCard.orderIntentId,
     paymentMethodId: body.paymentMethodId,
   });
   const needsVerification = pendingVerificationRails(agentCard).length > 0;
-  return json({ request: updated, agentCard, needsVerification });
+  return json({ request: updated, agentCard: withAgentRails(agentCard), needsVerification });
 }
 
 /** POST /v1/agent-card-requests/:id/verified */
@@ -86,10 +100,10 @@ export async function verifiedRequest(req: Request, ctx: Ctx, params: Params): P
       status: "failed",
       failureReason: `Agent card is ${agentCard.status}`,
     });
-  } else if (selectRail(agentCard, ctx.railPreference) && request.status !== "active") {
+  } else if (isReadyForAgent(agentCard) && request.status !== "active") {
     updated = await ctx.store.update(request.id, { status: "active" });
   }
-  return json({ request: updated, agentCard });
+  return json({ request: updated, agentCard: withAgentRails(agentCard) });
 }
 
 /** POST /v1/agent-card-requests/:id/deny */

@@ -8,12 +8,14 @@ export function buildPublicConfig(ctx: Ctx): PublicConfig {
   const ep = stytchEndpoints({
     projectId: config.auth.projectId,
     environment: config.auth.environment,
-    customDomain: config.auth.customDomain,
+    projectDomain: config.auth.projectDomain ?? config.auth.customDomain,
+    authorizationUrl: config.auth.authorizationUrl ?? `${config.webBaseUrl}/oauth/authorize`,
   });
   const oauth: PublicConfig["auth"]["oauth"] = {
     authorizationEndpoint: ep.authorize,
     tokenEndpoint: ep.token,
-    scopes: ["openid", "email", "profile", "offline_access"],
+    // full_access lets the server exchange the agent's access token for a Stytch session.
+    scopes: ["openid", "email", "profile", "offline_access", "full_access"],
   };
   if (config.auth.cliClientId) oauth.cliClientId = config.auth.cliClientId;
   if (config.auth.mcpClientId) oauth.mcpClientId = config.auth.mcpClientId;
@@ -26,6 +28,7 @@ export function buildPublicConfig(ctx: Ctx): PublicConfig {
       provider: "stytch",
       projectId: config.auth.projectId,
       environment: config.auth.environment,
+      authorizationServer: ep.projectDomain,
       oauth,
     },
   };

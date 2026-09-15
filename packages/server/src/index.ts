@@ -33,7 +33,7 @@ export type { CheckoutView } from "./handlers/checkouts.js";
 export { buildPublicConfig } from "./handlers/config.js";
 export { HttpError, type ErrorCode } from "./errors.js";
 export { routePath } from "./router.js";
-export { memoryCheckoutStore, memoryRequestStore } from "./store/memory.js";
+export { memoryCheckoutStore, memorySessionStore, memoryRequestStore } from "./store/memory.js";
 export * from "./types.js";
 
 export type GoatHandler = (req: Request) => Promise<Response>;

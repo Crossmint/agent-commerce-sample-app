@@ -16,10 +16,12 @@ import type {
   AgentCardRequest,
   AgentCardRequestPatch,
   AgentCardRequestStatus,
+  AgentSession,
   CheckoutLink,
   CheckoutStore,
   NewAgentCardRequest,
   RequestStore,
+  SessionStore,
 } from "./types.js";
 
 const tz = { withTimezone: true, mode: "date" } as const;
@@ -51,7 +53,18 @@ export const checkouts = pgTable("checkouts", {
   createdAt: timestamp("created_at", tz).notNull().defaultNow(),
 });
 
-export const goatSchema = { agentCardRequests, checkouts };
+/** Stytch sessions exchanged from agent access tokens. Keyed by token hash. */
+export const agentSessions = pgTable("agent_sessions", {
+  accessTokenHash: text("access_token_hash").primaryKey(),
+  userId: text("user_id").notNull(),
+  sessionToken: text("session_token").notNull(),
+  jwt: text("jwt").notNull(),
+  jwtExpiresAt: timestamp("jwt_expires_at", tz).notNull(),
+  createdAt: timestamp("created_at", tz).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", tz).notNull().defaultNow(),
+});
+
+export const goatSchema = { agentCardRequests, checkouts, agentSessions };
 
 type RequestRow = typeof agentCardRequests.$inferSelect;
 
@@ -63,8 +76,45 @@ export type AnyPgDatabase = PgDatabase<PgQueryResultHKT, any, any>;
  * Request store plus checkout links on Postgres.
  * Create the tables with drizzle-kit from `goatSchema`, or run the SQL in the README.
  */
-export function drizzleRequestStore(db: AnyPgDatabase): RequestStore & CheckoutStore {
+export function drizzleRequestStore(db: AnyPgDatabase): RequestStore & CheckoutStore & SessionStore {
   return {
+    async getSession(accessTokenHash: string): Promise<AgentSession | null> {
+      const [row] = await db
+        .select()
+        .from(agentSessions)
+        .where(eq(agentSessions.accessTokenHash, accessTokenHash))
+        .limit(1);
+      if (!row) return null;
+      return {
+        accessTokenHash: row.accessTokenHash,
+        userId: row.userId,
+        sessionToken: row.sessionToken,
+        jwt: row.jwt,
+        jwtExpiresAt: row.jwtExpiresAt.toISOString(),
+        createdAt: row.createdAt.toISOString(),
+        updatedAt: row.updatedAt.toISOString(),
+      };
+    },
+
+    async putSession(session: AgentSession): Promise<void> {
+      const values = {
+        accessTokenHash: session.accessTokenHash,
+        userId: session.userId,
+        sessionToken: session.sessionToken,
+        jwt: session.jwt,
+        jwtExpiresAt: new Date(session.jwtExpiresAt),
+        createdAt: new Date(session.createdAt),
+        updatedAt: new Date(session.updatedAt),
+      };
+      await db
+        .insert(agentSessions)
+        .values(values)
+        .onConflictDoUpdate({
+          target: agentSessions.accessTokenHash,
+          set: { jwt: values.jwt, jwtExpiresAt: values.jwtExpiresAt, sessionToken: values.sessionToken, updatedAt: values.updatedAt },
+        });
+    },
+
     async create(req: NewAgentCardRequest): Promise<AgentCardRequest> {
       const now = new Date();
       const [row] = await db

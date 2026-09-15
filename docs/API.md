@@ -8,7 +8,7 @@ Base path: the server is mounted at a prefix, in the reference app `/api/goat`. 
 
 Every route except `GET /v1/config` requires `Authorization: Bearer <user jwt>`. The JWT is a Stytch session JWT (browser) or a Stytch Connected Apps access token (CLI, MCP). The server calls `UserAuth.verify`. On failure: `401 { "error": { "code": "unauthorized", "message": "..." } }`.
 
-The verified JWT is forwarded as is to Crossmint on every payment-method and order-intent call. Agent Checkouts use the server key plus `x-crossmint-user-id: <userId>`.
+Session JWTs are forwarded as is to Crossmint on every payment-method and order-intent call. An OAuth access token from an agent is first exchanged for a Stytch session (first-party client, full access) and the resulting session JWT is what reaches Crossmint. The server stores that session keyed by a hash of the access token. Agent Checkouts use the server key plus `x-crossmint-user-id: <userId>`.
 
 ## Errors
 
@@ -16,7 +16,7 @@ The verified JWT is forwarded as is to Crossmint on every payment-method and ord
 { "error": { "code": "string", "message": "string", "details": {} } }
 ```
 
-Codes: `unauthorized`, `forbidden`, `not_found`, `invalid_request`, `expired`, `no_usable_rail`, `crossmint_error`, `internal`. `crossmint_error` carries `details.status` and `details.body` from Crossmint.
+Codes: `unauthorized`, `forbidden`, `not_found`, `invalid_request`, `expired`, `no_usable_rail`, `verification_required`, `merchant_required`, `crossmint_error`, `internal`. `crossmint_error` carries `details.status` and `details.body` from Crossmint.
 
 ## Public config
 
@@ -32,12 +32,13 @@ Codes: `unauthorized`, `forbidden`, `not_found`, `invalid_request`, `expired`, `
     "provider": "stytch",
     "projectId": "project-test-...",
     "environment": "test" | "live",
+    "authorizationServer": "https://test.stytch.com/v1/public/<projectId>",
     "oauth": {
-      "authorizationEndpoint": "https://test.stytch.com/v1/public/<projectId>/oauth2/authorize",
+      "authorizationEndpoint": "https://wallet.example.com/oauth/authorize",
       "tokenEndpoint": "https://test.stytch.com/v1/public/<projectId>/oauth2/token",
       "cliClientId": "connected-app-...",
       "mcpClientId": "connected-app-...",
-      "scopes": ["openid", "email", "profile", "offline_access"]
+      "scopes": ["openid", "email", "profile", "offline_access", "full_access"]
     }
   }
 }
@@ -51,7 +52,7 @@ Codes: `unauthorized`, `forbidden`, `not_found`, `invalid_request`, `expired`, `
 
 `GET /v1/payment-methods` → `{ "paymentMethods": PaymentMethod[] }` where `PaymentMethod` is the Crossmint shape from `@goat-wallet/core` (`paymentMethodId`, `type`, `displayName`, `card.brand`, `card.last4`, `card.expiration`). Never a full number.
 
-`POST /v1/payment-methods/:id/register` body `{ "email": string, "countryCode": string, "languageCode"?: string }` → `RegisterCardResult` (`{ paymentMethodId, rails: [{ rail, provider, status }] }`). Idempotent.
+`POST /v1/payment-methods/:id/register` body `{ "email"?: string, "countryCode"?: string, "languageCode"?: string }` → `RegisterCardResult` (`{ paymentMethodId, rails: [{ rail, provider, status }] }`). Idempotent. `countryCode` defaults to `US`. When `email` is absent the server uses the token's email, then `UserAuth.lookupEmail`, then fails with `400 invalid_request`.
 
 `DELETE /v1/payment-methods/:id` → `204`.
 
@@ -118,16 +119,16 @@ Server picks the rail (`selectRail`), mints, decrypts the encrypted-card rail wi
 ```json
 {
   "agentCardId": "…",
-  "rail": "agentic-token" | "spt" | "encrypted-card",
-  "provider"?: "vic" | "agentpay" | "stripe",
+  "rail": "agentic-token" | "encrypted-card",
+  "provider"?: "vic" | "agentpay",
   "enforced": true | false,
   "card"?: { "number": "…", "expirationMonth": "12", "expirationYear": "2030", "cvc": "123" },
-  "token"?: "spt_…",
+  "token"?: "…",            // only for the network-token format
   "expiresAt"?: "…"
 }
 ```
 
-`enforced: false` means Crossmint does not cap this rail; the limit is advisory. If no rail is active: `409 { error: { code: "no_usable_rail" } }`.
+`enforced: false` means Crossmint does not cap this rail; the limit is advisory. Rail order is fixed: `agentic-token` (Visa Intelligent Commerce or Mastercard Agent Pay) first, `encrypted-card` second. The Stripe `spt` rail is never used and is stripped from every agent card response. If the only card rail still needs the user's verification: `409 verification_required`. If no rail is active: `409 no_usable_rail`. If the agent card has no merchant and the body names none: `400 merchant_required`. Card networks issue credentials per merchant, so agents pass the store they are about to pay.
 
 ## Checkouts
 

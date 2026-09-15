@@ -14,7 +14,7 @@ function mockFetch(status: number, body: unknown) {
 describe("CrossmintClient", () => {
   it("sends client key and JWT for order intents", async () => {
     const f = mockFetch(201, { orderIntentId: "oi_1" });
-    const c = new CrossmintClient({ clientApiKey: "ck_test", environment: "staging", fetch: f });
+    const c = new CrossmintClient({ clientApiKey: "ck_test", environment: "staging", fetch: f, origin: "https://wallet.test/" });
     await c.orderIntents.create({ jwt: "jwt1" }, {
       paymentMethodId: "pm_1",
       amount: { value: "10.00", currency: "USD" },
@@ -23,7 +23,7 @@ describe("CrossmintClient", () => {
     });
     const [url, init] = (f as unknown as ReturnType<typeof vi.fn>).mock.calls[0]!;
     expect(url).toBe("https://staging.crossmint.com/api/unstable/order-intents");
-    expect((init as RequestInit).headers).toMatchObject({ "X-API-KEY": "ck_test", Authorization: "Bearer jwt1" });
+    expect((init as RequestInit).headers).toMatchObject({ "X-API-KEY": "ck_test", Authorization: "Bearer jwt1", Origin: "https://wallet.test" });
   });
   it("sends server key and user id for checkouts, always to production", async () => {
     const f = mockFetch(201, { id: "co_1", status: "pending" });

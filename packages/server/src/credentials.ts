@@ -1,5 +1,6 @@
 import {
   decryptEncryptedCard,
+  pendingVerificationRails,
   selectRail,
   toPublicJwk,
   type Amount,
@@ -11,7 +12,7 @@ import {
 } from "@goat-wallet/core";
 import type { AuthenticatedUser } from "@goat-wallet/auth";
 import type { Ctx } from "./context.js";
-import { HttpError, invalidRequest } from "./errors.js";
+import { HttpError } from "./errors.js";
 import type { CredentialResponse } from "./types.js";
 
 export interface MintOptions {
@@ -20,8 +21,6 @@ export interface MintOptions {
   /** Used only when the order intent has no merchant. */
   merchant?: Merchant;
   format?: "card";
-  /** Needed for the spt rail. */
-  networkBusinessProfile?: string;
   /** Rails to consider, in order. Default: the server's preference. */
   railPreference?: RailKind[];
 }
@@ -52,6 +51,15 @@ export async function mintFromAgentCard(
   }
   const selection = selectRail(orderIntent, preference);
   if (!selection) {
+    const pending = pendingVerificationRails(orderIntent);
+    if (pending.length) {
+      throw new HttpError(
+        409,
+        "verification_required",
+        "This agent card needs the user to verify it in the wallet before it can produce a card number. Ask them to open the approval link again.",
+        { rails: orderIntent.rails, status: orderIntent.status },
+      );
+    }
     throw new HttpError(409, "no_usable_rail", "No rail on this agent card is active right now", {
       rails: orderIntent.rails,
       status: orderIntent.status,
@@ -68,6 +76,16 @@ export async function mintFromAgentCard(
   const merchant = !orderIntent.merchant && opts.merchant ? opts.merchant : undefined;
 
   const { rail, enforced } = selection;
+  // Card networks issue a credential for a merchant. An open agent card has none,
+  // so the caller must name one now. Fail early with a clear message.
+  if (rail.rail === "agentic-token" && !orderIntent.merchant && !opts.merchant) {
+    throw new HttpError(
+      400,
+      "merchant_required",
+      "This agent card is not locked to a merchant. Pass `merchant` { name, url, countryCode } for the store you are about to pay.",
+      { agentCardId },
+    );
+  }
   let input: MintCredentialInput;
   switch (rail.rail) {
     case "agentic-token":
@@ -79,20 +97,6 @@ export async function mintFromAgentCard(
         ...(merchant ? { merchant } : {}),
       };
       break;
-    case "spt": {
-      const networkBusinessProfile = opts.networkBusinessProfile;
-      if (!networkBusinessProfile) {
-        throw invalidRequest("The spt rail needs `networkBusinessProfile` in the body");
-      }
-      input = {
-        rail: "spt",
-        provider: "stripe",
-        amount,
-        credential: { format: "identifier", payload: { networkBusinessProfile } },
-        ...(merchant ? { merchant } : {}),
-      };
-      break;
-    }
     case "encrypted-card": {
       const privateJwk = ctx.config.encryptedCardPrivateJwk;
       if (!privateJwk) {
@@ -121,14 +125,12 @@ export async function mintFromAgentCard(
       // Network tokens have no PAN. Expose the token so callers can still pay.
       response.token = credential.credential.value.paymentToken;
     }
-  } else if (credential.rail === "spt") {
-    response.provider = "stripe";
-    response.token = credential.credential.value;
-    response.expiresAt = credential.expiresAt;
-  } else {
+  } else if (credential.rail === "encrypted-card") {
     const privateJwk = ctx.config.encryptedCardPrivateJwk!;
     card = await decryptEncryptedCard(credential.credential.value, privateJwk);
     response.card = card;
+  } else {
+    throw new HttpError(502, "crossmint_error", "Crossmint returned a rail GOAT does not use");
   }
 
   console.info("[goat] credential minted", {

@@ -13,6 +13,10 @@ describe("selectRail", () => {
     expect(sel?.rail.rail).toBe("agentic-token");
     expect(sel?.enforced).toBe(true);
   });
+  it("never selects the Stripe rail", () => {
+    expect(selectRail({ rails: [spt] })).toBeNull();
+    expect(selectRail({ rails: [spt, enc] })?.rail.rail).toBe("encrypted-card");
+  });
   it("skips rails that are not active", () => {
     const sel = selectRail({ rails: [vicPending, enc] });
     expect(sel?.rail.rail).toBe("encrypted-card");

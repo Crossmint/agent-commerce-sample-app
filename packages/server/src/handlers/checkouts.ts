@@ -6,6 +6,7 @@ import {
   type Amount,
   type Checkout,
   type CheckoutContext,
+  type Merchant,
   type OrderIntent,
   type PendingUserAction,
   type RenderedAction,
@@ -132,9 +133,10 @@ async function settlePayment(
 
   const maxCost = checkout.constraints?.maxCost;
   const { card } = await mintFromAgentCard(ctx, user, agentCardId, {
-    // Cards only. A Stripe token cannot fill a card form.
-    railPreference: ctx.railPreference.filter((r) => r !== "spt"),
+    railPreference: ctx.railPreference,
     amount: (oi) => clampToAvailable(oi, maxCost),
+    // Card networks issue a number per merchant. The checkout knows which store it is on.
+    merchant: merchantFromTarget(checkout),
   });
   if (!card) {
     throw new HttpError(409, "no_usable_rail", "The agent card did not return card details");
@@ -186,4 +188,19 @@ function toView(checkout: Checkout, agentCardId: string | undefined): CheckoutVi
   if (checkout.receipt) view.receipt = checkout.receipt;
   if (checkout.failure) view.failure = checkout.failure;
   return view;
+}
+
+/** Merchant lock for a credential, derived from the checkout's target URL. */
+export function merchantFromTarget(checkout: Checkout): Merchant | undefined {
+  const raw = checkout.target?.url;
+  if (!raw) return undefined;
+  try {
+    const url = new URL(raw);
+    const host = url.hostname.replace(/^www\./, "");
+    const tld = host.split(".").pop() ?? "";
+    const countryCode = /^[a-z]{2}$/.test(tld) && tld !== "io" && tld !== "ai" && tld !== "co" ? tld.toUpperCase() : "US";
+    return { name: host, url: url.origin, countryCode };
+  } catch {
+    return undefined;
+  }
 }

@@ -28,7 +28,8 @@ export function createContext(overrides: ContextOverrides = {}): CliContext {
   const env = overrides.env ?? process.env;
   const base: CliContext = {
     env,
-    fetch: (input, init) => globalThis.fetch(input, init),
+    // Bind the real fetch now. `withFetch` swaps globalThis.fetch, so a lazy wrapper would call itself.
+    fetch: globalThis.fetch.bind(globalThis),
     out: (line = "") => {
       process.stdout.write(`${line}\n`);
     },

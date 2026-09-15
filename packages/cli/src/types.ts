@@ -65,7 +65,7 @@ export interface MintCredentialBody {
 
 export interface CredentialResponse {
   agentCardId: string;
-  rail: "agentic-token" | "spt" | "encrypted-card";
+  rail: "agentic-token" | "encrypted-card";
   provider?: "vic" | "agentpay" | "stripe";
   enforced: boolean;
   card?: { number: string; expirationMonth: string; expirationYear: string; cvc: string };

@@ -14,8 +14,8 @@ export const merchantSchema = z.object({
 });
 
 export const registerCardSchema = z.object({
-  email: z.string().email(),
-  countryCode: z.string().length(2),
+  email: z.string().email().optional(),
+  countryCode: z.string().length(2).default("US"),
   languageCode: z.string().optional(),
 });
 
@@ -41,8 +41,6 @@ export const credentialsSchema = z.object({
   amount: amountSchema.optional(),
   merchant: merchantSchema.optional(),
   format: z.literal("card").optional(),
-  /** Needed for the spt rail. Not in docs/API.md; an extension. */
-  networkBusinessProfile: z.string().min(1).optional(),
 });
 
 export const createCheckoutSchema = z.object({

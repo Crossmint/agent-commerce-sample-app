@@ -40,11 +40,10 @@ describe("GET /v1/config", () => {
         projectId: "project-test-123",
         environment: "test",
         oauth: {
-          authorizationEndpoint:
-            "https://test.stytch.com/v1/public/project-test-123/oauth2/authorize",
+          authorizationEndpoint: "https://wallet.test/oauth/authorize",
           tokenEndpoint: "https://test.stytch.com/v1/public/project-test-123/oauth2/token",
           cliClientId: "connected-app-cli",
-          scopes: ["openid", "email", "profile", "offline_access"],
+          scopes: ["openid", "email", "profile", "offline_access", "full_access"],
         },
       },
     });
@@ -263,6 +262,15 @@ describe("agent card requests", () => {
 });
 
 describe("POST /v1/agent-cards/:id/credentials", () => {
+  it("returns 400 merchant_required when the card is open and no merchant is given", async () => {
+    const { handlers } = makeServer([
+      { method: "GET", path: "/unstable/order-intents/oi_1", reply: { body: activeOrderIntent() } },
+    ]);
+    const res = await call(handlers, "POST", "/v1/agent-cards/oi_1/credentials", { body: {} });
+    expect(res.status).toBe(400);
+    expect((await res.json()).error.code).toBe("merchant_required");
+  });
+
   it("mints a card from the agentic-token rail for the full available amount", async () => {
     const info = vi.spyOn(console, "info").mockImplementation(() => {});
     const { handlers, calls } = makeServer([
@@ -273,7 +281,8 @@ describe("POST /v1/agent-cards/:id/credentials", () => {
         reply: { status: 201, body: cardCredential },
       },
     ]);
-    const res = await call(handlers, "POST", "/v1/agent-cards/oi_1/credentials", { body: {} });
+    const merchant = { name: "Shop", url: "https://shop.example", countryCode: "US" };
+    const res = await call(handlers, "POST", "/v1/agent-cards/oi_1/credentials", { body: { merchant } });
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body).toEqual({
@@ -295,6 +304,7 @@ describe("POST /v1/agent-cards/:id/credentials", () => {
       provider: "vic",
       amount: { value: "50.00", currency: "USD" },
       credential: { format: "card" },
+      merchant,
     });
     // Logged, but never the PAN.
     expect(info).toHaveBeenCalled();
@@ -317,6 +327,26 @@ describe("POST /v1/agent-cards/:id/credentials", () => {
     vi.restoreAllMocks();
   });
 
+  it("returns 409 verification_required when the only card rail is pending", async () => {
+    const { handlers } = makeServer([
+      {
+        method: "GET",
+        path: "/unstable/order-intents/oi_1",
+        reply: {
+          body: activeOrderIntent({
+            rails: [
+              { rail: "agentic-token", provider: "vic", status: "pending_verification" },
+              { rail: "spt", provider: "stripe", status: "active" },
+            ],
+          }),
+        },
+      },
+    ]);
+    const res = await call(handlers, "POST", "/v1/agent-cards/oi_1/credentials", { body: {} });
+    expect(res.status).toBe(409);
+    expect((await res.json()).error.code).toBe("verification_required");
+  });
+
   it("returns 409 no_usable_rail when no rail is active", async () => {
     const { handlers } = makeServer([
       {
@@ -324,7 +354,7 @@ describe("POST /v1/agent-cards/:id/credentials", () => {
         path: "/unstable/order-intents/oi_1",
         reply: {
           body: activeOrderIntent({
-            rails: [{ rail: "agentic-token", provider: "vic", status: "pending_verification" }],
+            rails: [{ rail: "agentic-token", provider: "vic", status: "error" }],
           }),
         },
       },
@@ -421,6 +451,7 @@ describe("checkouts", () => {
           body: {
             id: "co_1",
             status: "awaiting_user_action",
+            target: { kind: "direct_url", url: "https://www.shop.example/products/tee" },
             constraints: { maxCost: { amount: "30.00", currency: "USD" } },
             pendingUserAction: paymentAction,
           },

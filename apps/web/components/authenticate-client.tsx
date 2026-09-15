@@ -6,8 +6,7 @@ import { useRouter } from "next/navigation";
 import { useStytch } from "@stytch/nextjs";
 import { Alert, AlertDescription, AlertTitle, Button, Spinner } from "@goat-wallet/ui";
 import { NEXT_COOKIE } from "./login-form";
-
-const THIRTY_DAYS_MINUTES = 60 * 24 * 30;
+import { FALLBACK_SESSION_MINUTES, SESSION_MINUTES, isSessionDurationError } from "@/lib/stytch-client";
 
 function readNextCookie(): string {
   const match = document.cookie.split("; ").find((c) => c.startsWith(`${NEXT_COOKIE}=`));
@@ -38,9 +37,19 @@ export function AuthenticateClient({ token, tokenType }: { token?: string; token
   useEffect(() => {
     if (!token || !kind || started.current) return;
     started.current = true;
-    const opts = { session_duration_minutes: THIRTY_DAYS_MINUTES };
-    const run = kind === "oauth" ? stytch.oauth.authenticate(token, opts) : stytch.magicLinks.authenticate(token, opts);
-    run
+    const authenticate = async (minutes: number): Promise<void> => {
+      const opts = { session_duration_minutes: minutes };
+      if (kind === "oauth") await stytch.oauth.authenticate(token, opts);
+      else await stytch.magicLinks.authenticate(token, opts);
+    };
+    // If the project's maximum session duration is lower than what we ask for,
+    // retry once with a short session instead of failing the login.
+    authenticate(SESSION_MINUTES)
+      .catch((e: unknown) => {
+        if (!isSessionDurationError(e)) throw e;
+        console.warn("[goat] Session duration above the Stytch project maximum. Retrying with", FALLBACK_SESSION_MINUTES, "minutes.");
+        return authenticate(FALLBACK_SESSION_MINUTES);
+      })
       .then(() => {
         const next = readNextCookie();
         router.replace(next);

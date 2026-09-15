@@ -104,7 +104,7 @@ export function createGoatApi(opts: GoatApiOptions) {
     // Payment methods (saved cards)
     listPaymentMethods: async () =>
       (await request<{ paymentMethods: PaymentMethod[] }>("GET", "/payment-methods")).paymentMethods,
-    registerPaymentMethod: (id: string, input: RegisterCardInput) =>
+    registerPaymentMethod: (id: string, input: Partial<RegisterCardInput>) =>
       request<RegisterCardResult>("POST", `/payment-methods/${enc(id)}/register`, input),
     deletePaymentMethod: (id: string) => request<void>("DELETE", `/payment-methods/${enc(id)}`),
 

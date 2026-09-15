@@ -1,3 +1,4 @@
+import { withAgentRails } from "@goat-wallet/core";
 import { parseBody, requireUser, type Ctx } from "../context.js";
 import { mintFromAgentCard } from "../credentials.js";
 import { json, noContent } from "../errors.js";
@@ -8,14 +9,14 @@ import { credentialsSchema } from "../schemas.js";
 export async function listAgentCards(req: Request, ctx: Ctx): Promise<Response> {
   const user = await requireUser(req, ctx);
   const agentCards = await ctx.crossmint.orderIntents.list({ jwt: user.jwt });
-  return json({ agentCards });
+  return json({ agentCards: agentCards.map(withAgentRails) });
 }
 
 /** GET /v1/agent-cards/:id */
 export async function getAgentCard(req: Request, ctx: Ctx, params: Params): Promise<Response> {
   const user = await requireUser(req, ctx);
   const agentCard = await ctx.crossmint.orderIntents.get({ jwt: user.jwt }, params.id!);
-  return json(agentCard);
+  return json(withAgentRails(agentCard));
 }
 
 /** DELETE /v1/agent-cards/:id */
@@ -33,7 +34,6 @@ export async function mintCredentials(req: Request, ctx: Ctx, params: Params): P
     amount: body.amount,
     merchant: body.merchant,
     format: body.format,
-    networkBusinessProfile: body.networkBusinessProfile,
   });
   return json(response);
 }

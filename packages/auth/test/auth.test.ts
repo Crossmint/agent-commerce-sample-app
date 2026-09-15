@@ -40,10 +40,13 @@ describe("createJwksUserAuth", () => {
 describe("oauth + stytch endpoints", () => {
   it("builds a PKCE authorize URL", async () => {
     const pkce = await createPkcePair();
-    const ep = stytchEndpoints({ projectId: "project-test-123" });
-    const url = new URL(buildAuthorizeUrl({ authorizeEndpoint: ep.authorize, clientId: "c", redirectUri: "http://127.0.0.1:1/cb", scope: ["openid"], state: "s", pkce }));
-    expect(url.origin).toBe("https://test.stytch.com");
+    const ep = stytchEndpoints({ projectId: "project-test-123", authorizationUrl: "https://wallet.test/oauth/authorize" });
+    const url = new URL(buildAuthorizeUrl({ authorizeEndpoint: ep.authorize!, clientId: "c", redirectUri: "http://127.0.0.1:1/cb", scope: ["openid"], state: "s", pkce }));
+    expect(url.origin).toBe("https://wallet.test");
     expect(url.searchParams.get("code_challenge")).toBe(pkce.challenge);
     expect(ep.environment).toBe("test");
+    expect(ep.token).toBe("https://test.stytch.com/v1/public/project-test-123/oauth2/token");
+    expect(ep.idpJwks).toBe("https://test.stytch.com/v1/public/project-test-123/.well-known/jwks.json");
+    expect(stytchEndpoints({ projectId: "project-test-123", projectDomain: "auth.example.com" }).token).toBe("https://auth.example.com/oauth2/token");
   });
 });

@@ -8,6 +8,8 @@ export type ErrorCode =
   | "invalid_request"
   | "expired"
   | "no_usable_rail"
+  | "verification_required"
+  | "merchant_required"
   | "crossmint_error"
   | "internal";
 
@@ -65,6 +67,11 @@ export function toErrorResponse(err: unknown): Response {
   if (err instanceof HttpError) return err.toResponse();
   if (err instanceof CrossmintApiError) {
     const details = { status: err.status, body: err.body };
+    // Always log Crossmint failures server side. Bodies carry no card data.
+    console.warn(
+      `[goat] crossmint ${err.status} ${err.url}:`,
+      typeof err.body === "string" ? err.body.slice(0, 500) : JSON.stringify(err.body)?.slice(0, 500),
+    );
     if (err.isUnauthorized) {
       return errorResponse(401, "unauthorized", "Crossmint rejected the user token", details);
     }

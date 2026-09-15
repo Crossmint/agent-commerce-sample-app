@@ -1,20 +1,20 @@
 import { stytchEndpoints, inferStytchEnvironment } from "@goat-wallet/auth/stytch";
-import {
-  authorizationServerFromEndpoint,
-  createGoatMcpHandler,
-  createProtectedResourceMetadataHandler,
-} from "@goat-wallet/mcp";
+import { createGoatMcpHandler, createProtectedResourceMetadataHandler } from "@goat-wallet/mcp";
 import { serverEnv } from "./env";
 
-const SCOPES = ["openid", "email", "profile", "offline_access"];
+const SCOPES = ["openid", "email", "profile", "offline_access", "full_access"];
 
 function mcpOptions() {
   const projectId = serverEnv.required("STYTCH_PROJECT_ID");
-  const ep = stytchEndpoints({ projectId, environment: inferStytchEnvironment(projectId) });
+  const ep = stytchEndpoints({
+    projectId,
+    environment: inferStytchEnvironment(projectId),
+    projectDomain: serverEnv.optional("STYTCH_PROJECT_DOMAIN"),
+  });
   return {
     apiBaseUrl: serverEnv.apiBaseUrl(),
     resourceUrl: `${serverEnv.webBaseUrl()}/api/mcp`,
-    authorizationServers: [authorizationServerFromEndpoint(ep.authorize)],
+    authorizationServers: [ep.projectDomain],
     scopes: SCOPES,
     requester: "MCP agent",
     resourceName: "GOAT",

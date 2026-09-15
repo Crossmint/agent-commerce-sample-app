@@ -1,7 +1,8 @@
 "use client";
 
 import * as React from "react";
-import type { AgentCard, OrderIntentRail } from "@goat-wallet/core";
+import { hasCardRail, pendingVerificationRails, type AgentCard, type OrderIntentRail } from "@goat-wallet/core";
+import { VerifyAgentCard } from "./verify-agent-card.js";
 import { cn } from "../lib/utils.js";
 import { formatAmount, formatDate, railLongLabel, railShortLabel } from "../lib/format.js";
 import { Badge, type BadgeProps } from "./primitives/badge.js";
@@ -14,6 +15,8 @@ export interface AgentCardListProps {
   agentCards: AgentCard[] | undefined;
   loading?: boolean;
   onRevoke?: (agentCardId: string) => void | Promise<void>;
+  /** Called after the user finishes a pending network verification. Refetch here. */
+  onVerified?: (agentCardId: string) => void | Promise<void>;
   /** Hide cancelled and expired cards. Default false. */
   activeOnly?: boolean;
   className?: string;
@@ -25,10 +28,10 @@ export function agentCardStatusBadge(card: AgentCard): { label: string; variant:
   const expired = new Date(card.expiresAt).getTime() < Date.now();
   if (card.status === "cancelled") return { label: "Revoked", variant: "muted" };
   if (card.status === "expired" || expired) return { label: "Expired", variant: "muted" };
-  const pending = card.rails.some((r) => r.status === "pending_verification");
-  const active = card.rails.some((r) => r.status === "active");
-  if (active) return { label: "Active", variant: "success" };
+  const pending = pendingVerificationRails(card).length > 0;
+  if (hasCardRail(card)) return { label: "Active", variant: "success" };
   if (pending) return { label: "Needs verification", variant: "warning" };
+  if (card.rails.some((r) => r.status === "active")) return { label: "Active", variant: "success" };
   return { label: "Inactive", variant: "muted" };
 }
 
@@ -47,12 +50,14 @@ export function AgentCardList({
   agentCards,
   loading = false,
   onRevoke,
+  onVerified,
   activeOnly = false,
   className,
   mascotSrc,
   emptyAction,
 }: AgentCardListProps) {
   const [busy, setBusy] = React.useState<string | null>(null);
+  const [verifying, setVerifying] = React.useState<string | null>(null);
 
   if (loading && !agentCards) {
     return (
@@ -82,11 +87,14 @@ export function AgentCardList({
       {cards.map((card) => {
         const status = agentCardStatusBadge(card);
         const revocable = card.status === "active" && onRevoke;
+        const needsVerification = card.status === "active" && pendingVerificationRails(card).length > 0;
+        const isVerifying = verifying === card.orderIntentId;
         return (
           <li
             key={card.orderIntentId}
-            className="flex flex-col gap-3 rounded-2xl border border-border bg-card p-5 sm:flex-row sm:items-start sm:justify-between"
+            className="flex flex-col gap-3 rounded-2xl border border-border bg-card p-5"
           >
+           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div className="min-w-0 flex-1 space-y-2">
               <div className="flex flex-wrap items-center gap-2">
                 <p className="truncate font-semibold">{card.description}</p>
@@ -106,24 +114,47 @@ export function AgentCardList({
                 <span>· until {formatDate(card.expiresAt)}</span>
               </div>
             </div>
-            {revocable ? (
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                disabled={busy === card.orderIntentId}
-                onClick={async () => {
-                  setBusy(card.orderIntentId);
-                  try {
-                    await onRevoke(card.orderIntentId);
-                  } finally {
-                    setBusy(null);
-                  }
-                }}
-              >
-                {busy === card.orderIntentId ? <Spinner /> : null}
-                Revoke
-              </Button>
+            <div className="flex shrink-0 gap-2">
+              {needsVerification && !isVerifying ? (
+                <Button type="button" size="sm" onClick={() => setVerifying(card.orderIntentId)}>
+                  Verify
+                </Button>
+              ) : null}
+              {revocable ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={busy === card.orderIntentId}
+                  onClick={async () => {
+                    setBusy(card.orderIntentId);
+                    try {
+                      await onRevoke(card.orderIntentId);
+                    } finally {
+                      setBusy(null);
+                    }
+                  }}
+                >
+                  {busy === card.orderIntentId ? <Spinner /> : null}
+                  Revoke
+                </Button>
+              ) : null}
+            </div>
+           </div>
+            {isVerifying ? (
+              <div className="rounded-xl border border-border bg-background p-4">
+                <p className="mb-3 text-sm text-muted-foreground">
+                  Confirm with your card network so agents can get a card number.
+                </p>
+                <VerifyAgentCard
+                  agentCard={card}
+                  onComplete={async () => {
+                    setVerifying(null);
+                    await onVerified?.(card.orderIntentId);
+                  }}
+                  onError={() => setVerifying(null)}
+                />
+              </div>
             ) : null}
           </li>
         );
