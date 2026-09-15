@@ -1,0 +1,137 @@
+/*
+ * GOAT theme tokens.
+ *
+ * shadcn token names on top of Tailwind v4. Import this file once in your app
+ * CSS, after `@import "tailwindcss"`. Retheme by overriding the variables in
+ * `:root` and `.dark`. Nothing else needs to change.
+ *
+ * Dark is the default look: a warm near-black ground with a hint of olive,
+ * light text, one warm accent for primary actions. Pill buttons, soft borders.
+ */
+
+:root {
+  --radius: 1rem;
+
+  /* Light mode: warm paper. */
+  --background: #f7f3ea;
+  --foreground: #1c1b16;
+  --card: #fffdf8;
+  --card-foreground: #1c1b16;
+  --popover: #fffdf8;
+  --popover-foreground: #1c1b16;
+  --primary: #e8632b;
+  --primary-foreground: #fff8f2;
+  --secondary: #ebe6d9;
+  --secondary-foreground: #1c1b16;
+  --muted: #ece7da;
+  --muted-foreground: #6b675c;
+  --accent: #efe9dc;
+  --accent-foreground: #1c1b16;
+  --destructive: #c8402f;
+  --destructive-foreground: #fff8f2;
+  --success: #2f8a5b;
+  --success-foreground: #f2fff7;
+  --warning: #c98a17;
+  --warning-foreground: #1c1b16;
+  --border: #ddd6c6;
+  --input: #ddd6c6;
+  --ring: #e8632b;
+}
+
+.dark,
+[data-theme="dark"] {
+  --background: #14140f;
+  --foreground: #f3efe6;
+  --card: #1c1c15;
+  --card-foreground: #f3efe6;
+  --popover: #1c1c15;
+  --popover-foreground: #f3efe6;
+  --primary: #e8632b;
+  --primary-foreground: #fff8f2;
+  --secondary: #26261e;
+  --secondary-foreground: #f3efe6;
+  --muted: #23231b;
+  --muted-foreground: #a39e90;
+  --accent: #2b2b22;
+  --accent-foreground: #f3efe6;
+  --destructive: #e05a48;
+  --destructive-foreground: #fff8f2;
+  --success: #57b37f;
+  --success-foreground: #0f1a13;
+  --warning: #e0a63a;
+  --warning-foreground: #1c1b16;
+  --border: #2f2f26;
+  --input: #34342a;
+  --ring: #e8632b;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --radius-sm: calc(var(--radius) - 0.5rem);
+  --radius-md: calc(var(--radius) - 0.25rem);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 0.5rem);
+  --radius-2xl: calc(var(--radius) + 1rem);
+}
+
+@layer base {
+  * {
+    border-color: var(--border);
+    outline-color: color-mix(in srgb, var(--ring) 50%, transparent);
+  }
+  body {
+    background-color: var(--background);
+    color: var(--foreground);
+  }
+}
+
+/* A textured backdrop for hero areas and empty states. Subtle dots. */
+.goat-backdrop {
+  background-image: radial-gradient(
+    color-mix(in srgb, var(--foreground) 7%, transparent) 1px,
+    transparent 1px
+  );
+  background-size: 18px 18px;
+}
+
+/* Small window frame with three dots, for product surfaces. */
+.goat-window {
+  position: relative;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  background: var(--card);
+  overflow: hidden;
+}
+.goat-window::before {
+  content: "";
+  display: block;
+  height: 2.25rem;
+  border-bottom: 1px solid var(--border);
+  background:
+    radial-gradient(circle at 1rem 50%, #e06a5a 0.3rem, transparent 0.35rem),
+    radial-gradient(circle at 2.1rem 50%, #e0b25a 0.3rem, transparent 0.35rem),
+    radial-gradient(circle at 3.2rem 50%, #5ab38a 0.3rem, transparent 0.35rem);
+}

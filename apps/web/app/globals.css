@@ -1,0 +1,23 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+/* GOAT theme tokens and the @theme mapping. Retheme there, not here. */
+@import "@goat-wallet/ui/styles.css";
+
+/* Tailwind must see the classes used inside the UI package. */
+@source "../node_modules/@goat-wallet/ui/dist";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme inline {
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+}
+
+html {
+  color-scheme: dark;
+}
+
+body {
+  font-family: var(--font-sans);
+}

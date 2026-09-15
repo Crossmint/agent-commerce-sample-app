@@ -1,0 +1,1 @@
+{ "extends": "@goat-wallet/tsconfig/react-library.json", "include": ["src", "test"] }
