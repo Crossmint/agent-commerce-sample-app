@@ -1,5 +1,5 @@
 import Image from "next/image";
-import { AddedTag, APPROVE_T, CheckBurst, delay, FauxButton, VisaMark } from "../approve-bits";
+import { AddedTag, APPROVE_T, CardSelect, CheckBurst, delay, FauxButton, VisaMark } from "../approve-bits";
 import { LockIcon } from "../chat/icons";
 import type { ApproveLayoutProps, ApproveVariant, CardFormTheme } from "./types";
 
@@ -33,8 +33,8 @@ const form: CardFormTheme = {
 
 function MuseApprove({ agentName = "Muse", state }: ApproveLayoutProps) {
   return (
-    <div className="flex h-full flex-col px-4 pt-4 pb-4 antialiased" style={{ background: BG, color: INK }}>
-      <Image src={MARK} alt="" width={28} height={28} className="size-7" />
+    <div className="flex h-full flex-col px-4 pt-3 pb-4 antialiased" style={{ background: BG, color: INK }}>
+      <Image src={MARK} alt="" width={26} height={26} className="size-[26px]" />
 
       {state === "approved" ? (
         <div className="flex min-h-0 flex-1 flex-col items-start justify-center gap-5">
@@ -49,28 +49,21 @@ function MuseApprove({ agentName = "Muse", state }: ApproveLayoutProps) {
         </div>
       ) : (
         <>
-          <div className="flex min-h-0 flex-1 flex-col pt-5">
-            <p className="text-[18px] leading-[1.2] font-semibold tracking-tight">{agentName} wants to use your card</p>
-            <p className="mt-4 text-[38px] leading-none font-bold tracking-tight tabular-nums">$8.00</p>
-            <p className="mt-2 text-[12.5px]" style={{ color: MUTED }}>
+          <div className="flex min-h-0 flex-1 flex-col pt-4">
+            <p className="text-[17px] leading-[1.2] font-semibold tracking-tight">{agentName} wants to use your card</p>
+            <p className="mt-3 text-[34px] leading-none font-bold tracking-tight tabular-nums">$8.00</p>
+            <p className="mt-1.5 text-[12px]" style={{ color: MUTED }}>
               Grande latte at Starbucks
             </p>
 
-            <div className="mt-5 flex flex-col gap-1.5">
+            <div className="mt-4 flex flex-col gap-1.5">
               <span className="text-[11px] font-semibold tracking-wide uppercase" style={{ color: MUTED }}>
-                Card
+                Choose card
               </span>
               {state === "empty" ? (
-                <>
-                  <div aria-hidden className="flex h-11 items-center rounded-[12px] px-3 text-[12.5px]" style={{ background: FIELD, color: MUTED }}>
-                    No cards yet
-                  </div>
-                  <FauxButton press={APPROVE_T.addPress} className="h-11 rounded-[12px] text-[13.5px] text-white" style={{ background: BLUE }}>
-                    Add a card
-                  </FauxButton>
-                </>
+                <CardSelect className="h-11 text-[12.5px]" radius={form.fieldRadius} background={FIELD} border={FIELD} color={INK} iconColor={MUTED} />
               ) : (
-                <div aria-hidden className="landing-fade flex h-12 items-center gap-2.5 rounded-[12px] px-3" style={{ background: FIELD }}>
+                <div aria-hidden className="landing-fade flex h-11 items-center gap-2.5 rounded-[12px] px-3" style={{ background: FIELD }}>
                   <VisaMark />
                   <span className="flex min-w-0 flex-1 flex-col leading-tight">
                     <span className="truncate text-[12.5px] font-medium">Visa •••• 4242</span>
@@ -83,19 +76,19 @@ function MuseApprove({ agentName = "Muse", state }: ApproveLayoutProps) {
               )}
             </div>
 
-            <p className="mt-4 flex items-start gap-1.5 text-[10.5px] leading-snug" style={{ color: MUTED }}>
+            <p className="mt-3 flex items-start gap-1.5 text-[10.5px] leading-snug" style={{ color: MUTED }}>
               <LockIcon width={12} height={12} className="mt-px shrink-0" />
               The card number stays in the vault. {agentName} never sees it.
             </p>
           </div>
 
-          <div className="flex flex-col gap-2">
+          <div className="flex flex-col gap-1.5">
             <FauxButton
               disabled={state === "empty"}
               ready={state === "card"}
               press={state === "card" ? APPROVE_T.allowPress : undefined}
               ringColor="rgba(0, 100, 224, 0.22)"
-              className="h-12 rounded-[12px] text-[14px] text-white"
+              className="h-11 rounded-[12px] text-[14px] text-white"
               style={{ background: BLUE }}
             >
               Allow

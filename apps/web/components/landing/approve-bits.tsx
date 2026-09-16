@@ -1,6 +1,6 @@
 import type { CSSProperties, ReactNode } from "react";
 import { cn } from "@/lib/cn";
-import { CheckIcon } from "./chat/icons";
+import { CheckIcon, ChevronsUpDownIcon, CreditCardIcon } from "./chat/icons";
 
 /*
  * Pieces shared by the four brands' approval pages. Timings are ms from the
@@ -10,7 +10,7 @@ import { CheckIcon } from "./chat/icons";
 
 /** Approval page moments. */
 export const APPROVE_T = {
-  /** "Add a card" presses (empty state). */
+  /** The empty "Select credit card" control presses (empty state). */
   addPress: 1400,
   /** Allow starts to pulse (card state). */
   allowReady: 250,
@@ -118,6 +118,41 @@ export function FauxButton({
       style={{ ...(press !== undefined ? delay(press) : {}), ...(ringColor ? ({ "--ring-color": ringColor } as CSSProperties) : {}), ...style }}
     >
       {children}
+    </span>
+  );
+}
+
+/**
+ * The card picker with no card saved yet, drawn as a select: a card outline,
+ * "Select credit card", and an up/down chevron pair. Pressing it at `press`
+ * moves the story to the card form. `radius` follows the brand's fields.
+ */
+export function CardSelect({
+  press = APPROVE_T.addPress,
+  radius,
+  background,
+  border,
+  color,
+  iconColor,
+  className,
+}: {
+  press?: number;
+  radius: number;
+  background: string;
+  border: string;
+  color: string;
+  iconColor?: string;
+  className?: string;
+}) {
+  return (
+    <span
+      aria-hidden
+      className={cn("landing-press flex h-10 w-full items-center gap-2.5 border px-3 text-[12px] font-medium select-none", className)}
+      style={{ ...delay(press), borderRadius: radius, background, borderColor: border, color }}
+    >
+      <CreditCardIcon width={17} height={17} strokeWidth={1.8} className="shrink-0" style={{ color: iconColor ?? color }} />
+      <span className="min-w-0 flex-1 truncate">Select credit card</span>
+      <ChevronsUpDownIcon width={15} height={15} strokeWidth={2} className="shrink-0" style={{ color: iconColor ?? color }} />
     </span>
   );
 }

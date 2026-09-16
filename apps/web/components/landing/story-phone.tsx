@@ -11,7 +11,7 @@ import { ScreenStack } from "./step-ui";
 /*
  * The whole story in one phone, six screens:
  * 0. The thread. The user asks, the agent asks for $8 and sends the link.
- * 1. The approval page with no card yet: "No cards yet", "Add a card".
+ * 1. The approval page with no card yet: the "Select credit card" control, pressed.
  * 2. The card entry form. The digits type in, the Visa mark appears.
  * 3. The approval page with the card added. Allow lights up and is pressed.
  * 4. Approved. The check draws.
@@ -19,8 +19,8 @@ import { ScreenStack } from "./step-ui";
  */
 export const STORY_STEPS = 6;
 
-/** ms per screen. The form is longer: ~1.5s of typing plus the other fields. */
-export const STORY_DURATIONS = [3000, 2100, 3700, 2300, 2000, 3200];
+/** ms per screen. The form is longer: ~1.5s of typing plus the other fields and the Save press. */
+export const STORY_DURATIONS = [3000, 2100, 4000, 2300, 2000, 3200];
 
 /** Under reduced motion only the approval page with the card and the final thread show. */
 export const STORY_REDUCED = [3, 5];

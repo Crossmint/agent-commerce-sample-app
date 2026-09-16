@@ -13,11 +13,12 @@ export function Hero() {
     <section className="goat-backdrop relative overflow-hidden">
       <Container className="grid items-center gap-14 py-16 sm:py-24 lg:grid-cols-[1.1fr_1fr] lg:gap-10 lg:py-28">
         <div className="flex flex-col items-start gap-6">
-          <h1 className="landing-rise w-full max-w-[520px]" style={rise(0)}>
-            <Image src="/brand/logo.png" alt="GOAT Wallet" width={2170} height={725} priority sizes="(min-width: 640px) 520px, 90vw" className="h-auto w-full" />
+          <Image src="/brand/logo.png" alt="GOAT Wallet" width={2170} height={725} priority sizes="(min-width: 640px) 312px, 54vw" className="landing-rise h-auto w-[54vw] max-w-[312px]" style={rise(0)} />
+          <h1 className="landing-rise max-w-xl text-4xl leading-[1.05] font-bold tracking-tight sm:text-5xl lg:text-6xl" style={rise(60)}>
+            An open source alternative to Link
           </h1>
-          <p className="landing-rise max-w-xl text-xl leading-snug text-foreground/90 sm:text-2xl" style={rise(80)}>
-            An open source template to create your own evolved version of Stripe&apos;s Link.
+          <p className="landing-rise max-w-xl text-lg leading-snug text-foreground/90 sm:text-xl" style={rise(110)}>
+            Give your agents a card and check out at millions of merchants. Your brand, your users.
           </p>
           <a
             href={CROSSMINT_URL}
@@ -39,7 +40,7 @@ export function Hero() {
           </div>
         </div>
 
-        <HeroPhone className="landing-rise relative w-full max-w-[var(--phone-w)] lg:ml-auto" />
+        <HeroPhone className="landing-rise relative mx-auto w-full max-w-[var(--phone-w)] lg:mr-0" />
       </Container>
     </section>
   );

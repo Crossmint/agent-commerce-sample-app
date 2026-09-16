@@ -1,7 +1,7 @@
 # Logo sources
 
 Files in this folder are served from `/logos/...`. Nothing here is hotlinked.
-Agent marks for the "Try a live implementation" tiles are white (`#ffffff`) on transparent so they sit on dark tiles. The three real-brand marks (Instinct, Muse, Grok icon) keep their own colors.
+Agent marks for the "Try a live implementation" tiles are white (`#ffffff`) on transparent so they sit on dark tiles. The three real-brand marks (Instinct, Muse, Grok Bot) keep their own colors.
 
 | File | Brand | Source | Notes |
 | --- | --- | --- | --- |
@@ -14,8 +14,8 @@ Agent marks for the "Try a live implementation" tiles are white (`#ffffff`) on t
 | `instinct.svg`, `instinct-icon.png` | Instinct (Spear Street Technology) | `https://instinct.co/favicon.svg`, `https://instinct.co/apple-touch-icon.png` | Official mark: a dark (#060A09) "I" glyph on a white rounded tile. Full app icon, so avatars show it edge to edge. Site theme color #0d0d0d. |
 | `muse-squiggle.svg` | Muse (Meta) | `https://muse.ai/landing/brand/muse-logo.svg` (byte-identical to `https://muse.ai/images/favicon/app-squiggle.svg`, their favicon) | The current Muse mark, Sept 2026: the blue squiggle "M" by Jessica Hische, gradient #0082FB → #0064E0 → #0040DC. muse.ai blocks non-browser clients; fetched through a real browser. |
 | `muse.svg` | Muse (Meta) | Composed here from `muse-squiggle.svg` after `https://muse.ai/landing/placeholders/sizzle.png` ("The Muse app icon") | The Muse app icon: the squiggle centered on a white rounded tile with a faint gray gradient. Used for avatars and the selector pill. |
-| `grok-icon.png` | Grok (SpaceXAI) | `https://grok.com/images/apple-touch-icon.png` | Official app icon: white glyph on a black rounded tile. Re-fetched Sept 2026, byte-identical. Used for the GrokBot avatar. |
-| `grok-wordmark.svg` | Grok (SpaceXAI) | The inline header SVG on `https://grok.com` (88×33: mark + "Grok" letters) | Fill set to Grok's ink #050505 so it works as an image on the light approval page. grok.com light theme: background #f9f8f7, text #050505, filled buttons #050505. |
+| `grok-bot-mark.svg` | Grok Bot (SpaceXAI) | The inline `svg.grok-bot-mark` on `https://x.ai/bot` (Sept 2026), composed here | The Grok Bot product mark: a black (#0a0a0a) blob with two white eye slits. Only the resting head path and the two eye paths were kept; the idle animation groups, empty circles and duplicate hidden paths were removed and the viewBox was fit to the head. x.ai blocks non-browser clients (Cloudflare 403); read through a real browser. Used for the Grok Bot pill, avatar, and approval header. |
+| `xai-mark.png` | SpaceXAI | `https://x.ai/apple-icon.png` (180×180) | The company mark on x.ai (the swooping X). Kept for reference; not used on the page. x.ai/bot brand notes: page is white #ffffff, ink #0a0a0a, muted rgba(20,20,20,0.6), light gray surfaces #f1f0ee, filled pill buttons #0a0a0a with white text, headline font "xVf" (weight 500, tight tracking). The product name is written "Grok Bot" (two words) and there is no wordmark file: the hero sets the mark inline before the text. The app's chat: bot bubbles light gray (rgba(10,10,10,0.055), 16px corners), user bubbles #111110 with white text (16px corners, 14px), centered gray timestamps and status lines, a pill composer with a + and a round dark mic button. |
 | `hermes.svg` | Hermes (Nous Research) | Drawn here. **Placeholder.** | No official vector mark was obtainable: `nousresearch.com` has no logo image, its `safari-pinned-tab.svg` is a traced mascot illustration, the `hermes-agent` favicon is a text glyph, and Simple Icons has no `nousresearch` slug. Replace with an official mark when available. |
 
 `/brand/mark.png` (the GOAT example agent tile) lives in `public/brand/`.

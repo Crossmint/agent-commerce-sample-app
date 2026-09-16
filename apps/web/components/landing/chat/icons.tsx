@@ -121,3 +121,20 @@ export const RefreshIcon = (p: P) => (
     <path d="M20 12a8 8 0 1 1-2.3-5.7M20 4v4.5h-4.5" />
   </svg>
 );
+export const CreditCardIcon = (p: P) => (
+  <svg {...base(p)}>
+    <rect x="3" y="5.5" width="18" height="13" rx="2.5" />
+    <path d="M3 10h18M7 14.5h3" />
+  </svg>
+);
+export const ChevronsUpDownIcon = (p: P) => (
+  <svg {...base(p)}>
+    <path d="m8 9.5 4-4 4 4M8 14.5l4 4 4-4" />
+  </svg>
+);
+export const MonitorIcon = (p: P) => (
+  <svg {...base(p)}>
+    <rect x="3" y="4.5" width="18" height="12" rx="2.5" />
+    <path d="M8.5 20h7M12 16.5V20" />
+  </svg>
+);

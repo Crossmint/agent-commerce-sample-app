@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
 import { cn } from "@/lib/cn";
 import { type AgentBrand, type BrandId, BRANDS } from "./brands";
 import { StepDots } from "./step-ui";
@@ -10,14 +10,22 @@ import { useStepLoop } from "./use-step-loop";
 
 const LABELS = STORY_PHASES.map((p) => p.label);
 
+export interface BrandSwitcherProps {
+  /** Title and copy for the top of the left column. */
+  intro: ReactNode;
+  /** Call to action for the bottom of the left column. */
+  cta?: ReactNode;
+}
+
 /**
- * "Make it feel like your brand": one two-column block. Left, the title,
- * the subtitle, and the three numbered one-line steps (the current one lit).
- * Right, the brand pills over one phone that plays the whole story for the
- * selected brand, with the step dots under it. A brand switch restarts the
- * story. On small screens it stacks: text, then pills, then phone.
+ * "Start building today": one two-column block. Left, the intro, the three
+ * numbered one-line steps (the current one lit), and the call to action.
+ * Right, the brand pills centered over one phone that plays the whole story
+ * for the selected brand, with the step dots under it. A brand switch
+ * restarts the story. On small screens it stacks: text, then pills, phone,
+ * dots, all centered.
  */
-export function BrandSwitcher() {
+export function BrandSwitcher({ intro, cta }: BrandSwitcherProps) {
   const [active, setActive] = useState<BrandId>("instinct");
   const { ref, step, cycle, jump } = useStepLoop<HTMLDivElement>(STORY_STEPS, { durations: STORY_DURATIONS, hold: 1200, reducedSteps: STORY_REDUCED });
   const brand: AgentBrand = BRANDS.find((b) => b.id === active) ?? BRANDS[0]!;
@@ -30,12 +38,9 @@ export function BrandSwitcher() {
   };
 
   return (
-    <div ref={ref} className="grid items-start gap-10 lg:grid-cols-2 lg:gap-16">
-      <div className="flex flex-col gap-6">
-        <div className="flex flex-col gap-3">
-          <h3 className="text-3xl font-bold tracking-tight sm:text-4xl">Make it feel like your brand</h3>
-          <p className="max-w-2xl text-lg text-muted-foreground sm:text-xl">See examples of how this could look in your platform</p>
-        </div>
+    <div ref={ref} className="grid items-start gap-12 lg:grid-cols-2 lg:gap-16">
+      <div className="flex flex-col items-start gap-8">
+        {intro}
         <ol className="flex flex-col gap-2">
           {STORY_PHASES.map((p, i) => (
             <li key={p.label} className="flex">
@@ -54,10 +59,11 @@ export function BrandSwitcher() {
             </li>
           ))}
         </ol>
+        {cta}
       </div>
 
-      <div className="flex flex-col items-start gap-5 lg:justify-self-center">
-        <div role="tablist" aria-label="Brand" className="flex w-fit max-w-full flex-wrap gap-1 rounded-md border border-border bg-background p-1">
+      <div className="flex w-full flex-col items-center gap-5">
+        <div role="tablist" aria-label="Brand" className="flex w-fit max-w-full flex-wrap justify-center gap-1 rounded-md border border-border bg-background p-1">
           {BRANDS.map((b) => (
             <button
               key={b.id}
@@ -70,14 +76,14 @@ export function BrandSwitcher() {
                 b.id === active ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground",
               )}
             >
-              <Image src={b.logo} alt="" width={16} height={16} className="size-4 shrink-0 rounded-[3px] object-cover" />
+              <Image src={b.logo} alt="" width={16} height={16} className="size-4 shrink-0 rounded-[3px] bg-white object-cover" />
               {b.name}
             </button>
           ))}
         </div>
         {/* Keyed on the brand: a switch remounts the phone and the story starts over. */}
-        <StoryPhone key={brand.id} brand={brand} step={step} cycle={cycle} />
-        <StepDots count={3} active={phase} onPick={(i) => jump(STORY_PHASES[i]?.start ?? 0)} labels={LABELS} />
+        <StoryPhone key={brand.id} brand={brand} step={step} cycle={cycle} className="mx-auto" />
+        <StepDots count={3} active={phase} onPick={(i) => jump(STORY_PHASES[i]?.start ?? 0)} labels={LABELS} className="ml-0" />
       </div>
     </div>
   );

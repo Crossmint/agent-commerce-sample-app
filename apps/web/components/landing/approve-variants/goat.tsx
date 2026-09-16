@@ -1,5 +1,5 @@
 import Image from "next/image";
-import { AddedTag, APPROVE_T, CheckBurst, delay, FauxButton, VisaMark } from "../approve-bits";
+import { AddedTag, APPROVE_T, CardSelect, CheckBurst, delay, FauxButton, VisaMark } from "../approve-bits";
 import { LockIcon } from "../chat/icons";
 import type { ApproveLayoutProps, ApproveVariant, CardFormTheme } from "./types";
 
@@ -36,7 +36,7 @@ const form: CardFormTheme = {
 function GoatApprove({ agentName = "Your agent", state }: ApproveLayoutProps) {
   return (
     <div className="flex h-full flex-col p-3 antialiased" style={{ background: C.bg, color: C.text }}>
-      <div className="flex items-center gap-2 px-1 pt-1 text-[12px] font-semibold tracking-tight">
+      <div className="flex items-center gap-2 px-1 pt-0.5 text-[12px] font-semibold tracking-tight">
         <Image src="/brand/mark.png" alt="" width={18} height={18} className="size-[18px] rounded-sm" />
         yourplatform
       </div>
@@ -57,9 +57,9 @@ function GoatApprove({ agentName = "Your agent", state }: ApproveLayoutProps) {
             </p>
           </div>
         ) : (
-          <div className="flex flex-col gap-4 rounded-md border p-4" style={{ background: C.card, borderColor: C.border }}>
-            <p className="text-[17px] leading-tight font-semibold tracking-tight">{agentName} is requesting to use your card</p>
-            <dl className="grid grid-cols-[auto_1fr] gap-x-5 gap-y-1.5 text-[12px]">
+          <div className="flex flex-col gap-3.5 rounded-md border p-3.5" style={{ background: C.card, borderColor: C.border }}>
+            <p className="text-[16px] leading-tight font-semibold tracking-tight">{agentName} is requesting to use your card</p>
+            <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-[12px]">
               <dt style={{ color: C.muted }}>Purpose</dt>
               <dd className="font-medium">Grande latte at Starbucks</dd>
               <dt style={{ color: C.muted }}>Limit</dt>
@@ -69,14 +69,7 @@ function GoatApprove({ agentName = "Your agent", state }: ApproveLayoutProps) {
             <div className="flex flex-col gap-1.5">
               <span className="text-[12px] font-medium">Choose card</span>
               {state === "empty" ? (
-                <>
-                  <div aria-hidden className="flex h-10 items-center justify-center rounded-md border border-dashed text-[12px]" style={{ borderColor: C.input, color: C.muted }}>
-                    No cards yet
-                  </div>
-                  <FauxButton press={APPROVE_T.addPress} className="h-10 rounded-md text-[13px]" style={{ background: C.primary, color: C.onPrimary }}>
-                    Add a card
-                  </FauxButton>
-                </>
+                <CardSelect radius={form.fieldRadius} background={C.bg} border={C.input} color={C.text} iconColor={C.muted} />
               ) : (
                 <div aria-hidden className="landing-fade flex h-10 items-center gap-2 rounded-md border px-3 text-[12px]" style={{ borderColor: C.input, background: C.bg }}>
                   <VisaMark />
@@ -91,13 +84,13 @@ function GoatApprove({ agentName = "Your agent", state }: ApproveLayoutProps) {
               Your card number is never shared with the agent or the store.
             </p>
 
-            <div className="flex flex-col items-center gap-2">
+            <div className="flex flex-col items-center gap-1.5">
               <FauxButton
                 disabled={state === "empty"}
                 ready={state === "card"}
                 press={state === "card" ? APPROVE_T.allowPress : undefined}
                 ringColor="rgba(232, 99, 43, 0.35)"
-                className="h-11 w-full rounded-md text-[14px]"
+                className="h-10 w-full rounded-md text-[14px]"
                 style={{ background: C.primary, color: C.onPrimary }}
               >
                 Allow

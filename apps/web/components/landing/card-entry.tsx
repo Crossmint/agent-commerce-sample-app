@@ -19,15 +19,15 @@ const ZIP = "10001";
 export function CardEntryScreen({ theme, agentName = "Your agent" }: { theme: CardFormTheme; agentName?: string }) {
   const t = theme;
   return (
-    <div className="flex h-full flex-col px-4 pt-4 pb-4 antialiased" style={{ background: t.bg, color: t.text }}>
+    <div className="flex h-full flex-col px-4 pt-3 pb-3.5 antialiased" style={{ background: t.bg, color: t.text }}>
       <div className="flex flex-col gap-0.5">
-        <p className="text-[17px] leading-tight font-semibold tracking-tight">Add a card</p>
+        <p className="text-[16px] leading-tight font-semibold tracking-tight">Add a card</p>
         <p className="text-[11px] leading-snug" style={{ color: t.muted }}>
           {agentName} will be able to use it after you approve.
         </p>
       </div>
 
-      <div className="mt-3 flex min-h-0 flex-1 flex-col justify-start gap-2.5 overflow-hidden">
+      <div className="mt-2.5 flex min-h-0 flex-1 flex-col justify-start gap-2 overflow-hidden">
         <Field theme={t} label="Card number" from={CARD_T.number - 120} to={CARD_T.brand} trailing={<VisaMark at={CARD_T.brand} />}>
           <Typed text={NUMBER} at={CARD_T.number} speed={CARD_T.numberSpeed} className="tabular-nums" />
         </Field>
@@ -47,8 +47,8 @@ export function CardEntryScreen({ theme, agentName = "Your agent" }: { theme: Ca
         </Field>
       </div>
 
-      <div className="flex flex-col gap-2.5">
-        <FauxButton press={CARD_T.save} className="h-12 text-[14px]" style={{ background: t.button, color: t.buttonText, borderRadius: t.radius }}>
+      <div className="flex flex-col gap-2">
+        <FauxButton press={CARD_T.save} className="h-10 text-[13.5px]" style={{ background: t.button, color: t.buttonText, borderRadius: t.radius }}>
           Save card
         </FauxButton>
         <p className="flex items-center justify-center gap-1 text-[10px]" style={{ color: t.muted }}>
@@ -68,11 +68,11 @@ function Field({ theme: t, label, from, to, placeholder, trailing, children }: {
   const focus = { ...delay(from), "--dur": `${Math.max(to - from, 1)}ms`, "--field-border": t.border, "--field-focus": t.focus, "--field-ring": t.ring } as CSSProperties;
   return (
     <label className="flex flex-col gap-1">
-      <span className="text-[11px] font-medium" style={{ color: t.muted }}>
+      <span className="text-[10.5px] leading-tight font-medium" style={{ color: t.muted }}>
         {label}
       </span>
       <span
-        className="landing-focus relative flex h-10 items-center border px-3 text-[12.5px]"
+        className="landing-focus relative flex h-9 items-center border px-3 text-[12px]"
         style={{ ...focus, background: t.field, borderColor: t.border, borderRadius: t.fieldRadius }}
       >
         {placeholder ? (

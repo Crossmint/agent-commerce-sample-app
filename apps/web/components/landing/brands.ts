@@ -48,10 +48,11 @@ export interface AgentBrand extends Brand {
  * - Instinct lives in iMessage and WhatsApp, so its thread is iMessage.
  * - Muse is Meta's agent; the thread is Instagram Direct. Its avatar is the
  *   Muse app icon (the blue squiggle on a white tile).
- * - GrokBot is chatted with in the Grok app. Its avatar is the Grok app icon.
+ * - Grok Bot (x.ai/bot) is messaged in its own app. Its avatar is the Grok
+ *   Bot mark: the black blob with two eyes from the product page.
  */
 export const BRANDS: AgentBrand[] = [
   { id: "instinct", name: "Instinct", logo: "/logos/instinct.svg", logoStyle: "fill", domain: "instinct.co", chatStyle: "imessage", tone: "light", approval: "instinct" },
   { id: "muse", name: "Muse", logo: "/logos/muse.svg", logoStyle: "fill", domain: "muse.ai", chatStyle: "instagram", tone: "light", approval: "muse" },
-  { id: "grokbot", name: "GrokBot", logo: "/logos/grok-icon.png", logoStyle: "fill", domain: "grok.com", chatStyle: "grok", tone: "light", approval: "grokbot" },
+  { id: "grokbot", name: "Grok Bot", logo: "/logos/grok-bot-mark.svg", logoStyle: "fill", domain: "x.ai", chatStyle: "grok", tone: "light", approval: "grokbot" },
 ];

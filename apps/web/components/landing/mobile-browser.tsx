@@ -39,7 +39,7 @@ export function MobileBrowser({ domain, path = "/approve/…", tone = "dark", ch
         </span>
         <RotateCw className="size-3.5 opacity-70" />
       </div>
-      <div className="min-h-0 flex-1 overflow-hidden">{children}</div>
+      <div data-page className="min-h-0 flex-1 overflow-hidden">{children}</div>
       <div className={cn("flex items-center justify-between border-t px-6 pt-2.5 pb-6 text-[#0a84ff] [&_svg]:size-[18px]", bar, line)}>
         <ChevronLeft />
         <ChevronRight className="opacity-40" />

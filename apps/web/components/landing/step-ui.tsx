@@ -26,9 +26,9 @@ export function ScreenStack({ active, children }: { active: number; children: Re
 }
 
 /** Small dots under a single phone. Clicking a dot jumps to that step. */
-export function StepDots({ count, active, onPick, labels }: { count: number; active: number; onPick: (i: number) => void; labels: string[] }) {
+export function StepDots({ count, active, onPick, labels, className }: { count: number; active: number; onPick: (i: number) => void; labels: string[]; className?: string }) {
   return (
-    <div role="tablist" aria-label="Steps" className="-ml-2 flex items-center gap-2">
+    <div role="tablist" aria-label="Steps" className={cn("-ml-2 flex items-center gap-2", className)}>
       {Array.from({ length: count }, (_, i) => (
         <button
           key={i}

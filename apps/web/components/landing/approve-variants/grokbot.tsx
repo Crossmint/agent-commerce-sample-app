@@ -1,49 +1,58 @@
 import Image from "next/image";
-import { AddedTag, APPROVE_T, CheckBurst, delay, FauxButton, VisaMark } from "../approve-bits";
+import { AddedTag, APPROVE_T, CardSelect, CheckBurst, delay, FauxButton, VisaMark } from "../approve-bits";
 import { LockIcon } from "../chat/icons";
 import type { ApproveLayoutProps, ApproveVariant, CardFormTheme } from "./types";
 
 /*
- * GrokBot (grok.com, SpaceXAI), as grok.com looks in September 2026 in its
- * light theme: warm off-white #f9f8f7, #050505 text, hairline borders, a
- * clean sans (no mono), filled buttons in #050505 with white text (8px
- * corners here), Deny as plain text. The header carries the Grok wordmark
- * from grok.com's own header.
+ * Grok Bot (x.ai/bot, SpaceXAI), as the product page looks in September 2026:
+ * a white page, #0a0a0a ink, muted text at 60% ink, light warm-gray surfaces,
+ * hairline borders, pill buttons filled #0a0a0a with white text, and the
+ * Grok Bot mark (a black blob with two white eyes) set inline before the
+ * name, which the page writes as two words.
  */
-const BG = "#f9f8f7";
-const INK = "#050505";
-const MUTED = "#636363";
-const LINE = "#e5e3df";
+export const GROK_BOT_MARK = "/logos/grok-bot-mark.svg";
+const BG = "#ffffff";
+const INK = "#0a0a0a";
+const MUTED = "rgba(20, 20, 20, 0.6)";
+const SURFACE = "#f5f5f3";
+const LINE = "#e6e5e2";
 
 const form: CardFormTheme = {
   bg: BG,
   text: INK,
   muted: MUTED,
   border: LINE,
-  field: "#ffffff",
+  field: SURFACE,
   focus: INK,
-  ring: "rgba(20, 20, 19, 0.12)",
+  ring: "rgba(10, 10, 10, 0.12)",
   button: INK,
   buttonText: "#ffffff",
-  radius: 8,
-  fieldRadius: 8,
+  radius: 9999,
+  fieldRadius: 12,
 };
 
-function GrokBotApprove({ agentName = "GrokBot", state }: ApproveLayoutProps) {
+/** The Grok Bot mark next to the name, as the x.ai/bot hero sets it. */
+export function GrokBotWordmark({ size = 18, className }: { size?: number; className?: string }) {
   return (
-    <div className="flex h-full flex-col px-4 pt-4 pb-4 antialiased" style={{ background: BG, color: INK }}>
-      <div className="flex items-center gap-2">
-        <Image src="/logos/grok-wordmark.svg" alt="Grok" width={88} height={33} className="h-[18px] w-auto" />
-        <span className="text-[11px] font-medium" style={{ color: MUTED }}>
-          / {agentName}
-        </span>
-      </div>
+    <span className={className ? `inline-flex items-center gap-1.5 ${className}` : "inline-flex items-center gap-1.5"}>
+      <Image src={GROK_BOT_MARK} alt="" width={size} height={size} style={{ width: size, height: size }} />
+      <span className="font-medium tracking-tight" style={{ fontSize: size * 0.78, color: INK }}>
+        Grok Bot
+      </span>
+    </span>
+  );
+}
+
+function GrokBotApprove({ agentName = "Grok Bot", state }: ApproveLayoutProps) {
+  return (
+    <div className="flex h-full flex-col px-4 pt-3 pb-3 antialiased" style={{ background: BG, color: INK }}>
+      <GrokBotWordmark size={18} />
 
       {state === "approved" ? (
         <div className="flex min-h-0 flex-1 flex-col justify-center gap-5">
           <CheckBurst fill={INK} size={56} />
           <div className="landing-fade flex flex-col gap-2" style={delay(APPROVE_T.copy)}>
-            <p className="text-[21px] leading-[1.15] font-semibold tracking-tight">Approved.</p>
+            <p className="text-[21px] leading-[1.15] font-medium tracking-tight">Approved.</p>
             <p className="text-[13px] leading-snug">{agentName} can spend up to $8.00.</p>
             <p className="text-[11.5px]" style={{ color: MUTED }}>
               Visa ···· 4242 · expires in 24h
@@ -53,31 +62,24 @@ function GrokBotApprove({ agentName = "GrokBot", state }: ApproveLayoutProps) {
       ) : (
         <>
           <div className="flex min-h-0 flex-1 flex-col justify-center">
-            <div className="flex flex-col gap-3 rounded-[10px] border bg-white p-3.5" style={{ borderColor: LINE }}>
+            <div className="flex flex-col gap-2.5 rounded-[14px] border p-3.5" style={{ background: SURFACE, borderColor: LINE }}>
               <p className="text-[11px]" style={{ color: MUTED }}>
                 Card access request
               </p>
-              <p className="text-[30px] leading-none font-semibold tracking-tight tabular-nums">$8.00</p>
-              <dl className="flex flex-col gap-1 text-[12px]">
-                <Row k="Agent" v={agentName} />
+              <p className="text-[26px] leading-none font-medium tracking-tight tabular-nums">$8.00</p>
+              <dl className="flex flex-col gap-0.5 text-[11.5px]">
+                <Row k="Bot" v={agentName} />
                 <Row k="Purpose" v="Grande latte" />
                 <Row k="Expires" v="24h" />
               </dl>
               <div className="flex flex-col gap-1.5 border-t pt-2.5" style={{ borderColor: LINE }}>
                 <span className="text-[11px]" style={{ color: MUTED }}>
-                  Card
+                  Choose card
                 </span>
                 {state === "empty" ? (
-                  <>
-                    <div aria-hidden className="flex h-10 items-center rounded-[8px] border px-3 text-[12px]" style={{ borderColor: LINE, color: MUTED }}>
-                      No cards yet
-                    </div>
-                    <FauxButton press={APPROVE_T.addPress} className="h-10 rounded-[8px] text-[13px] text-white" style={{ background: INK }}>
-                      Add a card
-                    </FauxButton>
-                  </>
+                  <CardSelect radius={form.fieldRadius} background={BG} border={LINE} color={INK} iconColor={MUTED} />
                 ) : (
-                  <div aria-hidden className="landing-fade flex h-10 items-center gap-2 rounded-[8px] border px-3 text-[12px]" style={{ borderColor: LINE }}>
+                  <div aria-hidden className="landing-fade flex h-10 items-center gap-2 rounded-[12px] border bg-white px-3 text-[12px]" style={{ borderColor: LINE }}>
                     <VisaMark />
                     <span className="min-w-0 flex-1 truncate">Visa ···· 4242</span>
                     <AddedTag color={INK} />
@@ -91,13 +93,13 @@ function GrokBotApprove({ agentName = "GrokBot", state }: ApproveLayoutProps) {
             </p>
           </div>
 
-          <div className="flex flex-col gap-2">
+          <div className="flex flex-col gap-1.5">
             <FauxButton
               disabled={state === "empty"}
               ready={state === "card"}
               press={state === "card" ? APPROVE_T.allowPress : undefined}
-              ringColor="rgba(20, 20, 19, 0.16)"
-              className="h-11 rounded-[8px] text-[14px] text-white"
+              ringColor="rgba(10, 10, 10, 0.16)"
+              className="h-10 rounded-full text-[13.5px] font-medium text-white"
               style={{ background: INK }}
             >
               Allow
@@ -116,7 +118,7 @@ function Row({ k, v }: { k: string; v: string }) {
   return (
     <div className="flex items-baseline justify-between gap-3">
       <dt style={{ color: MUTED }}>{k}</dt>
-      <dd className="text-right">{v}</dd>
+      <dd className="text-right font-medium">{v}</dd>
     </div>
   );
 }

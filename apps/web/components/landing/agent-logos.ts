@@ -15,5 +15,5 @@ export const AGENT_LOGOS: AgentLogo[] = [
   { name: "Claude Code", by: "Anthropic", src: "/logos/claude-code.svg" },
   { name: "OpenClaw", src: "/logos/openclaw.svg" },
   { name: "Hermes", by: "Nous Research", src: "/logos/hermes.svg" },
-  { name: "GOAT agent", by: "Try the example chat", src: "/brand/mark.png", href: "/chat" },
+  { name: "GOAT agent", src: "/brand/mark.png", href: "/chat" },
 ];

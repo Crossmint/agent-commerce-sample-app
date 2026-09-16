@@ -38,12 +38,12 @@ export interface ChatScreenProps {
 
 /**
  * Screen color behind the status bar for each chat style. iMessage is the
- * dark appearance; Instagram Direct and Grok are their light themes.
+ * dark appearance; Instagram Direct and the Grok Bot app are light.
  */
 export const CHAT_SCREEN_BG: Record<ChatStyle, string> = {
   imessage: "bg-black",
   instagram: "bg-white",
-  grok: "bg-[#f9f8f7]",
+  grok: "bg-white",
 };
 
 /** Status bar glyph tone for each chat style. */
@@ -57,7 +57,7 @@ export const CHAT_TONE: Record<ChatStyle, "light" | "dark"> = {
 export const CHAT_APP_NAME: Record<ChatStyle, string> = {
   imessage: "iMessage",
   instagram: "Instagram",
-  grok: "Grok",
+  grok: "Grok Bot",
 };
 
 export const delayStyle = (ms: number) => ({ "--delay": `${ms}ms` }) as CSSProperties;

@@ -391,8 +391,13 @@ html {
     stroke-dashoffset: 0;
   }
 }
+/*
+ * A short real fade, not a 1ms step. Chrome mishandles dozens of 1ms
+ * delayed animations in one subtree: some characters flip back to the
+ * `from` keyframe after they finish, so typed text vanished mid-word.
+ */
 .landing-type {
-  animation: landing-type 1ms steps(1) both;
+  animation: landing-type 0.12s ease both;
   animation-delay: var(--delay, 0ms);
 }
 .landing-focus {
