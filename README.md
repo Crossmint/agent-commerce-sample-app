@@ -30,6 +30,7 @@ GOAT is not a crypto wallet. It wraps the Crossmint Agents APIs and adds the par
 | [`goat`](packages/cli) | The CLI. Same surface as MCP, for terminal agents and humans. |
 | [`skills/goat`](skills/goat) | A skill that teaches coding agents how to use the CLI. |
 | [`plugins/cursor`](plugins/cursor) | Cursor plugin: the hosted MCP server, the skill, and a payments rule. Also loads in Grok Bot. |
+| [`plugins/claude`](plugins/claude) | Claude Code plugin: the same MCP server and skill. Install with `/plugin marketplace add Crossmint/goat`. |
 | [`apps/web`](apps/web) | The reference website: wallet pages, agent chat, API, MCP endpoint. |
 
 ## How it flows

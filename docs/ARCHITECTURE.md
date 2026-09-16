@@ -71,7 +71,8 @@ goat/
 ├── skills/
 │   └── goat/                       SKILL.md for Claude Code, OpenClaw and similar agents.
 ├── plugins/
-│   └── cursor/                     Cursor plugin (marketplace manifest at .cursor-plugin/): MCP endpoint, skill, rule.
+│   ├── cursor/                     Cursor plugin (marketplace manifest at .cursor-plugin/): MCP endpoint, skill, rule.
+│   └── claude/                     Claude Code plugin (marketplace manifest at .claude-plugin/): MCP endpoint, skill.
 └── docs/
 ```
 

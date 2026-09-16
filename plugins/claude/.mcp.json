@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "goat": {
+      "type": "http",
+      "url": "https://goat-jade.vercel.app/api/mcp"
+    }
+  }
+}
