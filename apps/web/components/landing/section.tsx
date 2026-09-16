@@ -20,7 +20,7 @@ export function Section({ id, className, children }: SectionProps) {
   );
 }
 
-export function SectionHeading({ title, sub, align = "center" }: { title: string; sub?: string; align?: "center" | "left" }) {
+export function SectionHeading({ title, sub, align = "center" }: { title: string; sub?: ReactNode; align?: "center" | "left" }) {
   return (
     <Reveal className={cn("mb-12 flex flex-col gap-3 sm:mb-16", align === "center" ? "items-center text-center" : "items-start")}>
       <h2 className="text-4xl font-bold tracking-tight text-balance sm:text-5xl">{title}</h2>

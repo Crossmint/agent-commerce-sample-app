@@ -7,7 +7,14 @@ import { cn } from "@/lib/cn";
 import { PhoneFrame } from "./phone-frame";
 import { useInView } from "./use-in-view";
 
-export type ThreadVariant = "full" | "request" | "confirmation";
+/**
+ * Which part of the story to show.
+ * - request: the ask and the agent's approval link.
+ * - approved: request, then the "You approved" status line.
+ * - confirmation: the status line and the receipt.
+ * - full: all four.
+ */
+export type ThreadVariant = "full" | "request" | "approved" | "confirmation";
 export type ThreadStyle = "imessage" | "whatsapp";
 
 export interface MessageThreadMockProps {
@@ -22,9 +29,11 @@ export interface MessageThreadMockProps {
   className?: string;
   /** Accessible description for the phone. */
   label?: string;
+  /** Frame width in CSS px at full size. Default 300. */
+  width?: number;
 }
 
-interface Bubble {
+export interface Bubble {
   key: string;
   from: "user" | "agent" | "status";
   node: ReactNode;
@@ -32,19 +41,33 @@ interface Bubble {
   at: number;
 }
 
+/** Screen color behind the status bar for each chat skin. */
+export const THREAD_SCREEN_BG: Record<ThreadStyle, string> = { imessage: "bg-[#1c1c1e]", whatsapp: "bg-[#075e54]" };
+
 /**
  * A chat thread inside a phone: the user asks, the agent asks for a budget,
  * the user approves, the agent sends the receipt. Bubbles appear in sequence
  * and the sequence restarts each time the thread scrolls back into view.
  */
-export function MessageThreadMock({
-  style = "imessage",
-  variant = "full",
-  agentName = "Your agent",
-  domain = "yourplatform.com",
-  className,
-  label,
-}: MessageThreadMockProps) {
+export function MessageThreadMock({ className, label, width, ...screen }: MessageThreadMockProps) {
+  const style = screen.style ?? "imessage";
+  const wa = style === "whatsapp";
+  return (
+    <PhoneFrame
+      className={className}
+      width={width}
+      screenClassName={THREAD_SCREEN_BG[style]}
+      label={label ?? `A ${wa ? "WhatsApp" : "iMessage"} thread with ${screen.agentName ?? "Your agent"}`}
+    >
+      <MessageThreadScreen {...screen} />
+    </PhoneFrame>
+  );
+}
+
+export type MessageThreadScreenProps = Omit<MessageThreadMockProps, "className" | "label" | "width">;
+
+/** The thread without the phone. Use it to stack screens inside one `PhoneFrame`. */
+export function MessageThreadScreen({ style = "imessage", variant = "full", agentName = "Your agent", domain = "yourplatform.com" }: MessageThreadScreenProps) {
   const { ref, inView } = useInView<HTMLDivElement>({ threshold: 0.35 });
   // Remounting the bubbles restarts their CSS animations. The first run starts
   // on page load; later runs start on re-entry.
@@ -62,32 +85,26 @@ export function MessageThreadMock({
   const wa = style === "whatsapp";
 
   return (
-    <PhoneFrame
-      className={className}
-      screenClassName={wa ? "bg-[#075e54]" : "bg-[#1c1c1e]"}
-      label={label ?? `A ${wa ? "WhatsApp" : "iMessage"} thread with ${agentName}`}
-    >
-      <div ref={ref} className="flex h-full flex-col font-sans text-[13px] text-white">
-        {wa ? <WhatsAppHeader name={agentName} /> : <IMessageHeader name={agentName} />}
-        <div key={run} className={cn("flex min-h-0 flex-1 flex-col gap-1.5 overflow-hidden px-2.5 pt-2.5", wa ? "landing-wa-doodle" : "bg-black")}>
-          {wa ? (
-            <span className="mx-auto mb-1 rounded-md bg-[#182229] px-2 py-0.5 text-[10px] font-medium text-[#8696a0]">Today</span>
-          ) : (
-            <p className="mb-1 text-center text-[10px] text-[#8e8e93]">
-              <span className="font-semibold">iMessage</span>
-              <br />
-              Today 9:41
-            </p>
-          )}
-          {bubbles.map((b, i) => (
-            <div key={b.key} className="landing-bubble flex flex-col" style={{ "--delay": `${b.at}ms` } as CSSProperties}>
-              {wa ? <WhatsAppBubble b={b} /> : <IMessageBubble b={b} delivered={b.from === "user" && !bubbles.slice(i + 1).some((n) => n.from === "user")} />}
-            </div>
-          ))}
-        </div>
-        {wa ? <WhatsAppComposer /> : <IMessageComposer />}
+    <div ref={ref} className="flex h-full flex-col font-sans text-[13px] text-white">
+      {wa ? <WhatsAppHeader name={agentName} /> : <IMessageHeader name={agentName} />}
+      <div key={run} className={cn("flex min-h-0 flex-1 flex-col gap-1.5 overflow-hidden px-2.5 pt-2.5", wa ? "landing-wa-doodle" : "bg-black")}>
+        {wa ? (
+          <span className="mx-auto mb-1 rounded-md bg-[#182229] px-2 py-0.5 text-[10px] font-medium text-[#8696a0]">Today</span>
+        ) : (
+          <p className="mb-1 text-center text-[10px] text-[#8e8e93]">
+            <span className="font-semibold">iMessage</span>
+            <br />
+            Today 9:41
+          </p>
+        )}
+        {bubbles.map((b, i) => (
+          <div key={b.key} className="landing-bubble flex flex-col" style={{ "--delay": `${b.at}ms` } as CSSProperties}>
+            {wa ? <WhatsAppBubble b={b} /> : <IMessageBubble b={b} delivered={b.from === "user" && !bubbles.slice(i + 1).some((n) => n.from === "user")} />}
+          </div>
+        ))}
       </div>
-    </PhoneFrame>
+      {wa ? <WhatsAppComposer /> : <IMessageComposer />}
+    </div>
   );
 }
 
@@ -151,7 +168,7 @@ function IMessageComposer() {
 
 /* ---------- WhatsApp ---------- */
 
-function WhatsAppHeader({ name }: { name: string }) {
+export function WhatsAppHeader({ name }: { name: string }) {
   return (
     <div className="flex items-center gap-1.5 bg-[#075e54] px-2 pt-11 pb-2.5 text-white">
       <ChevronLeft className="size-5" strokeWidth={2.25} />
@@ -167,7 +184,7 @@ function WhatsAppHeader({ name }: { name: string }) {
   );
 }
 
-function WhatsAppBubble({ b }: { b: Bubble }) {
+export function WhatsAppBubble({ b }: { b: Bubble }) {
   if (b.from === "status") {
     return <p className="mx-auto my-1 rounded-md bg-[#182229] px-2 py-0.5 text-center text-[10px] font-medium text-[#8696a0]">{b.node}</p>;
   }
@@ -188,7 +205,7 @@ function WhatsAppBubble({ b }: { b: Bubble }) {
   );
 }
 
-function WhatsAppComposer() {
+export function WhatsAppComposer() {
   return (
     <div className="landing-wa-doodle flex items-center gap-2 px-2 pt-2 pb-7 text-[#8696a0]">
       <span className="flex h-9 flex-1 items-center gap-2 rounded-full bg-[#202c33] px-3 text-[12px]">
@@ -252,6 +269,7 @@ function script(variant: ThreadVariant, domain: string, style: ThreadStyle): Bub
   };
 
   if (variant === "request") return [ask, request];
+  if (variant === "approved") return [ask, request, { ...approved, at: 300 }];
   if (variant === "confirmation") return [{ ...approved, at: 250 }, { ...done, at: 1000 }];
   return [ask, request, approved, done];
 }

@@ -28,7 +28,8 @@ export interface ApproveAgentCardPreviewProps extends Omit<React.ComponentProps<
  *
  * It reads the shadcn theme tokens (`--background`, `--card`, `--primary`,
  * `--radius`, ...) so a wrapper that sets those variables restyles it. Two extra
- * variables are optional: `--radius-button` for the Allow button (default pill)
+ * variables are optional: `--radius-button` for the Allow button (default: the
+ * theme radius)
  * and `--font-heading` for the headline (default: inherit).
  */
 export function ApproveAgentCardPreview({
@@ -49,7 +50,7 @@ export function ApproveAgentCardPreview({
       data-slot="approve-preview"
       aria-label={`Preview: ${agentName} is requesting to use your card`}
       className={cn(
-        "mx-auto flex w-full max-w-md flex-col gap-5 rounded-[calc(var(--radius)+0.5rem)] border border-border bg-card p-6 text-card-foreground shadow-sm sm:p-7",
+        "mx-auto flex w-full max-w-md flex-col gap-5 rounded-lg border border-border bg-card p-6 text-card-foreground shadow-sm sm:p-7",
         className,
       )}
       {...props}
@@ -105,7 +106,7 @@ export function ApproveAgentCardPreview({
           tabIndex={-1}
           aria-hidden
           className="w-full cursor-default"
-          style={{ borderRadius: "var(--radius-button, 9999px)" }}
+          style={{ borderRadius: "var(--radius-button, var(--radius))" }}
         >
           {allowLabel}
         </Button>

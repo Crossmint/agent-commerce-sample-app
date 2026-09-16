@@ -200,7 +200,7 @@ export function ApproveAgentCard({
           <Skeleton className="h-5 w-1/3" />
         </div>
         <Skeleton className="h-11 w-full" />
-        <Skeleton className="h-11 w-full rounded-full" />
+        <Skeleton className="h-11 w-full rounded-md" />
       </Shell>
     );
   }

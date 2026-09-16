@@ -33,8 +33,8 @@ const goat: CSSProperties = {
   "--border": "#2f2f26",
   "--input": "#34342a",
   "--ring": "#e8632b",
-  "--radius": "1rem",
-  "--radius-button": "9999px",
+  "--radius": "0.375rem",
+  "--radius-button": "0.375rem",
   "--font-heading": "inherit",
   fontFamily: "var(--font-sans)",
 } as CSSProperties;
@@ -86,7 +86,7 @@ const forge: CSSProperties = {
 export const DEFAULT_BRAND: Brand = {
   id: "goat",
   name: "GOAT",
-  blurb: "Dark warm ground, one orange accent, a centered card.",
+  blurb: "Dark warm ground, one orange accent, a centered card with squared corners.",
   domain: "goat.wallet",
   tone: "dark",
   threadStyle: "imessage",

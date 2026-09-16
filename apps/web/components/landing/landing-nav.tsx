@@ -5,7 +5,7 @@ import { GITHUB_URL } from "./links";
 
 const links = [
   { href: "#how", label: "How it works" },
-  { href: "#developers", label: "For developers" },
+  { href: "#build", label: "For developers" },
   { href: GITHUB_URL, label: "GitHub", external: true },
 ];
 

@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
-import { GetStarted } from "@/components/landing/get-started";
+import { BuildYourOwn } from "@/components/landing/build-your-own";
+import { CorePieces } from "@/components/landing/core-pieces";
 import { Hero } from "@/components/landing/hero";
-import { HowItWorks } from "@/components/landing/how-it-works";
 import { LandingFooter } from "@/components/landing/landing-footer";
 import { LandingNav } from "@/components/landing/landing-nav";
-import { Pillars } from "@/components/landing/pillars";
+import { TryLive } from "@/components/landing/try-live";
 import "@/components/landing/landing.css";
 
 export const metadata: Metadata = {
@@ -19,9 +19,9 @@ export default function LandingPage() {
       <LandingNav />
       <main className="flex flex-1 flex-col">
         <Hero />
-        <Pillars />
-        <HowItWorks />
-        <GetStarted />
+        <CorePieces />
+        <TryLive />
+        <BuildYourOwn />
       </main>
       <LandingFooter />
     </>

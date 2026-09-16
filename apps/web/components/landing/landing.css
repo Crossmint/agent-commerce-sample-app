@@ -49,6 +49,7 @@ html {
 }
 .landing-fade {
   animation: landing-fade 0.45s ease both;
+  animation-delay: var(--delay, 0ms);
 }
 .landing-reveal[data-reveal="hidden"] {
   opacity: 0;
@@ -65,26 +66,123 @@ html {
 .landing-bar {
   transition: width 1.1s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
+
+/*
+ * Step sequences. A phone in a sequence is full size when active and dims
+ * and shrinks a little when not. Screens stacked in one phone crossfade with
+ * a small slide toward the side they sit on.
+ */
+.landing-step-phone {
+  transition:
+    opacity 0.5s ease,
+    transform 0.6s cubic-bezier(0.2, 0.8, 0.2, 1),
+    filter 0.5s ease;
+}
+.landing-step-phone[data-active="false"] {
+  opacity: 0.45;
+  transform: scale(0.94);
+  filter: saturate(0.6);
+}
+.landing-step-phone[data-active="false"]:hover {
+  opacity: 0.7;
+}
+.landing-screen-layer {
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    opacity 0.45s ease,
+    transform 0.55s cubic-bezier(0.2, 0.8, 0.2, 1),
+    visibility 0s linear 0.45s;
+}
+.landing-screen-layer[data-state="before"] {
+  transform: translateX(-16px);
+}
+.landing-screen-layer[data-state="after"] {
+  transform: translateX(16px);
+}
+.landing-screen-layer[data-state="active"] {
+  opacity: 1;
+  visibility: visible;
+  transform: none;
+  transition-delay: 0s;
+}
+
+/*
+ * A run in progress. Each mark is three stacked layers: a hollow dot that
+ * vanishes at --delay, a spinner that shows for --dur from --delay, and a
+ * check that pops at --delay. Labels brighten and the picked chip fills in.
+ */
+@keyframes landing-vanish {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+@keyframes landing-window {
+  0%,
+  100% {
+    opacity: 0;
+  }
+  8%,
+  92% {
+    opacity: 1;
+  }
+}
+@keyframes landing-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.4);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes landing-bright {
+  from {
+    opacity: 0.5;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes landing-pick {
+  from {
+    background-color: transparent;
+    border-color: rgba(255, 255, 255, 0.2);
+  }
+  to {
+    background-color: rgba(0, 168, 132, 0.35);
+    border-color: #00a884;
+  }
+}
+.landing-vanish {
+  animation: landing-vanish 0.2s ease both;
+  animation-delay: var(--delay, 0ms);
+}
+.landing-window {
+  animation: landing-window var(--dur, 800ms) linear both;
+  animation-delay: var(--delay, 0ms);
+}
+.landing-pop {
+  animation: landing-pop 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  animation-delay: var(--delay, 0ms);
+}
+.landing-bright {
+  animation: landing-bright 0.3s ease both;
+  animation-delay: var(--delay, 0ms);
+}
+.landing-pick {
+  animation: landing-pick 0.3s ease both;
+  animation-delay: var(--delay, 0ms);
+}
 .landing-theme,
 .landing-theme * {
   transition-property: background-color, color, border-color;
   transition-duration: 0.35s;
   transition-timing-function: ease;
-}
-
-/* Brand panels share one grid cell and crossfade. */
-.landing-xfade {
-  grid-area: 1 / 1;
-  opacity: 0;
-  visibility: hidden;
-  transition:
-    opacity 0.45s ease,
-    visibility 0s linear 0.45s;
-}
-.landing-xfade[data-active="true"] {
-  opacity: 1;
-  visibility: visible;
-  transition-delay: 0s;
 }
 
 /* Agent logo tiles lift a little on hover. */
@@ -193,9 +291,24 @@ html {
   }
   .landing-rise,
   .landing-bubble,
-  .landing-fade {
+  .landing-fade,
+  .landing-pop,
+  .landing-bright,
+  .landing-pick {
     animation: none;
     opacity: 1;
+  }
+  .landing-pick {
+    background-color: rgba(0, 168, 132, 0.35);
+    border-color: #00a884;
+  }
+  .landing-vanish,
+  .landing-window {
+    animation: none;
+    opacity: 0;
+  }
+  .landing-step-phone[data-active="false"] {
+    transform: none;
   }
   .landing-reveal[data-reveal="hidden"] {
     opacity: 1;
@@ -205,8 +318,9 @@ html {
   .landing-bar,
   .landing-theme,
   .landing-theme *,
-  .landing-xfade,
-  .landing-tile {
+  .landing-tile,
+  .landing-step-phone,
+  .landing-screen-layer {
     transition: none;
   }
 }

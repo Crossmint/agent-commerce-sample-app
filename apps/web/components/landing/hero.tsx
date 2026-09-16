@@ -4,7 +4,7 @@ import Link from "next/link";
 import { Button } from "@goat-wallet/ui";
 import { ApproveScreenMock } from "./approve-screen-mock";
 import { Container } from "./section";
-import { CROSSMINT_URL, DOCS_URL } from "./links";
+import { CROSSMINT_URL } from "./links";
 import { MessageThreadMock } from "./message-thread-mock";
 
 const rise = (ms: number) => ({ "--delay": `${ms}ms` }) as CSSProperties;
@@ -32,12 +32,10 @@ export function Hero() {
           </a>
           <div className="landing-rise flex w-full flex-col gap-3 pt-2 sm:w-auto sm:flex-row" style={rise(220)}>
             <Button asChild size="lg">
-              <Link href="#try">Try it with your agent</Link>
+              <Link href="#try">Try it live</Link>
             </Button>
             <Button asChild size="lg" variant="outline">
-              <a href={DOCS_URL} target="_blank" rel="noreferrer">
-                Read the docs
-              </a>
+              <Link href="#build">Build your own</Link>
             </Button>
           </div>
         </div>
