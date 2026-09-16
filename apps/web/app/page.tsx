@@ -4,6 +4,7 @@ import { CorePieces } from "@/components/landing/core-pieces";
 import { Hero } from "@/components/landing/hero";
 import { LandingFooter } from "@/components/landing/landing-footer";
 import { LandingNav } from "@/components/landing/landing-nav";
+import { PoweredBy } from "@/components/landing/powered-by";
 import { TryLive } from "@/components/landing/try-live";
 import "@/components/landing/landing.css";
 
@@ -19,6 +20,7 @@ export default function LandingPage() {
       <LandingNav />
       <main className="landing flex flex-1 flex-col">
         <Hero />
+        <PoweredBy />
         <CorePieces />
         <TryLive />
         <BuildYourOwn />

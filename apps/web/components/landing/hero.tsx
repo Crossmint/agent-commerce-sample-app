@@ -3,7 +3,6 @@ import Image from "next/image";
 import Link from "next/link";
 import { Button } from "@goat-wallet/ui";
 import { HeroPhone } from "./hero-phone";
-import { CROSSMINT_URL } from "./links";
 import { Container } from "./section";
 
 const rise = (ms: number) => ({ "--delay": `${ms}ms` }) as CSSProperties;
@@ -20,16 +19,6 @@ export function Hero() {
           <p className="landing-rise max-w-xl text-lg leading-snug text-foreground/90 sm:text-xl" style={rise(110)}>
             Give your agents a card and check out at millions of merchants. Your brand, your users.
           </p>
-          <a
-            href={CROSSMINT_URL}
-            target="_blank"
-            rel="noreferrer"
-            className="landing-rise inline-flex items-center gap-3 rounded-md py-1 text-sm text-muted-foreground transition-opacity hover:opacity-80"
-            style={rise(140)}
-          >
-            <span>Powered by</span>
-            <Image src="/logos/crossmint-white.svg" alt="Crossmint" width={459} height={86} className="h-5 w-auto" />
-          </a>
           <div className="landing-rise flex w-full flex-col gap-3 pt-2 sm:w-auto sm:flex-row" style={rise(220)}>
             <Button asChild size="lg">
               <Link href="#try">Try it live</Link>
