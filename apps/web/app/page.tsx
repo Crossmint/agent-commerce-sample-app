@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { BrandsSection } from "@/components/landing/brands-section";
 import { GetStarted } from "@/components/landing/get-started";
 import { Hero } from "@/components/landing/hero";
 import { HowItWorks } from "@/components/landing/how-it-works";
@@ -10,7 +9,7 @@ import "@/components/landing/landing.css";
 
 export const metadata: Metadata = {
   title: { absolute: "GOAT Wallet" },
-  description: "The open source, white-label evolution of Link. Your users save a card once. Your agents pay anywhere.",
+  description: "An open source template to create your own evolved version of Stripe's Link. Powered by Crossmint.",
 };
 
 /** Public marketing page. The wallet lives at /wallet. */
@@ -23,7 +22,6 @@ export default function LandingPage() {
         <Pillars />
         <HowItWorks />
         <GetStarted />
-        <BrandsSection />
       </main>
       <LandingFooter />
     </>

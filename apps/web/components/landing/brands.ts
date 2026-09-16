@@ -1,13 +1,18 @@
 import type { CSSProperties } from "react";
+import type { ThreadStyle } from "./message-thread-mock";
 
 export type BrandId = "goat" | "nimbus" | "forge";
 
 export interface Brand {
   id: BrandId;
   name: string;
-  /** What the agent calls itself in the approval headline and thread. */
-  agentName: string;
   blurb: string;
+  /** Host shown in the browser bar and in the approval link. */
+  domain: string;
+  /** Light brands get dark status bar glyphs and a light browser chrome. */
+  tone: "light" | "dark";
+  /** Which chat skin the demo thread uses next to the approval screen. */
+  threadStyle: ThreadStyle;
   /** Theme tokens for the wrapper. The same names `@goat-wallet/ui` reads. */
   vars: CSSProperties;
 }
@@ -75,19 +80,37 @@ const forge: CSSProperties = {
   "--radius": "6px",
   "--radius-button": "6px",
   "--font-heading": "var(--font-mono)",
-  fontFamily: "var(--font-sans)",
+  fontFamily: "var(--font-mono)",
 } as CSSProperties;
 
 export const DEFAULT_BRAND: Brand = {
   id: "goat",
   name: "GOAT",
-  agentName: "GOAT",
-  blurb: "Dark warm ground, one orange accent, pill buttons.",
+  blurb: "Dark warm ground, one orange accent, a centered card.",
+  domain: "goat.wallet",
+  tone: "dark",
+  threadStyle: "imessage",
   vars: goat,
 };
 
 export const BRANDS: Brand[] = [
   DEFAULT_BRAND,
-  { id: "nimbus", name: "Nimbus", agentName: "Nimbus", blurb: "A travel assistant. Light, indigo, soft and airy.", vars: nimbus },
-  { id: "forge", name: "Forge", agentName: "Forge", blurb: "A dev tools brand. Near-black, lime, sharp corners, mono headings.", vars: forge },
+  {
+    id: "nimbus",
+    name: "Nimbus",
+    blurb: "A travel assistant. Light, indigo, a full-height sheet with a big amount.",
+    domain: "nimbus.travel",
+    tone: "light",
+    threadStyle: "whatsapp",
+    vars: nimbus,
+  },
+  {
+    id: "forge",
+    name: "Forge",
+    blurb: "A dev tools brand. Near-black, lime, a monospace receipt.",
+    domain: "forge.tools",
+    tone: "dark",
+    threadStyle: "imessage",
+    vars: forge,
+  },
 ];

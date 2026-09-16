@@ -1,12 +1,15 @@
+import Image from "next/image";
 import Link from "next/link";
-import { ArrowRight, Check } from "lucide-react";
-import { Badge, Button } from "@goat-wallet/ui";
-import { STEPS } from "./how-it-works";
+import { ArrowRight, ArrowUpRight, Check } from "lucide-react";
+import { Button } from "@goat-wallet/ui";
+import { cn } from "@/lib/cn";
+import { AGENT_LOGOS, type AgentLogo } from "./agent-logos";
+import { BrandSwitcher } from "./brand-switcher";
 import { DOCS_URL } from "./links";
 import { Reveal } from "./reveal";
 import { Section, SectionHeading } from "./section";
 
-const agents = ["ChatGPT", "Grok", "Claude (MCP)", "Claude Code CLI + skill", "OpenClaw", "Hermes", "Example chat"];
+const trySteps = ["Connect GOAT to your agent.", "Ask for something. Approve once, with a limit.", "The agent checks out and sends the receipt."];
 
 const devBullets = [
   "Typed client for Crossmint Agents APIs",
@@ -22,40 +25,22 @@ export function GetStarted() {
       <div className="grid gap-5 lg:grid-cols-2">
         <Reveal className="flex">
           <article className="flex w-full flex-col gap-7 rounded-3xl border border-border bg-card p-6 sm:p-9">
-            <header className="flex flex-col gap-2">
-              <h3 className="text-3xl font-bold tracking-tight">I want to try it</h3>
-              <p className="text-lg text-muted-foreground">Buy a Starbucks coffee with your agent in three steps.</p>
-            </header>
-            <ol className="flex flex-col gap-5">
-              {STEPS.map((step, i) => (
-                <li key={step.title} className="flex gap-4">
-                  <span className="mt-0.5 inline-flex size-7 shrink-0 items-center justify-center rounded-full bg-primary/15 text-sm font-bold text-primary">
-                    {i + 1}
-                  </span>
-                  <div className="flex flex-col gap-2">
-                    <p className="font-semibold">{step.title}</p>
-                    {i === 0 ? (
-                      <div className="flex flex-wrap gap-1.5">
-                        {agents.map((a) => (
-                          <Badge key={a} variant="outline" className="px-2.5 py-1 text-xs font-medium text-muted-foreground">
-                            {a}
-                          </Badge>
-                        ))}
-                      </div>
-                    ) : (
-                      <p className="text-sm text-muted-foreground">{step.text}</p>
-                    )}
-                  </div>
+            <h3 className="text-3xl font-bold tracking-tight">I want to try it</h3>
+            <ul className="grid grid-cols-3 gap-2.5 sm:grid-cols-4">
+              {AGENT_LOGOS.map((a) => (
+                <li key={a.name} className={cn("flex", a.href ? "col-span-3 sm:col-span-2" : "")}>
+                  <AgentTile agent={a} />
+                </li>
+              ))}
+            </ul>
+            <ol className="mt-auto flex flex-col gap-2 text-sm text-muted-foreground">
+              {trySteps.map((s, i) => (
+                <li key={s} className="flex gap-3">
+                  <span className="w-4 shrink-0 font-semibold text-primary tabular-nums">{i + 1}</span>
+                  <span>{s}</span>
                 </li>
               ))}
             </ol>
-            <div className="mt-auto pt-2">
-              <Button asChild size="lg" className="w-full sm:w-auto">
-                <Link href="/chat">
-                  Open the example chat <ArrowRight />
-                </Link>
-              </Button>
-            </div>
           </article>
         </Reveal>
 
@@ -64,8 +49,8 @@ export function GetStarted() {
             <header className="flex flex-col gap-2">
               <h3 className="text-3xl font-bold tracking-tight">I&apos;m building an agent or platform</h3>
               <p className="text-lg text-muted-foreground">
-                Use the Crossmint APIs behind GOAT to add saved cards, agent budgets, and checkouts to your product. Copy the parts
-                you need.
+                Use Crossmint APIs to add saved cards, agent budgets, and checkouts to your product. Copy the parts you need from the GOAT
+                template.
               </p>
             </header>
             <ul className="flex flex-col gap-3">
@@ -78,17 +63,6 @@ export function GetStarted() {
                 </li>
               ))}
             </ul>
-            <div className="goat-window">
-              <pre className="flex flex-col gap-1 p-4 font-mono text-[13px] leading-relaxed break-words whitespace-pre-wrap text-foreground">
-                <code className="block pl-5 -indent-5">
-                  <span className="text-muted-foreground select-none">$ </span>npm i -g goat
-                </code>
-                <code className="block pl-5 -indent-5">
-                  <span className="text-muted-foreground select-none">$ </span>goat agent-card request --amount 5 --description{" "}
-                  <span className="text-primary">&quot;Starbucks&quot;</span>
-                </code>
-              </pre>
-            </div>
             <div className="mt-auto pt-2">
               <Button asChild size="lg" variant="outline" className="w-full sm:w-auto">
                 <a href={DOCS_URL} target="_blank" rel="noreferrer">
@@ -98,7 +72,51 @@ export function GetStarted() {
             </div>
           </article>
         </Reveal>
+
+        <Reveal delay={150} className="flex lg:col-span-2">
+          <article id="brands" className="flex w-full scroll-mt-24 flex-col gap-8 rounded-3xl border border-border bg-card p-4 sm:p-9">
+            <header className="flex flex-col gap-2">
+              <p className="text-xs font-semibold tracking-wider text-primary uppercase">For builders</p>
+              <h3 className="text-3xl font-bold tracking-tight">Make it yours</h3>
+              <p className="text-lg text-muted-foreground">Same flow, your brand. Change colors, type, and layout.</p>
+            </header>
+            <BrandSwitcher />
+          </article>
+        </Reveal>
       </div>
     </Section>
+  );
+}
+
+function AgentTile({ agent }: { agent: AgentLogo }) {
+  const isGoat = Boolean(agent.href);
+  const body = (
+    <>
+      <span className={cn("inline-flex size-12 shrink-0 items-center justify-center rounded-xl", isGoat ? "" : "bg-[#0c0c0c]")}>
+        <Image
+          src={agent.src}
+          alt=""
+          width={48}
+          height={48}
+          className={cn("object-contain", isGoat ? "size-12 rounded-full" : "size-6")}
+        />
+      </span>
+      <span className={cn("flex min-w-0 flex-col leading-tight", isGoat ? "text-left" : "text-center")}>
+        <span className="truncate text-sm font-semibold">{agent.name}</span>
+        {agent.by ? <span className="truncate text-[11px] text-muted-foreground">{agent.by}</span> : null}
+      </span>
+      {isGoat ? <ArrowUpRight className="ml-auto size-4 shrink-0 text-primary" /> : null}
+    </>
+  );
+  const cls = cn(
+    "landing-tile flex w-full items-center gap-3 rounded-2xl border border-border bg-background/60 p-3",
+    isGoat ? "flex-row border-primary/40" : "flex-col justify-center gap-2 px-2 py-4",
+  );
+  return agent.href ? (
+    <Link href={agent.href} className={cn(cls, "outline-none focus-visible:ring-2 focus-visible:ring-ring/60")}>
+      {body}
+    </Link>
+  ) : (
+    <div className={cls}>{body}</div>
   );
 }

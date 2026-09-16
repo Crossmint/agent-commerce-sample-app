@@ -2,8 +2,9 @@ import type { CSSProperties } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { Button } from "@goat-wallet/ui";
+import { ApproveScreenMock } from "./approve-screen-mock";
 import { Container } from "./section";
-import { DOCS_URL } from "./links";
+import { CROSSMINT_URL, DOCS_URL } from "./links";
 import { MessageThreadMock } from "./message-thread-mock";
 
 const rise = (ms: number) => ({ "--delay": `${ms}ms` }) as CSSProperties;
@@ -13,24 +14,23 @@ export function Hero() {
     <section className="goat-backdrop relative overflow-hidden">
       <Container className="grid items-center gap-14 py-16 sm:py-24 lg:grid-cols-[1.1fr_1fr] lg:gap-10 lg:py-28">
         <div className="flex flex-col items-start gap-6">
-          <p className="landing-rise inline-flex flex-wrap items-center gap-x-2 rounded-full border border-border bg-card px-3.5 py-1.5 text-xs font-medium text-muted-foreground" style={rise(0)}>
-            <span>Open source</span>
-            <span aria-hidden className="text-primary">
-              ·
-            </span>
-            <span>White-label</span>
-            <span aria-hidden className="text-primary">
-              ·
-            </span>
-            <span>Powered by Crossmint</span>
-          </p>
-          <h1 className="landing-rise text-6xl font-extrabold tracking-tighter sm:text-7xl lg:text-8xl" style={rise(80)}>
-            GOAT Wallet
+          <h1 className="landing-rise w-full max-w-[520px]" style={rise(0)}>
+            <Image src="/brand/logo.png" alt="GOAT Wallet" width={2170} height={725} priority sizes="(min-width: 640px) 520px, 90vw" className="h-auto w-full" />
           </h1>
-          <p className="landing-rise max-w-xl text-xl leading-snug text-balance text-foreground/90 sm:text-2xl" style={rise(160)}>
-            The open source, white-label evolution of Link. Your users save a card once. Your agents pay anywhere.
+          <p className="landing-rise max-w-xl text-xl leading-snug text-balance text-foreground/90 sm:text-2xl" style={rise(80)}>
+            An open source template to create your own evolved version of Stripe&apos;s Link.
           </p>
-          <div className="landing-rise flex w-full flex-col gap-3 pt-2 sm:w-auto sm:flex-row" style={rise(240)}>
+          <a
+            href={CROSSMINT_URL}
+            target="_blank"
+            rel="noreferrer"
+            className="landing-rise inline-flex items-center gap-3 rounded-md py-1 text-sm text-muted-foreground transition-opacity hover:opacity-80"
+            style={rise(140)}
+          >
+            <span>Powered by</span>
+            <Image src="/logos/crossmint-white.svg" alt="Crossmint" width={459} height={86} className="h-5 w-auto" />
+          </a>
+          <div className="landing-rise flex w-full flex-col gap-3 pt-2 sm:w-auto sm:flex-row" style={rise(220)}>
             <Button asChild size="lg">
               <Link href="#try">Try it with your agent</Link>
             </Button>
@@ -42,20 +42,10 @@ export function Hero() {
           </div>
         </div>
 
-        <div className="landing-rise relative mx-auto mt-10 w-full max-w-md sm:mt-6 lg:mt-0" style={rise(200)}>
+        <div className="landing-rise relative mx-auto w-full max-w-[300px] sm:max-w-[430px]" style={rise(200)}>
           <div aria-hidden className="landing-glow absolute -inset-16 -z-10" />
-          <Image
-            src="/brand/mark.png"
-            alt="The GOAT mascot"
-            width={725}
-            height={725}
-            priority
-            className="landing-float absolute -top-16 right-1 z-10 w-32 drop-shadow-[0_24px_40px_rgba(0,0,0,0.5)] select-none sm:-top-20 sm:-left-12 sm:right-auto sm:w-44 lg:-left-16 lg:w-52"
-            draggable={false}
-          />
-          <div className="goat-window">
-            <MessageThreadMock frame="plain" />
-          </div>
+          <ApproveScreenMock className="absolute top-8 right-0 hidden w-[270px] origin-bottom-left rotate-[6deg] scale-90 opacity-80 sm:block" />
+          <MessageThreadMock style="whatsapp" className="relative z-10 w-full sm:w-[290px] sm:-rotate-3 sm:shadow-2xl" label="A WhatsApp thread: the user asks their agent for a latte, approves $8, and gets the receipt" />
         </div>
       </Container>
     </section>
