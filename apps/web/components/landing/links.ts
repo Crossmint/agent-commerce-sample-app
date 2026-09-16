@@ -4,3 +4,6 @@ export const DOCS_URL = "https://github.com/Crossmint/goat#readme";
 export const CROSSMINT_URL = "https://www.crossmint.com";
 // TODO: confirm the Telegram invite link before launch.
 export const TELEGRAM_URL = "https://t.me/goatwallet";
+
+/** Crossmint on X. */
+export const X_URL = "https://x.com/crossmint_ai";

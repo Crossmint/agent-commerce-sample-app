@@ -76,7 +76,7 @@ export function BrandSwitcher({ intro, cta }: BrandSwitcherProps) {
                 b.id === active ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground",
               )}
             >
-              <Image src={b.logo} alt="" width={16} height={16} className="size-4 shrink-0 rounded-[3px] bg-white object-cover" />
+              <Image src={b.logo} alt="" width={16} height={16} className="size-4 shrink-0 rounded-[3px] object-contain" />
               {b.name}
             </button>
           ))}
