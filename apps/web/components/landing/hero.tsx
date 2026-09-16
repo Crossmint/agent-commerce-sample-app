@@ -13,7 +13,7 @@ export function Hero() {
     <section className="goat-backdrop relative overflow-hidden">
       <Container className="grid items-center gap-14 py-16 sm:py-24 lg:grid-cols-[1.1fr_1fr] lg:gap-10 lg:py-28">
         <div className="flex flex-col items-start gap-6">
-          <Image src="/brand/logo.png" alt="GOAT Wallet" width={2170} height={725} priority sizes="(min-width: 640px) 312px, 54vw" className="landing-rise h-auto w-[54vw] max-w-[312px]" style={rise(0)} />
+          <Image src="/brand/logo.png" alt="GOAT Wallet" width={2170} height={725} priority unoptimized className="landing-rise h-auto w-[54vw] max-w-[312px]" style={rise(0)} />
           <h1 className="landing-rise max-w-xl text-4xl leading-[1.05] font-bold tracking-tight sm:text-5xl lg:text-6xl" style={rise(60)}>
             An open source alternative to Link
           </h1>
