@@ -2,7 +2,9 @@ import { stytchEndpoints, inferStytchEnvironment } from "@goat-wallet/auth/stytc
 import { createGoatMcpHandler, createProtectedResourceMetadataHandler } from "@goat-wallet/mcp";
 import { serverEnv } from "./env";
 
-const SCOPES = ["openid", "email", "profile", "offline_access", "full_access"];
+// No full_access: MCP hosts are third-party clients, and Crossmint accepts their
+// access tokens directly, so the server never needs to exchange them.
+const SCOPES = ["openid", "email", "profile", "offline_access"];
 
 function mcpOptions() {
   const projectId = serverEnv.required("STYTCH_PROJECT_ID");
