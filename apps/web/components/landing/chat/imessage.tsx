@@ -12,10 +12,10 @@ import { type ChatMessage, type ChatScreenProps, delayStyle, endsGroup, isLastFr
 
 const GRAY = "text-[#8e8e93]";
 
-export function IMessageScreen({ name, logo, messages }: ChatScreenProps) {
+export function IMessageScreen({ name, logo, logoStyle, messages }: ChatScreenProps) {
   return (
     <div className="landing-im flex h-full flex-col bg-black text-[13px] leading-[1.3] text-white">
-      <Header name={name} logo={logo} />
+      <Header name={name} logo={logo} logoStyle={logoStyle} />
       <div className="flex min-h-0 flex-1 flex-col justify-end overflow-hidden">
         <div className="flex flex-col px-2.5 pt-3 pb-1">
           <p className={cn("mb-2.5 text-center text-[10.5px]", GRAY)}>
@@ -33,12 +33,12 @@ export function IMessageScreen({ name, logo, messages }: ChatScreenProps) {
   );
 }
 
-function Header({ name, logo }: { name: string; logo?: string }) {
+function Header({ name, logo, logoStyle }: { name: string; logo?: string; logoStyle?: "fill" | "mark" }) {
   return (
     <div className="flex items-end justify-between border-b border-white/10 bg-[#1c1c1e]/95 px-2.5 pt-10 pb-1.5 text-[#0a84ff]">
       <ChevronLeftIcon width={26} height={26} strokeWidth={2.4} className="mb-4 -ml-1" />
       <div className="flex flex-col items-center gap-[5px] text-white">
-        <ContactAvatar size={46} logo={logo} />
+        <ContactAvatar size={46} logo={logo} logoStyle={logoStyle} />
         <span className="flex items-center text-[10.5px] leading-none">
           {name}
           <ChevronRightIcon width={9} height={9} strokeWidth={3} className={cn("ml-px", GRAY)} />

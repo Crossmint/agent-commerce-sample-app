@@ -1,18 +1,11 @@
-import type { ComponentType } from "react";
 import type { ApprovalLayout } from "../brands";
-import { GoatApprove } from "./goat";
-import { GrokBotApprove } from "./grokbot";
-import { InstinctApprove } from "./instinct";
-import { MuseApprove } from "./muse";
-import type { ApproveLayoutProps } from "./types";
+import { goat } from "./goat";
+import { grokbot } from "./grokbot";
+import { instinct } from "./instinct";
+import { muse } from "./muse";
+import type { ApproveVariant } from "./types";
 
-export type { ApproveLayoutProps } from "./types";
-export { GoatApprove, GrokBotApprove, InstinctApprove, MuseApprove };
+export type { ApproveLayoutProps, ApproveState, ApproveVariant, CardFormTheme } from "./types";
 
-/** One approval layout per brand. They differ in structure, not only in color. */
-export const APPROVE_LAYOUTS: Record<ApprovalLayout, ComponentType<ApproveLayoutProps>> = {
-  goat: GoatApprove,
-  instinct: InstinctApprove,
-  muse: MuseApprove,
-  grokbot: GrokBotApprove,
-};
+/** One approval page and card form theme per brand. They differ in structure, not only in color. */
+export const APPROVE_VARIANTS: Record<ApprovalLayout, ApproveVariant> = { goat, instinct, muse, grokbot };

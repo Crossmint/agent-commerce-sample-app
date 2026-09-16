@@ -21,11 +21,7 @@ export function BuildYourOwn() {
         </Button>
       </Reveal>
 
-      <Reveal className="flex flex-col gap-8">
-        <div className="flex flex-col gap-3">
-          <h3 className="text-3xl font-bold tracking-tight sm:text-4xl">Make it feel like your brand</h3>
-          <p className="max-w-2xl text-lg text-muted-foreground sm:text-xl">See examples of how this could look in your platform</p>
-        </div>
+      <Reveal>
         <BrandSwitcher />
       </Reveal>
     </Section>

@@ -65,24 +65,9 @@ html {
 }
 
 /*
- * Step sequences. A phone in a sequence is full size when active and dims
- * and shrinks a little when not. Screens stacked in one phone crossfade with
- * a small slide toward the side they sit on.
+ * Screens stacked in one phone crossfade with a small slide toward the side
+ * they sit on.
  */
-.landing-step-phone {
-  transition:
-    opacity 0.5s ease,
-    transform 0.6s cubic-bezier(0.2, 0.8, 0.2, 1),
-    filter 0.5s ease;
-}
-.landing-step-phone[data-active="false"] {
-  opacity: 0.45;
-  transform: scale(0.94);
-  filter: saturate(0.6);
-}
-.landing-step-phone[data-active="false"]:hover {
-  opacity: 0.7;
-}
 .landing-screen-layer {
   opacity: 0;
   visibility: hidden;
@@ -188,18 +173,44 @@ html {
 }
 
 /*
- * Phone frame. 9:19.5 body that shrinks with its container. Screens draw
- * their own header under the 44px status bar and leave room for the home
- * indicator at the bottom.
+ * Phone frame. iPhone 15/16 proportions that shrink with the container.
+ * Screens draw their own header under the status bar (they pad 44px) and
+ * leave room for the home indicator at the bottom.
  */
+/*
+ * One phone width for the whole page. Every PhoneFrame reads it, and the
+ * adapters panel matches the phone's height from it, so the blocks line up.
+ * The page sets it on <main class="landing">; it shrinks under 320px wide
+ * viewports so a phone never pushes past the side gutter.
+ */
+.landing {
+  --phone-w: 280px;
+}
+@media (max-width: 319px) {
+  .landing {
+    --phone-w: calc(100vw - 32px);
+  }
+}
 .landing-phone {
-  --phone-w: 300px;
+  /* iPhone 15/16 geometry in points: 393x852 screen, 55pt screen corners,
+     126x37pt dynamic island 11pt from the top, 54pt status bar. Everything
+     scales from the screen width, which is the frame width minus the bezel. */
+  --phone-bezel: 10px;
+  --phone-screen-w: calc(var(--phone-w, 280px) - 2 * var(--phone-bezel));
+  --phone-screen-r: calc(var(--phone-screen-w) * 55 / 393);
+  --phone-island-w: calc(var(--phone-screen-w) * 126 / 393);
+  --phone-island-h: calc(var(--phone-screen-w) * 37 / 393);
+  --phone-island-top: calc(var(--phone-screen-w) * 11 / 393);
+  --phone-status-h: calc(var(--phone-screen-w) * 54 / 393);
+  width: 100%;
+  max-width: var(--phone-w, 280px);
   /* The screen's text must not set the frame's minimum width. Narrow columns
      shrink the frame; the aspect ratio keeps the phone proportions. */
   contain: inline-size;
-  aspect-ratio: 9 / 19.5;
-  padding: 10px;
-  border-radius: 44px;
+  /* Screen 393:852 exactly, plus the bezel on top and bottom. */
+  height: calc(var(--phone-screen-w) * 852 / 393 + 2 * var(--phone-bezel));
+  padding: var(--phone-bezel);
+  border-radius: calc(var(--phone-screen-r) + var(--phone-bezel));
   background: linear-gradient(160deg, #2c2c2c 0%, #0c0c0c 38%, #161616 100%);
   box-shadow:
     0 0 0 1px rgba(255, 255, 255, 0.09),
@@ -213,8 +224,10 @@ html {
   height: 100%;
   width: 100%;
   overflow: hidden;
-  border-radius: 34px;
-  background: #000;
+  border-radius: var(--phone-screen-r);
+  /* No background here: PhoneFrame sets it with a utility class (default
+     bg-black) so light screens can override it. Screens crossfade over this
+     color, so it must match the screens, or the fade flashes. */
 }
 .landing-phone-content {
   display: flex;
@@ -222,6 +235,7 @@ html {
   height: 100%;
   min-height: 0;
 }
+/* Time on the left, signal/wifi/battery on the right, both clear of the island. */
 .landing-phone-status {
   position: absolute;
   top: 0;
@@ -231,19 +245,19 @@ html {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  height: 44px;
-  padding: 0 22px 0 26px;
+  height: var(--phone-status-h);
+  padding: 0 18px 0 24px;
   font-size: 13px;
   font-weight: 600;
   pointer-events: none;
 }
 .landing-phone-island {
   position: absolute;
-  top: 10px;
+  top: var(--phone-island-top);
   left: 50%;
   z-index: 30;
-  width: 84px;
-  height: 24px;
+  width: var(--phone-island-w);
+  height: var(--phone-island-h);
   border-radius: 9999px;
   background: #000;
   transform: translateX(-50%);
@@ -253,7 +267,7 @@ html {
   bottom: 8px;
   left: 50%;
   z-index: 20;
-  width: 100px;
+  width: calc(var(--phone-screen-w) * 139 / 393);
   height: 4px;
   border-radius: 9999px;
   transform: translateX(-50%);
@@ -304,6 +318,136 @@ html {
   position: relative;
 }
 
+
+/*
+ * Approval mini-sequence. Characters type in one by one (each span gets its
+ * own --delay), a field shows a focus ring for --dur from --delay, a button
+ * presses at --delay, the check draws itself, and the adapters panel lights
+ * its lines in turn.
+ */
+@keyframes landing-type {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes landing-focus {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 transparent;
+    border-color: var(--field-border);
+  }
+  0.1%,
+  99.9% {
+    box-shadow: 0 0 0 2px var(--field-ring);
+    border-color: var(--field-focus);
+  }
+}
+@keyframes landing-caret {
+  0%,
+  100% {
+    opacity: 0;
+  }
+  0.1%,
+  99.9% {
+    opacity: 1;
+  }
+}
+@keyframes landing-press {
+  0%,
+  100% {
+    transform: none;
+    filter: none;
+  }
+  35% {
+    transform: scale(0.965);
+    filter: brightness(0.86);
+  }
+}
+@keyframes landing-glow-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 var(--ring-color);
+  }
+  50% {
+    box-shadow: 0 0 0 5px var(--ring-color);
+  }
+}
+@keyframes landing-draw {
+  from {
+    stroke-dashoffset: 30;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+@keyframes landing-line {
+  from {
+    stroke-dashoffset: 200;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+.landing-type {
+  animation: landing-type 1ms steps(1) both;
+  animation-delay: var(--delay, 0ms);
+}
+.landing-focus {
+  animation: landing-focus var(--dur, 800ms) linear both;
+  animation-delay: var(--delay, 0ms);
+}
+.landing-caret {
+  display: inline-block;
+  width: 1.5px;
+  height: 1em;
+  margin-left: 1px;
+  vertical-align: -0.15em;
+  background: currentColor;
+  animation: landing-caret var(--dur, 800ms) linear both;
+  animation-delay: var(--delay, 0ms);
+}
+.landing-press {
+  animation: landing-press 0.36s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  animation-delay: var(--delay, 0ms);
+}
+.landing-ready {
+  animation: landing-glow-pulse 1.4s ease-in-out infinite;
+  animation-delay: var(--delay, 0ms);
+}
+.landing-draw {
+  stroke-dasharray: 30;
+  stroke-dashoffset: 30;
+  animation: landing-draw 0.4s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  animation-delay: var(--delay, 0ms);
+}
+
+/* Adapters panel: three wires from the wallet mark to three cards. */
+.landing-wire {
+  stroke: color-mix(in srgb, var(--foreground) 14%, transparent);
+  transition: stroke 0.4s ease;
+}
+.landing-wire-lit {
+  stroke: var(--primary);
+  stroke-dasharray: 200;
+  animation: landing-line 0.9s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+.landing-adapter {
+  transition:
+    border-color 0.4s ease,
+    background-color 0.4s ease,
+    opacity 0.4s ease;
+}
+.landing-adapter[data-active="false"] {
+  opacity: 0.55;
+}
+.landing-adapter[data-active="true"] {
+  border-color: color-mix(in srgb, var(--primary) 60%, var(--border));
+  background-color: color-mix(in srgb, var(--primary) 8%, transparent);
+}
+
 /* A soft warm glow behind hero art. */
 .landing-glow {
   background: radial-gradient(closest-side, color-mix(in srgb, var(--primary) 22%, transparent), transparent 70%);
@@ -318,9 +462,27 @@ html {
   .landing-fade,
   .landing-pop,
   .landing-bright,
-  .landing-pick {
+  .landing-pick,
+  .landing-type,
+  .landing-press,
+  .landing-ready,
+  .landing-draw,
+  .landing-wire-lit {
     animation: none;
     opacity: 1;
+  }
+  .landing-draw {
+    stroke-dashoffset: 0;
+  }
+  .landing-focus,
+  .landing-caret {
+    animation: none;
+  }
+  .landing-caret {
+    opacity: 0;
+  }
+  .landing-adapter {
+    transition: none;
   }
   .landing-pick {
     background-color: rgba(10, 132, 255, 0.16);
@@ -330,16 +492,12 @@ html {
     animation: none;
     opacity: 0;
   }
-  .landing-step-phone[data-active="false"] {
-    transform: none;
-  }
   .landing-reveal[data-reveal="hidden"] {
     opacity: 1;
     transform: none;
   }
   .landing-reveal[data-reveal="shown"],
   .landing-tile,
-  .landing-step-phone,
   .landing-screen-layer {
     transition: none;
   }

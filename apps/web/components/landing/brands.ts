@@ -9,13 +9,19 @@ export type ApprovalLayout = BrandId | "goat";
 export interface Brand {
   id: BrandId | "goat";
   name: string;
-  /** Logo under `public/`. A monochrome white mark on transparent. */
+  /** Logo under `public/`. */
   logo: string;
+  /**
+   * How the logo sits in a round avatar. "fill": the file is a full app icon
+   * and covers the circle. "mark": a glyph on transparent, centered on a
+   * neutral disc.
+   */
+  logoStyle: "fill" | "mark";
   /** Host shown in the browser bar and in the approval link. */
   domain: string;
   /** Which chat app the demo thread imitates. */
   chatStyle: ChatStyle;
-  /** Light brands get dark status bar glyphs and a light browser chrome. */
+  /** Tone of the approval pages. Light brands get dark status bar glyphs and a light browser chrome. */
   tone: "light" | "dark";
   approval: ApprovalLayout;
 }
@@ -25,6 +31,7 @@ export const DEFAULT_BRAND: Brand = {
   id: "goat",
   name: "Your agent",
   logo: "/brand/mark.png",
+  logoStyle: "mark",
   domain: "yourplatform.com",
   chatStyle: "imessage",
   tone: "dark",
@@ -36,8 +43,15 @@ export interface AgentBrand extends Brand {
   id: BrandId;
 }
 
+/*
+ * Real products, real marks. Sources are in public/logos/SOURCES.md.
+ * - Instinct lives in iMessage and WhatsApp, so its thread is iMessage.
+ * - Muse is Meta's agent; the thread is Instagram Direct. Its avatar is the
+ *   Muse app icon (the blue squiggle on a white tile).
+ * - GrokBot is chatted with in the Grok app. Its avatar is the Grok app icon.
+ */
 export const BRANDS: AgentBrand[] = [
-  { id: "instinct", name: "Instinct", logo: "/logos/instinct.svg", domain: "instinct.app", chatStyle: "imessage", tone: "light", approval: "instinct" },
-  { id: "muse", name: "Muse", logo: "/logos/muse.svg", domain: "muse.ai", chatStyle: "instagram", tone: "dark", approval: "muse" },
-  { id: "grokbot", name: "GrokBot", logo: "/logos/grok.svg", domain: "grok.com", chatStyle: "grok", tone: "dark", approval: "grokbot" },
+  { id: "instinct", name: "Instinct", logo: "/logos/instinct.svg", logoStyle: "fill", domain: "instinct.co", chatStyle: "imessage", tone: "light", approval: "instinct" },
+  { id: "muse", name: "Muse", logo: "/logos/muse.svg", logoStyle: "fill", domain: "muse.ai", chatStyle: "instagram", tone: "light", approval: "muse" },
+  { id: "grokbot", name: "GrokBot", logo: "/logos/grok-icon.png", logoStyle: "fill", domain: "grok.com", chatStyle: "grok", tone: "light", approval: "grokbot" },
 ];

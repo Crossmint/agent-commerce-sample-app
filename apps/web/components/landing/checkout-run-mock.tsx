@@ -9,9 +9,9 @@ import { PhoneFrame } from "./phone-frame";
 import { useStepLoop } from "./use-step-loop";
 
 /*
- * One timeline in ms, shared by the phone and the browser window. Everything
- * is CSS animation with delays, so a single remount replays the whole run
- * and reduced motion shows the final state with no JS.
+ * One timeline in ms. Everything is CSS animation with delays, so a single
+ * remount replays the whole run and reduced motion shows the final state
+ * with no JS.
  */
 const T = {
   buying: 300,
@@ -31,28 +31,23 @@ const OPTIONS = ["Visa •••• 4242", "Shop Pay", "Starbucks saved card"];
 const delay = (ms: number) => ({ "--delay": `${ms}ms` }) as CSSProperties;
 
 /**
- * The agent buys a latte. An iMessage thread on a phone: the agent offers
- * payment methods in a list card, the user picks Visa, then a progress card
- * ticks through the checkout and the receipt lands. Beside it on large
- * screens, a browser window logs the same steps: the automation the user
- * never sees.
+ * The agent buys a latte. An iMessage thread on a phone: the agent says it
+ * is buying, offers payment methods in a list card, the user picks Visa,
+ * then a progress card ticks through the checkout and the receipt lands.
+ * The phone alone carries the story.
  */
 export function CheckoutRunMock({ className }: { className?: string }) {
   const { ref, cycle } = useStepLoop<HTMLDivElement>(1, { interval: T.loop });
   return (
-    <div ref={ref} className={cn("relative flex items-center gap-5 lg:gap-6", className)}>
+    <div ref={ref} className={cn("relative flex", className)}>
       <div aria-hidden className="landing-glow absolute -inset-10 -z-10" />
-      <div key={cycle} className="contents">
-        <PhoneFrame
-          width={270}
-          className="mx-0 shrink"
-          screenClassName="bg-black"
-          label="An iMessage thread: the agent buys a latte at Starbucks, the user picks Visa from a list, a progress card checks off each step, and the receipt arrives"
-        >
-          <IMessageScreen name="Your agent" messages={messages()} />
-        </PhoneFrame>
-        <AutomationWindow className="hidden min-w-0 flex-1 self-center lg:block" />
-      </div>
+      <PhoneFrame
+        key={cycle}
+        screenClassName="bg-black"
+        label="An iMessage thread: the agent buys a latte at Starbucks, the user picks Visa from a list, a progress card checks off each step, and the receipt arrives"
+      >
+        <IMessageScreen name="Your agent" messages={messages()} />
+      </PhoneFrame>
     </div>
   );
 }
@@ -113,45 +108,17 @@ function ProgressCard() {
   );
 }
 
-/* ---------- Browser window ---------- */
-
-function AutomationWindow({ className }: { className?: string }) {
-  return (
-    <div className={cn("goat-window max-w-[300px] text-[12px]", className)} aria-hidden>
-      <div className="flex flex-col gap-3 p-4 font-mono">
-        <p className="flex items-center gap-1.5 truncate text-[11px] text-muted-foreground">
-          <LockIcon width={12} height={12} strokeWidth={2.5} className="shrink-0" />
-          starbucks.com/checkout
-        </p>
-        <ol className="flex flex-col gap-2">
-          {STEPS.map((label, i) => {
-            const from = i === 0 ? T.card : (T.steps[i - 1] ?? T.card);
-            return (
-              <li key={label} className="landing-fade" style={delay(from)}>
-                <RunStep label={label} from={from} at={T.steps[i] ?? T.receipt} mono />
-              </li>
-            );
-          })}
-        </ol>
-        <p className="landing-fade text-[11px] text-muted-foreground" style={delay(T.receipt)}>
-          Receipt sent to the user.
-        </p>
-      </div>
-    </div>
-  );
-}
-
 /* ---------- Shared pieces ---------- */
 
 /**
  * One step in a run. A hollow dot until `from`, a spinner from `from` to `at`,
  * a check from `at`. The label brightens at `at`.
  */
-function RunStep({ label, from, at, mono = false }: { label: string; from: number; at: number; mono?: boolean }) {
+function RunStep({ label, from, at }: { label: string; from: number; at: number }) {
   return (
-    <span className={cn("flex items-start gap-2 leading-tight", mono ? "text-[11px] text-foreground" : "text-white")}>
-      <RunMark from={from} at={at} className={mono ? "mt-px" : undefined} />
-      <span className={cn("landing-bright min-w-0", mono ? "" : "truncate")} style={delay(at)}>
+    <span className="flex items-start gap-2 leading-tight text-white">
+      <RunMark from={from} at={at} />
+      <span className="landing-bright min-w-0 truncate" style={delay(at)}>
         {label}
       </span>
     </span>

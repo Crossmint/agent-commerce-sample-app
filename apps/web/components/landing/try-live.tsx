@@ -13,13 +13,9 @@ export function TryLive() {
       <SectionHeading
         title="Try a live implementation"
         sub={
-          <>
-            Try a live deployment, or{" "}
-            <Link href="#build" className="text-primary underline-offset-4 hover:underline">
-              build your own
-            </Link>
-            .
-          </>
+          <Link href="#build" className="text-primary underline-offset-4 hover:underline">
+            or build your own
+          </Link>
         }
       />
       <Reveal className="flex flex-col gap-5">

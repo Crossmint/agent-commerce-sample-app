@@ -1,50 +1,7 @@
 "use client";
 
-import { Children, type KeyboardEvent, type ReactNode } from "react";
+import { Children, type ReactNode } from "react";
 import { cn } from "@/lib/cn";
-
-/**
- * Wraps one phone in a step sequence. The active phone is full size; the
- * others dim and shrink a little. Clicking it jumps to its step.
- *
- * A div with the button role, not a `<button>`: the screens inside draw
- * decorative buttons, and HTML forbids a button inside a button.
- */
-export function StepPhone({
-  active,
-  onClick,
-  label,
-  className,
-  children,
-}: {
-  active: boolean;
-  onClick: () => void;
-  /** What clicking shows, for assistive tech. */
-  label: string;
-  className?: string;
-  children: ReactNode;
-}) {
-  const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
-    if (e.key === "Enter" || e.key === " ") {
-      e.preventDefault();
-      onClick();
-    }
-  };
-  return (
-    <div
-      role="button"
-      tabIndex={0}
-      onClick={onClick}
-      onKeyDown={onKeyDown}
-      aria-label={label}
-      aria-pressed={active}
-      data-active={active}
-      className={cn("landing-step-phone block w-full cursor-pointer text-left outline-none focus-visible:ring-2 focus-visible:ring-ring/60", className)}
-    >
-      {children}
-    </div>
-  );
-}
 
 /**
  * Stacks screens inside one phone. The active one is visible; the others

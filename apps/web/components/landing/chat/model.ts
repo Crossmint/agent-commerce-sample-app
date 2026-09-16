@@ -31,14 +31,26 @@ export interface ChatScreenProps {
   name: string;
   /** Logo for the contact avatar. Default: a neutral robot mark. */
   logo?: string;
+  /** How the logo sits in the avatar. Default "mark". */
+  logoStyle?: "fill" | "mark";
   messages: ChatMessage[];
 }
 
-/** Screen color behind the status bar for each chat style. */
+/**
+ * Screen color behind the status bar for each chat style. iMessage is the
+ * dark appearance; Instagram Direct and Grok are their light themes.
+ */
 export const CHAT_SCREEN_BG: Record<ChatStyle, string> = {
   imessage: "bg-black",
-  instagram: "bg-black",
-  grok: "bg-black",
+  instagram: "bg-white",
+  grok: "bg-[#f9f8f7]",
+};
+
+/** Status bar glyph tone for each chat style. */
+export const CHAT_TONE: Record<ChatStyle, "light" | "dark"> = {
+  imessage: "light",
+  instagram: "dark",
+  grok: "dark",
 };
 
 /** Human name of each app, for accessible labels. */

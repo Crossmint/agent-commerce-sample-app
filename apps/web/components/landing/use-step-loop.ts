@@ -17,28 +17,42 @@ export function useReducedMotion(): boolean {
 }
 
 export interface StepLoopOptions {
-  /** ms per step. Default 2500. */
+  /** ms per step when `durations` is not given. Default 2500. */
   interval?: number;
+  /** ms per step, one entry per step. Missing entries fall back to `interval`. */
+  durations?: number[];
   /** Extra ms to hold the last step before the loop restarts. Default 0. */
   hold?: number;
   /** How much of the element must be visible to run. Default 0.3. */
   threshold?: number;
+  /**
+   * Steps to show under reduced motion. With one entry the loop rests on it.
+   * With more, they alternate every `reducedInterval` ms with no transitions.
+   * Default: the last step.
+   */
+  reducedSteps?: number[];
+  /** ms per step under reduced motion. Default 5000. */
+  reducedInterval?: number;
 }
 
 /**
  * Steps 0..count-1 on a timer while the element is in view, then loops.
  * `cycle` goes up on each loop, so callers can key replayed pieces on it.
  * The loop pauses out of view and restarts from step 0 on re-entry. Under
- * reduced motion the step rests on the last one and nothing moves.
+ * reduced motion only `reducedSteps` show, and nothing else moves.
  *
  * With `count = 1` the hook is a plain loop timer: `cycle` ticks every
  * `interval` ms while in view.
  */
-export function useStepLoop<T extends Element>(count: number, { interval = 2500, hold = 0, threshold = 0.3 }: StepLoopOptions = {}) {
+export function useStepLoop<T extends Element>(
+  count: number,
+  { interval = 2500, durations, hold = 0, threshold = 0.3, reducedSteps, reducedInterval = 5000 }: StepLoopOptions = {},
+) {
   const { ref, inView } = useInView<T>({ threshold });
   const reduce = useReducedMotion();
   const [step, setStep] = useState(0);
   const [cycle, setCycle] = useState(0);
+  const [reducedIndex, setReducedIndex] = useState(0);
   const wasOut = useRef(false);
 
   useEffect(() => {
@@ -53,6 +67,7 @@ export function useStepLoop<T extends Element>(count: number, { interval = 2500,
   useEffect(() => {
     if (reduce || inView !== true) return;
     const last = step >= count - 1;
+    const ms = durations?.[step] ?? interval;
     const id = window.setTimeout(
       () => {
         if (last) {
@@ -62,10 +77,18 @@ export function useStepLoop<T extends Element>(count: number, { interval = 2500,
           setStep(step + 1);
         }
       },
-      last ? interval + hold : interval,
+      last ? ms + hold : ms,
     );
     return () => window.clearTimeout(id);
-  }, [step, cycle, inView, reduce, count, interval, hold]);
+  }, [step, cycle, inView, reduce, count, interval, durations, hold]);
 
-  return { ref, step: reduce ? count - 1 : step, cycle, jump: setStep, reduce };
+  const reducedCount = reducedSteps?.length ?? 1;
+  useEffect(() => {
+    if (!reduce || inView !== true || reducedCount < 2) return;
+    const id = window.setTimeout(() => setReducedIndex((i) => (i + 1) % reducedCount), reducedInterval);
+    return () => window.clearTimeout(id);
+  }, [reduce, inView, reducedCount, reducedIndex, reducedInterval]);
+
+  const reducedStep = reducedSteps?.[reducedIndex % reducedCount] ?? count - 1;
+  return { ref, step: reduce ? reducedStep : step, cycle, jump: setStep, reduce };
 }

@@ -1,56 +1,29 @@
 "use client";
 
 import { cn } from "@/lib/cn";
-import { APPROVE_SCREEN_BG, ApproveScreen, ApproveScreenMock } from "./approve-screen-mock";
-import { CHAT_SCREEN_BG } from "./chat";
-import { MessageThreadMock, MessageThreadScreen } from "./message-thread-mock";
-import { PhoneFrame } from "./phone-frame";
-import { ScreenStack, StepDots, StepPhone } from "./step-ui";
+import { StepDots } from "./step-ui";
+import { phaseOf, STORY_DURATIONS, STORY_PHASES, STORY_REDUCED, STORY_STEPS, StoryPhone } from "./story-phone";
 import { useStepLoop } from "./use-step-loop";
 
 const DOMAIN = "yourplatform.com";
 
-const CAPTIONS = ["The user asks. The agent sends an approval link.", `The user approves once, on ${DOMAIN}.`, "The agent has $8 on the user's card."];
+const CAPTIONS = ["The user asks. The agent sends an approval link.", `The user adds a card and approves once, on ${DOMAIN}.`, "The agent has $8 on the user's card."];
 
 /**
- * The Agent Cards experience as a three-step loop. Step 0: the thread, ask
- * and link. Step 1: the approval screen. Step 2: the thread again, with the
- * "You approved" line. Two phones on wide screens, one phone with a screen
- * crossfade on small ones.
+ * The Agent Cards experience: one phone that plays the story, three dots for
+ * its three phases, and a caption for the current one.
  */
 export function AgentCardsDemo({ className }: { className?: string }) {
-  const { ref, step, cycle, jump } = useStepLoop<HTMLDivElement>(3, { interval: 2800, hold: 800 });
-  const variant = step === 2 ? "approved" : "request";
-  const onThread = step !== 1;
-
+  const { ref, step, cycle, jump } = useStepLoop<HTMLDivElement>(STORY_STEPS, { durations: STORY_DURATIONS, hold: 1200, reducedSteps: STORY_REDUCED });
+  const phase = phaseOf(step);
   return (
     <div ref={ref} className={cn("relative flex flex-col gap-5", className)}>
       <div aria-hidden className="landing-glow absolute -inset-10 -z-10" />
-
-      {/* Two phones from sm up. */}
-      <div className="hidden w-full max-w-[520px] grid-cols-2 items-end gap-4 sm:grid sm:gap-6">
-        <StepPhone active={onThread} onClick={() => jump(step === 2 ? 2 : 0)} label="Show the message thread">
-          <MessageThreadMock key={`${cycle}-${variant}`} style="imessage" variant={variant} domain={DOMAIN} width={250} />
-        </StepPhone>
-        <StepPhone active={!onThread} onClick={() => jump(1)} label="Show the approval screen">
-          <ApproveScreenMock domain={DOMAIN} agentName="Your agent" width={250} />
-        </StepPhone>
-      </div>
-
-      {/* One phone below sm. The screen crossfades. */}
-      <div className="w-full sm:hidden">
-        <PhoneFrame width={260} className="mx-0" screenClassName={onThread ? CHAT_SCREEN_BG.imessage : APPROVE_SCREEN_BG.dark} label="A phone that switches between the message thread and the approval screen">
-          <ScreenStack active={onThread ? 0 : 1}>
-            <MessageThreadScreen key={`${cycle}-${variant}`} style="imessage" variant={variant} domain={DOMAIN} />
-            <ApproveScreen domain={DOMAIN} agentName="Your agent" />
-          </ScreenStack>
-        </PhoneFrame>
-      </div>
-
+      <StoryPhone step={step} cycle={cycle} />
       <div className="flex flex-col items-start gap-2">
-        <StepDots count={3} active={step} onPick={jump} labels={CAPTIONS} />
+        <StepDots count={3} active={phase} onPick={(i) => jump(STORY_PHASES[i]?.start ?? 0)} labels={CAPTIONS} />
         <p className="min-h-[1.5em] text-sm text-muted-foreground" aria-live="polite">
-          {CAPTIONS[step]}
+          {CAPTIONS[phase]}
         </p>
       </div>
     </div>

@@ -1,38 +1,21 @@
 "use client";
 
-import { APPROVE_SCREEN_BG, ApproveScreen } from "./approve-screen-mock";
-import { CHAT_SCREEN_BG } from "./chat";
-import { MessageThreadScreen } from "./message-thread-mock";
-import { PhoneFrame } from "./phone-frame";
-import { ScreenStack } from "./step-ui";
+import { STORY_DURATIONS, STORY_STEPS, StoryPhone } from "./story-phone";
 import { useStepLoop } from "./use-step-loop";
 
-const DOMAIN = "yourplatform.com";
-
 /**
- * The hero phone. One phone that steps through the story: the iMessage
- * thread where the agent asks and sends the link, the approval screen on
- * yourplatform.com, then the thread again with "You approved $8.00". Loops
- * while in view; rests on the final thread under reduced motion.
+ * The hero phone. It plays the whole story on a loop: the iMessage ask, the
+ * approval on yourplatform.com with the card added, and the thread again
+ * with the approval, "Ordered", and the receipt. It rests on the final
+ * thread for 3s before it loops, pauses out of view, and under reduced
+ * motion shows the final thread only.
  */
 export function HeroPhone({ className }: { className?: string }) {
-  const { ref, step, cycle } = useStepLoop<HTMLDivElement>(3, { interval: 2900, hold: 1100 });
-  const onThread = step !== 1;
+  const { ref, step, cycle } = useStepLoop<HTMLDivElement>(STORY_STEPS, { durations: STORY_DURATIONS, hold: 3000, reducedSteps: [STORY_STEPS - 1] });
   return (
     <div ref={ref} className={className}>
       <div aria-hidden className="landing-glow absolute -inset-16 -z-10" />
-      <PhoneFrame
-        width={300}
-        screenClassName={onThread ? CHAT_SCREEN_BG.imessage : APPROVE_SCREEN_BG.dark}
-        className="shadow-2xl"
-        label="A phone that steps through the flow: the user asks their agent for a latte in iMessage, approves $8 on yourplatform.com, and the thread confirms the approval"
-      >
-        <ScreenStack active={step}>
-          <MessageThreadScreen key={cycle} style="imessage" variant="request" domain={DOMAIN} />
-          <ApproveScreen domain={DOMAIN} agentName="Your agent" />
-          <MessageThreadScreen key={`${cycle}-approved`} style="imessage" variant="approved" domain={DOMAIN} />
-        </ScreenStack>
-      </PhoneFrame>
+      <StoryPhone step={step} cycle={cycle} className="shadow-2xl" />
     </div>
   );
 }

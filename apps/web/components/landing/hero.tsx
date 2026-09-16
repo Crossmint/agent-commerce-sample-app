@@ -39,7 +39,7 @@ export function Hero() {
           </div>
         </div>
 
-        <HeroPhone className="landing-rise relative w-full max-w-[280px] sm:max-w-[300px] lg:ml-auto" />
+        <HeroPhone className="landing-rise relative w-full max-w-[var(--phone-w)] lg:ml-auto" />
       </Container>
     </section>
   );

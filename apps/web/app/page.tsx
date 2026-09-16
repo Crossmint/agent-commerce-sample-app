@@ -17,7 +17,7 @@ export default function LandingPage() {
   return (
     <>
       <LandingNav />
-      <main className="flex flex-1 flex-col">
+      <main className="landing flex flex-1 flex-col">
         <Hero />
         <CorePieces />
         <TryLive />

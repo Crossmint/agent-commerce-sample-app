@@ -5,20 +5,21 @@ import { CameraIcon, ChevronLeftIcon, ImageIcon, LockIcon, MicIcon, PhoneIcon, S
 import { type ChatMessage, type ChatScreenProps, delayStyle, endsGroup, isLastFromUser } from "./model";
 
 /*
- * Instagram Direct, dark. Black canvas, #262626 received bubbles with a small
- * avatar beside the last one of a group, sent bubbles in the blue-purple DM
- * gradient, a tiny "Seen" under the last sent one. Bubbles in a group flatten
- * the corners that face each other. The composer is one pill with a gradient
- * camera button inside.
+ * Instagram Direct, light appearance. White canvas, #efefef received bubbles
+ * with a small avatar beside the last one of a group, sent bubbles in the
+ * blue-purple DM gradient, a tiny "Seen" under the last sent one. Bubbles in
+ * a group flatten the corners that face each other. The header stacks the
+ * name over "Active now" beside the avatar. The composer is one gray pill
+ * with a gradient camera button inside.
  */
 
 const GRADIENT = "bg-[linear-gradient(160deg,#7a40f2_0%,#5b5cf0_45%,#3797f0_100%)]";
-const GRAY = "text-[#a8a8a8]";
+const GRAY = "text-[#737373]";
 
-export function InstagramScreen({ name, logo, messages }: ChatScreenProps) {
+export function InstagramScreen({ name, logo, logoStyle, messages }: ChatScreenProps) {
   return (
-    <div className="flex h-full flex-col bg-black text-[13px] leading-[1.3] text-white">
-      <Header name={name} logo={logo} />
+    <div className="flex h-full flex-col bg-white text-[13px] leading-[1.3] text-black antialiased">
+      <Header name={name} logo={logo} logoStyle={logoStyle} />
       <div className="flex min-h-0 flex-1 flex-col justify-end overflow-hidden">
         <div className="flex flex-col px-2.5 pt-2 pb-1">
           <p className={cn("mb-3 text-center text-[10.5px] font-medium", GRAY)}>Today 9:41 AM</p>
@@ -27,7 +28,7 @@ export function InstagramScreen({ name, logo, messages }: ChatScreenProps) {
             const last = endsGroup(messages, i);
             return (
               <div key={m.key} className={cn("landing-bubble flex flex-col", last ? "mb-2.5" : "mb-[2px]")} style={delayStyle(m.at)}>
-                <Message m={m} first={first} last={last} seen={isLastFromUser(messages, i)} logo={logo} />
+                <Message m={m} first={first} last={last} seen={isLastFromUser(messages, i)} logo={logo} logoStyle={logoStyle} />
               </div>
             );
           })}
@@ -38,11 +39,11 @@ export function InstagramScreen({ name, logo, messages }: ChatScreenProps) {
   );
 }
 
-function Header({ name, logo }: { name: string; logo?: string }) {
+function Header({ name, logo, logoStyle }: { name: string; logo?: string; logoStyle?: "fill" | "mark" }) {
   return (
-    <div className="flex items-center gap-2 border-b border-white/10 bg-black px-2 pt-11 pb-2.5">
+    <div className="flex items-center gap-2 border-b border-black/10 bg-white px-2 pt-11 pb-2.5">
       <ChevronLeftIcon width={24} height={24} strokeWidth={2} className="-mr-0.5" />
-      <ContactAvatar size={30} logo={logo} />
+      <ContactAvatar size={30} logo={logo} logoStyle={logoStyle} className="ring-1 ring-black/10" />
       <div className="min-w-0 flex-1 leading-tight">
         <p className="truncate text-[12.5px] font-semibold">{name}</p>
         <p className={cn("text-[10.5px]", GRAY)}>Active now</p>
@@ -53,13 +54,13 @@ function Header({ name, logo }: { name: string; logo?: string }) {
   );
 }
 
-function Message({ m, first, last, seen, logo }: { m: ChatMessage; first: boolean; last: boolean; seen: boolean; logo?: string }) {
+function Message({ m, first, last, seen, logo, logoStyle }: { m: ChatMessage; first: boolean; last: boolean; seen: boolean; logo?: string; logoStyle?: "fill" | "mark" }) {
   if (m.from === "status") return <p className={cn("my-1 text-center text-[10.5px] font-medium", GRAY)}>{m.node}</p>;
   const sent = m.from === "user";
   const radius = sent
     ? cn("rounded-[20px]", !first && "rounded-tr-[5px]", !last && "rounded-br-[5px]")
     : cn("rounded-[20px]", !first && "rounded-tl-[5px]", !last && "rounded-bl-[5px]");
-  const skin = sent ? GRADIENT : "bg-[#262626]";
+  const skin = sent ? cn(GRADIENT, "text-white") : "bg-[#efefef] text-black";
 
   let body: ReactNode;
   if (m.link) {
@@ -85,7 +86,7 @@ function Message({ m, first, last, seen, logo }: { m: ChatMessage; first: boolea
   return (
     <div className="flex items-end gap-1.5">
       {/* The avatar sits by the last bubble of a group; a spacer keeps the others aligned. */}
-      {last ? <ContactAvatar size={22} logo={logo} /> : <span className="w-[22px] shrink-0" />}
+      {last ? <ContactAvatar size={22} logo={logo} logoStyle={logoStyle} className="ring-1 ring-black/10" /> : <span className="w-[22px] shrink-0" />}
       {body}
     </div>
   );
@@ -94,9 +95,9 @@ function Message({ m, first, last, seen, logo }: { m: ChatMessage; first: boolea
 function LinkPreview({ domain, title }: { domain: string; title: string }) {
   return (
     <div className="flex flex-col">
-      <div className="flex h-[70px] items-center justify-center bg-gradient-to-br from-[#2b2b2b] to-[#141414]">
-        <span className="inline-flex size-9 items-center justify-center rounded-full bg-white/10">
-          <LockIcon width={17} height={17} strokeWidth={2.2} className="text-white/85" />
+      <div className="flex h-[70px] items-center justify-center bg-gradient-to-br from-[#e4e4e4] to-[#f6f6f6]">
+        <span className="inline-flex size-9 items-center justify-center rounded-full bg-black/8">
+          <LockIcon width={17} height={17} strokeWidth={2.2} className="text-black/70" />
         </span>
       </div>
       <div className="flex flex-col gap-px px-3 py-2">
@@ -109,15 +110,15 @@ function LinkPreview({ domain, title }: { domain: string; title: string }) {
 
 function Composer() {
   return (
-    <div className="bg-black px-2.5 pt-1.5 pb-7">
-      <div className={cn("flex h-[38px] items-center gap-2 rounded-full bg-[#262626] pr-3 pl-[4px] text-[12.5px]", GRAY)}>
+    <div className="bg-white px-2.5 pt-1.5 pb-7">
+      <div className={cn("flex h-[38px] items-center gap-2 rounded-full bg-[#efefef] pr-3 pl-[4px] text-[12.5px]", GRAY)}>
         <span className={cn("inline-flex size-[30px] shrink-0 items-center justify-center rounded-full text-white", GRADIENT)}>
           <CameraIcon width={17} height={17} strokeWidth={2} />
         </span>
         <span className="flex-1">Message…</span>
-        <MicIcon width={19} height={19} strokeWidth={1.8} className="text-white" />
-        <ImageIcon width={19} height={19} strokeWidth={1.8} className="text-white" />
-        <StickerIcon width={19} height={19} strokeWidth={1.8} className="text-white" />
+        <MicIcon width={19} height={19} strokeWidth={1.8} className="text-black" />
+        <ImageIcon width={19} height={19} strokeWidth={1.8} className="text-black" />
+        <StickerIcon width={19} height={19} strokeWidth={1.8} className="text-black" />
       </div>
     </div>
   );
