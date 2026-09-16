@@ -27,7 +27,7 @@ export function CardEntryScreen({ theme, agentName = "Your agent" }: { theme: Ca
         </p>
       </div>
 
-      <div className="flex min-h-0 flex-1 flex-col justify-center gap-3">
+      <div className="mt-3 flex min-h-0 flex-1 flex-col justify-start gap-2.5 overflow-hidden">
         <Field theme={t} label="Card number" from={CARD_T.number - 120} to={CARD_T.brand} trailing={<VisaMark at={CARD_T.brand} />}>
           <Typed text={NUMBER} at={CARD_T.number} speed={CARD_T.numberSpeed} className="tabular-nums" />
         </Field>
