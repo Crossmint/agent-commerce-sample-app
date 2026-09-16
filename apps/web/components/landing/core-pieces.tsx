@@ -56,7 +56,7 @@ function Item({ title, children }: { title: string; children: ReactNode }) {
 
 function Block({ index, title, bullets, visual, flip = false }: { index: string; title: string; bullets: ReactNode[]; visual: ReactNode; flip?: boolean }) {
   return (
-    <article className="grid items-center gap-12 lg:grid-cols-2 lg:gap-16">
+    <article className="grid items-start gap-12 lg:grid-cols-2 lg:gap-16">
       <Reveal className={cn("flex flex-col gap-6", flip && "lg:order-2")}>
         <p className="font-mono text-sm font-semibold tracking-wider text-primary">{index}</p>
         <h3 className="text-3xl font-bold tracking-tight sm:text-4xl">{title}</h3>
