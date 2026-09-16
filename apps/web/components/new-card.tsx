@@ -16,7 +16,7 @@ export function NewCard() {
       {saved ? (
         <div className="flex flex-col gap-3 sm:flex-row">
           <Button asChild className="flex-1">
-            <Link href="/">Back to wallet</Link>
+            <Link href="/wallet">Back to wallet</Link>
           </Button>
           <Button type="button" variant="outline" className="flex-1" onClick={() => setSaved(null)}>
             Add another

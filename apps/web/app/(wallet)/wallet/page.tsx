@@ -2,11 +2,11 @@ import type { Metadata } from "next";
 import type { ConnectedAgentSession } from "@goat-wallet/ui";
 import { WalletHome } from "@/components/wallet-home";
 import { getSession, listSessions } from "@/lib/auth";
-import { revokeSessionAction } from "./actions";
+import { revokeSessionAction } from "../actions";
 
 export const metadata: Metadata = { title: "Wallet" };
 
-export default async function HomePage() {
+export default async function WalletPage() {
   const session = await getSession();
   let sessions: ConnectedAgentSession[] = [];
   let sessionsNote: string | undefined;

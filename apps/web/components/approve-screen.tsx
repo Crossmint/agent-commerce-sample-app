@@ -11,7 +11,7 @@ export function ApproveScreen({ requestId }: { requestId: string }) {
       <ApproveAgentCard requestId={requestId} onDone={setOutcome} mascotSrc="/brand/mark.png" />
       {outcome ? (
         <Button asChild variant="outline">
-          <Link href="/">Back to wallet</Link>
+          <Link href="/wallet">Back to wallet</Link>
         </Button>
       ) : null}
     </div>

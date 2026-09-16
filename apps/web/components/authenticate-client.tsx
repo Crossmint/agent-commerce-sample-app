@@ -10,9 +10,9 @@ import { FALLBACK_SESSION_MINUTES, SESSION_MINUTES, isSessionDurationError } fro
 
 function readNextCookie(): string {
   const match = document.cookie.split("; ").find((c) => c.startsWith(`${NEXT_COOKIE}=`));
-  const raw = match ? decodeURIComponent(match.slice(NEXT_COOKIE.length + 1)) : "/";
+  const raw = match ? decodeURIComponent(match.slice(NEXT_COOKIE.length + 1)) : "/wallet";
   document.cookie = `${NEXT_COOKIE}=; Path=/; Max-Age=0; SameSite=Lax`;
-  return raw.startsWith("/") && !raw.startsWith("//") ? raw : "/";
+  return raw.startsWith("/") && !raw.startsWith("//") ? raw : "/wallet";
 }
 
 type TokenKind = "magic_links" | "oauth";

@@ -7,7 +7,7 @@ export const metadata: Metadata = { title: "Sign in" };
 function safeNext(raw: string | string[] | undefined): string {
   const v = Array.isArray(raw) ? raw[0] : raw;
   // Same-origin paths only.
-  if (!v || !v.startsWith("/") || v.startsWith("//")) return "/";
+  if (!v || !v.startsWith("/") || v.startsWith("//")) return "/wallet";
   return v;
 }
 

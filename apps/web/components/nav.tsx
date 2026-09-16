@@ -15,7 +15,7 @@ export function Nav({ email, chatEnabled = false }: NavProps) {
           <Image src="/brand/logo.png" alt="GOAT" width={96} height={32} priority className="h-8 w-auto" />
         </Link>
         <nav className="flex items-center gap-4 text-sm font-medium text-muted-foreground">
-          <Link href="/" className="hover:text-foreground">
+          <Link href="/wallet" className="hover:text-foreground">
             Wallet
           </Link>
           <Link href="/cards/new" className="hover:text-foreground">

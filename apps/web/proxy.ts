@@ -15,10 +15,10 @@ export function proxy(request: NextRequest) {
   const { pathname, search } = request.nextUrl;
   const login = new URL("/login", request.url);
   const next = `${pathname}${search}`;
-  if (next !== "/") login.searchParams.set("next", next);
+  if (next !== "/wallet") login.searchParams.set("next", next);
   return NextResponse.redirect(login);
 }
 
 export const config = {
-  matcher: ["/", "/cards/:path*", "/approve/:path*", "/checkouts/:path*", "/chat", "/chat/:path*", "/oauth/:path*"],
+  matcher: ["/wallet", "/wallet/:path*", "/cards/:path*", "/approve/:path*", "/checkouts/:path*", "/chat", "/chat/:path*", "/oauth/:path*"],
 };

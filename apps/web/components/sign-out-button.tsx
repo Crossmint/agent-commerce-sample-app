@@ -20,7 +20,7 @@ export function SignOutButton() {
         try {
           await stytch.session.revoke();
         } finally {
-          router.replace("/login");
+          router.replace("/");
           router.refresh();
         }
       }}

@@ -15,6 +15,8 @@ export { CardPicker, ADD_NEW_CARD } from "./components/card-picker.js";
 export type { CardPickerProps } from "./components/card-picker.js";
 export { ApproveAgentCard } from "./components/approve-agent-card.js";
 export type { ApproveAgentCardProps, ApproveOutcome, ApproveOutcomeStatus } from "./components/approve-agent-card.js";
+export { ApproveAgentCardPreview } from "./components/approve-agent-card-preview.js";
+export type { ApproveAgentCardPreviewProps } from "./components/approve-agent-card-preview.js";
 export { VerifyAgentCard } from "./components/verify-agent-card.js";
 export type { VerifyAgentCardProps, VerificationAppearance } from "./components/verify-agent-card.js";
 export { AgentCardList, RailBadge, agentCardStatusBadge } from "./components/agent-card-list.js";

@@ -1,6 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
+import { usePathname } from "next/navigation";
 import { StytchProvider } from "@stytch/nextjs";
 import { GoatProvider } from "@goat-wallet/ui";
 import { stytch } from "@/lib/stytch-client";
@@ -17,7 +18,10 @@ export interface ProvidersProps {
  * to the GOAT API and to Crossmint. One login, one identity.
  */
 export function Providers({ crossmintClientApiKey, crossmintEnvironment, children }: ProvidersProps) {
+  const pathname = usePathname();
   if (!stytch) {
+    // The landing page needs no auth. Everything else does.
+    if (pathname === "/") return <>{children}</>;
     return (
       <div className="flex flex-1 items-center justify-center p-8 text-center">
         <div className="max-w-md space-y-2">
