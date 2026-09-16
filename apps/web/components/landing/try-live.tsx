@@ -30,7 +30,7 @@ export function TryLive() {
             </li>
           ))}
         </ul>
-        <p className="text-center font-mono text-xs leading-relaxed text-muted-foreground sm:text-[13px]">
+        <p className="font-mono text-xs leading-relaxed text-muted-foreground sm:text-[13px]">
           MCP endpoint: goat-jade.vercel.app/api/mcp · CLI: npm i -g goat
         </p>
       </Reveal>
@@ -41,15 +41,16 @@ export function TryLive() {
 function AgentTile({ agent }: { agent: AgentLogo }) {
   const isGoat = Boolean(agent.href);
   const cls = cn(
-    "landing-tile flex w-full min-w-0 items-center justify-center gap-3 rounded-md border border-border bg-black/40 p-3",
-    // Regular tiles are squares. The GOAT tile spans a row on small screens, so
-    // it lays out as a row there and becomes a square at the 7-across size.
-    isGoat ? "flex-row border-primary/40 lg:aspect-square lg:flex-col lg:gap-2.5" : "aspect-square flex-col gap-2.5",
+    "landing-tile flex w-full min-w-0 items-start gap-3 rounded-md border border-border bg-black/40 p-3",
+    // Regular tiles are squares: logo top left, name bottom left. The GOAT tile
+    // spans a row on small screens, so it lays out as a row there and becomes
+    // a square at the 7-across size.
+    isGoat ? "flex-row items-center border-primary/40 lg:aspect-square lg:flex-col lg:items-start lg:justify-between" : "aspect-square flex-col justify-between",
   );
   const body = (
     <>
       <Image src={agent.src} alt="" width={40} height={40} className={cn("size-10 shrink-0 object-contain", isGoat && "rounded-full")} />
-      <span className={cn("flex min-w-0 flex-col leading-tight", isGoat ? "text-left lg:text-center" : "text-center")}>
+      <span className="flex min-w-0 flex-col text-left leading-tight">
         <span className="truncate text-sm font-semibold">{agent.name}</span>
         {isGoat ? <span className="text-[11px] text-primary lg:hidden">Try the example chat</span> : null}
       </span>

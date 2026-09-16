@@ -20,11 +20,12 @@ export function Section({ id, className, children }: SectionProps) {
   );
 }
 
-export function SectionHeading({ title, sub, align = "center" }: { title: string; sub?: ReactNode; align?: "center" | "left" }) {
+/** A section title with an optional line under it. Left-aligned, like all landing copy. */
+export function SectionHeading({ title, sub }: { title: string; sub?: ReactNode }) {
   return (
-    <Reveal className={cn("mb-12 flex flex-col gap-3 sm:mb-16", align === "center" ? "items-center text-center" : "items-start")}>
-      <h2 className="text-4xl font-bold tracking-tight text-balance sm:text-5xl">{title}</h2>
-      {sub ? <p className="max-w-2xl text-lg text-muted-foreground text-balance sm:text-xl">{sub}</p> : null}
+    <Reveal className="mb-12 flex flex-col items-start gap-3 sm:mb-16">
+      <h2 className="text-4xl font-bold tracking-tight sm:text-5xl">{title}</h2>
+      {sub ? <p className="max-w-2xl text-lg text-muted-foreground sm:text-xl">{sub}</p> : null}
     </Reveal>
   );
 }

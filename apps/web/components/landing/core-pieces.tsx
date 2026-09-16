@@ -3,7 +3,6 @@ import { Check } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { AgentCardsDemo } from "./agent-cards-demo";
 import { CheckoutRunMock } from "./checkout-run-mock";
-import { CostCompare } from "./cost-compare";
 import { Reveal } from "./reveal";
 import { Section, SectionHeading } from "./section";
 
@@ -24,15 +23,10 @@ const checkouts = [
 export function CorePieces() {
   return (
     <Section id="how" className="border-t border-border/70">
-      <SectionHeading title="This template includes two core pieces" />
+      <SectionHeading title="Two core pieces" />
       <div className="flex flex-col gap-24 sm:gap-32">
         <Block index="01" title="Agent Cards" bullets={cards} visual={<AgentCardsDemo />} />
-        <div className="flex flex-col gap-14 sm:gap-16">
-          <Block index="02" title="Agent Checkouts" bullets={checkouts} visual={<CheckoutRunMock />} flip />
-          <Reveal>
-            <CostCompare />
-          </Reveal>
-        </div>
+        <Block index="02" title="Agent Checkouts" bullets={checkouts} visual={<CheckoutRunMock />} flip />
       </div>
     </Section>
   );
@@ -43,7 +37,7 @@ function Block({ index, title, bullets, visual, flip = false }: { index: string;
     <article className="grid items-center gap-12 lg:grid-cols-2 lg:gap-16">
       <Reveal className={cn("flex flex-col gap-6", flip && "lg:order-2")}>
         <p className="font-mono text-sm font-semibold tracking-wider text-primary">{index}</p>
-        <h3 className="text-3xl font-bold tracking-tight text-balance sm:text-4xl">{title}</h3>
+        <h3 className="text-3xl font-bold tracking-tight sm:text-4xl">{title}</h3>
         <ul className="flex flex-col gap-3.5">
           {bullets.map((b) => (
             <li key={b} className="flex items-start gap-3">

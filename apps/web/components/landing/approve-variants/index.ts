@@ -1,16 +1,18 @@
 import type { ComponentType } from "react";
-import type { BrandId } from "../brands";
-import { ForgeApprove } from "./forge";
+import type { ApprovalLayout } from "../brands";
 import { GoatApprove } from "./goat";
-import { NimbusApprove } from "./nimbus";
+import { GrokBotApprove } from "./grokbot";
+import { InstinctApprove } from "./instinct";
+import { MuseApprove } from "./muse";
 import type { ApproveLayoutProps } from "./types";
 
 export type { ApproveLayoutProps } from "./types";
-export { ForgeApprove, GoatApprove, NimbusApprove };
+export { GoatApprove, GrokBotApprove, InstinctApprove, MuseApprove };
 
-/** One approval layout per fictional brand. They differ in structure, not only in color. */
-export const APPROVE_LAYOUTS: Record<BrandId, ComponentType<ApproveLayoutProps>> = {
+/** One approval layout per brand. They differ in structure, not only in color. */
+export const APPROVE_LAYOUTS: Record<ApprovalLayout, ComponentType<ApproveLayoutProps>> = {
   goat: GoatApprove,
-  nimbus: NimbusApprove,
-  forge: ForgeApprove,
+  instinct: InstinctApprove,
+  muse: MuseApprove,
+  grokbot: GrokBotApprove,
 };

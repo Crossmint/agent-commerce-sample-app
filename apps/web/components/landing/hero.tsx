@@ -2,10 +2,9 @@ import type { CSSProperties } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { Button } from "@goat-wallet/ui";
-import { ApproveScreenMock } from "./approve-screen-mock";
-import { Container } from "./section";
+import { HeroPhone } from "./hero-phone";
 import { CROSSMINT_URL } from "./links";
-import { MessageThreadMock } from "./message-thread-mock";
+import { Container } from "./section";
 
 const rise = (ms: number) => ({ "--delay": `${ms}ms` }) as CSSProperties;
 
@@ -17,7 +16,7 @@ export function Hero() {
           <h1 className="landing-rise w-full max-w-[520px]" style={rise(0)}>
             <Image src="/brand/logo.png" alt="GOAT Wallet" width={2170} height={725} priority sizes="(min-width: 640px) 520px, 90vw" className="h-auto w-full" />
           </h1>
-          <p className="landing-rise max-w-xl text-xl leading-snug text-balance text-foreground/90 sm:text-2xl" style={rise(80)}>
+          <p className="landing-rise max-w-xl text-xl leading-snug text-foreground/90 sm:text-2xl" style={rise(80)}>
             An open source template to create your own evolved version of Stripe&apos;s Link.
           </p>
           <a
@@ -40,11 +39,7 @@ export function Hero() {
           </div>
         </div>
 
-        <div className="landing-rise relative mx-auto w-full max-w-[300px] sm:max-w-[430px]" style={rise(200)}>
-          <div aria-hidden className="landing-glow absolute -inset-16 -z-10" />
-          <ApproveScreenMock className="absolute top-8 right-0 hidden w-[270px] origin-bottom-left rotate-[6deg] scale-90 opacity-80 sm:block" />
-          <MessageThreadMock style="whatsapp" className="relative z-10 w-full sm:w-[290px] sm:-rotate-3 sm:shadow-2xl" label="A WhatsApp thread: the user asks their agent for a latte, approves $8, and gets the receipt" />
-        </div>
+        <HeroPhone className="landing-rise relative w-full max-w-[280px] sm:max-w-[300px] lg:ml-auto" />
       </Container>
     </section>
   );
