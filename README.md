@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/logo.png" alt="GOAT" width="420" />
+  <img src="docs/logo-black-background.png" alt="GOAT" width="100%" />
 </p>
 
 <p align="center"><strong>An open source agentic commerce wallet, built on Crossmint.</strong></p>
