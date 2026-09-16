@@ -19,3 +19,8 @@ Agent marks for the "Try a live implementation" tiles are white (`#ffffff`) on t
 | `hermes.svg` | Hermes (Nous Research) | Drawn here. **Placeholder.** | No official vector mark was obtainable: `nousresearch.com` has no logo image, its `safari-pinned-tab.svg` is a traced mascot illustration, the `hermes-agent` favicon is a text glyph, and Simple Icons has no `nousresearch` slug. Replace with an official mark when available. |
 
 `/brand/mark.png` (the GOAT example agent tile) lives in `public/brand/`.
+
+## Powered-by strip
+- visa.svg, mastercard.svg, basis-theory.svg, crossmint-gray.svg: gray logotypes from lobster.cash (Crossmint's own site), same gray #959AA4.
+- adyen.svg: inline header SVG from adyen.com, fill set to #959AA4.
+- vercel.svg: Wikimedia Commons "Vercel logo 2025" (triangle + wordmark), recolored #959AA4.
