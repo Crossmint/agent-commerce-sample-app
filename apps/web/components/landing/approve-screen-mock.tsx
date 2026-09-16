@@ -34,7 +34,7 @@ export function CardEntryPage({ brand = DEFAULT_BRAND, domain, agentName }: Omit
   const { form } = APPROVE_VARIANTS[brand.approval];
   return (
     <MobileBrowser domain={domain ?? brand.domain} path="/cards/new" tone={brand.tone}>
-      <CardEntryScreen theme={form} agentName={agentName ?? brand.name} />
+      <CardEntryScreen theme={form} tone={brand.tone} agentName={agentName ?? brand.name} />
     </MobileBrowser>
   );
 }

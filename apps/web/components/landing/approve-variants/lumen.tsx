@@ -4,12 +4,14 @@ import { LockIcon } from "../chat/icons";
 import type { ApproveLayoutProps, ApproveVariant, CardFormTheme } from "./types";
 
 /*
- * Muse (muse.ai, Meta), as it looks in September 2026: an off-white
- * (#fcfcfc) page, the blue squiggle "M" mark at the top, near-black text
- * from Meta's gray scale, and one blue call to action. The button carries
- * the mark's own gradient (#0082FB to #0064E0 to #0040DC), 12px corners.
+ * Lumen (lumen.ai), an example agent with a light, Meta-style UI that lives
+ * in Instagram Direct: an off-white (#fcfcfc) page, the Lumen mark at the
+ * top (a blue-to-violet circle with a white spark, original GOAT art),
+ * near-black text on a cool gray scale, and one blue call to action. The
+ * button carries a blue gradient (#0082FB to #0064E0 to #0040DC), 12px
+ * corners.
  */
-const MARK = "/logos/muse-squiggle.svg";
+const MARK = "/logos/lumen.svg";
 const BLUE = "linear-gradient(135deg, #0082FB 0%, #0064E0 60%, #0040DC 100%)";
 const BG = "#fcfcfc";
 const INK = "#111112";
@@ -31,7 +33,7 @@ const form: CardFormTheme = {
   fieldRadius: 12,
 };
 
-function MuseApprove({ agentName = "Muse", state }: ApproveLayoutProps) {
+function LumenApprove({ agentName = "Lumen", state }: ApproveLayoutProps) {
   return (
     <div className="flex h-full flex-col px-4 pt-3 pb-4 antialiased" style={{ background: BG, color: INK }}>
       <Image src={MARK} alt="" width={26} height={26} className="size-[26px]" />
@@ -103,4 +105,4 @@ function MuseApprove({ agentName = "Muse", state }: ApproveLayoutProps) {
   );
 }
 
-export const muse: ApproveVariant = { Screen: MuseApprove, form };
+export const lumen: ApproveVariant = { Screen: LumenApprove, form };

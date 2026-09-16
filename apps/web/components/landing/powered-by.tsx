@@ -1,15 +1,22 @@
-import Image from "next/image";
+import { MaskLogo } from "./mask-logo";
 import { Container } from "./section";
 
-/** One row of the rails and infrastructure under GOAT. Full logotypes, one gray (#959AA4), one height. */
-const LOGOS: Array<{ name: string; src: string; href: string }> = [
-  { name: "Visa", src: "/logos/visa.svg", href: "https://usa.visa.com" },
-  { name: "Mastercard", src: "/logos/mastercard.svg", href: "https://www.mastercard.com" },
-  { name: "Basis Theory", src: "/logos/basis-theory.svg", href: "https://basistheory.com" },
-  { name: "Adyen", src: "/logos/adyen.svg", href: "https://www.adyen.com" },
-  { name: "Vercel", src: "/logos/vercel.svg", href: "https://vercel.com" },
-  { name: "Crossmint", src: "/logos/crossmint-gray.svg", href: "https://www.crossmint.com" },
+/**
+ * One row of the rails and infrastructure under GOAT. Full logotypes at one
+ * height, in the page's muted text color: the files fill with
+ * `currentColor` and render as masks, so they follow the theme. `w` and
+ * `h` are each file's intrinsic size, for the aspect ratio.
+ */
+const LOGOS: Array<{ name: string; src: string; href: string; w: number; h: number }> = [
+  { name: "Visa", src: "/logos/visa.svg", href: "https://usa.visa.com", w: 58, h: 19 },
+  { name: "Mastercard", src: "/logos/mastercard.svg", href: "https://www.mastercard.com", w: 42, h: 26 },
+  { name: "Basis Theory", src: "/logos/basis-theory.svg", href: "https://basistheory.com", w: 87, h: 30 },
+  { name: "Adyen", src: "/logos/adyen.svg", href: "https://www.adyen.com", w: 80, h: 26 },
+  { name: "Vercel", src: "/logos/vercel.svg", href: "https://vercel.com", w: 2048, h: 407 },
+  { name: "Crossmint", src: "/logos/crossmint-gray.svg", href: "https://www.crossmint.com", w: 127, h: 24 },
 ];
+
+const HEIGHT = 24;
 
 export function PoweredBy() {
   return (
@@ -24,9 +31,9 @@ export function PoweredBy() {
                 target="_blank"
                 rel="noreferrer"
                 title={logo.name}
-                className="inline-flex h-6 items-center gap-1.5 transition-opacity hover:opacity-80"
+                className="inline-flex h-6 items-center text-muted-foreground transition-colors hover:text-foreground"
               >
-                <Image src={logo.src} alt={logo.name} width={160} height={24} unoptimized className="h-6 w-auto" />
+                <MaskLogo src={logo.src} label={logo.name} width={Math.round((HEIGHT * logo.w) / logo.h)} height={HEIGHT} />
               </a>
             </li>
           ))}

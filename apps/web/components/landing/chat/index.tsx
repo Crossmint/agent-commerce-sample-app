@@ -7,6 +7,7 @@ import type { ChatScreenProps, ChatStyle } from "./model";
 export { ContactAvatar } from "./avatar";
 export * from "./model";
 export { GrokScreen, IMessageScreen, InstagramScreen };
+export { ReceiptCard, type ReceiptCardProps } from "./receipt-card";
 
 const SCREENS: Record<ChatStyle, ComponentType<ChatScreenProps>> = {
   imessage: IMessageScreen,

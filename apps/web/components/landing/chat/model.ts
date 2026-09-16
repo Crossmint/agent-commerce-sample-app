@@ -1,6 +1,6 @@
 import type { CSSProperties, ReactNode } from "react";
 
-/** Which real chat app a screen imitates. */
+/** Which chat surface a screen imitates. "grok" is a Grok-style bot app: the BotBot example uses it. */
 export type ChatStyle = "imessage" | "instagram" | "grok";
 
 /**
@@ -18,6 +18,12 @@ export interface ChatMessage {
   link?: ChatLink;
   /** Content that fills the bubble edge to edge (progress cards, lists). */
   card?: ReactNode;
+  /**
+   * The card draws its own surface (a receipt, a pass). Styles render it
+   * with no bubble, tail, or bubble color behind it, and it closes the
+   * group before it.
+   */
+  bare?: boolean;
 }
 
 export interface ChatLink {
@@ -38,7 +44,7 @@ export interface ChatScreenProps {
 
 /**
  * Screen color behind the status bar for each chat style. iMessage is the
- * dark appearance; Instagram Direct and the Grok Bot app are light.
+ * dark appearance; Instagram Direct and the BotBot app are light.
  */
 export const CHAT_SCREEN_BG: Record<ChatStyle, string> = {
   imessage: "bg-black",
@@ -57,16 +63,21 @@ export const CHAT_TONE: Record<ChatStyle, "light" | "dark"> = {
 export const CHAT_APP_NAME: Record<ChatStyle, string> = {
   imessage: "iMessage",
   instagram: "Instagram",
-  grok: "Grok Bot",
+  grok: "BotBot",
 };
 
 export const delayStyle = (ms: number) => ({ "--delay": `${ms}ms` }) as CSSProperties;
 
-/** True when this is the last message of a run from the same sender. */
+/** True when this is the last message of a run from the same sender. A bare card is its own group. */
 export function endsGroup(messages: ChatMessage[], i: number): boolean {
   const cur = messages[i];
   const next = messages[i + 1];
-  return !cur || !next || next.from !== cur.from;
+  return !cur || !next || next.from !== cur.from || Boolean(cur.bare) || Boolean(next.bare);
+}
+
+/** True when this is the first message of a run from the same sender. */
+export function startsGroup(messages: ChatMessage[], i: number): boolean {
+  return i === 0 || endsGroup(messages, i - 1);
 }
 
 /** True when this is the last message the user sent. */

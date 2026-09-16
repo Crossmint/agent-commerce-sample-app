@@ -1,7 +1,7 @@
 # Logo sources
 
 Files in this folder are served from `/logos/...`. Nothing here is hotlinked.
-Agent marks for the "Try a live implementation" tiles are white (`#ffffff`) on transparent so they sit on dark tiles. The three real-brand marks (Instinct, Muse, Grok Bot) keep their own colors.
+Agent marks for the "Try a live implementation" tiles are white (`#ffffff`) on transparent so they sit on dark tiles. The three example agents in the brand switcher (Impulse, Lumen, BotBot) are not real companies: their marks are original GOAT art, drawn here, and keep their own colors.
 
 | File | Brand | Source | Notes |
 | --- | --- | --- | --- |
@@ -11,16 +11,16 @@ Agent marks for the "Try a live implementation" tiles are white (`#ffffff`) on t
 | `openai.svg` | ChatGPT (OpenAI) | `https://raw.githubusercontent.com/openai/openai-realtime-console/main/client/assets/openai-logomark.svg` | Official OpenAI logomark from an OpenAI GitHub repo. `openai.com/brand` returns 403 to non-browser clients and Simple Icons no longer ships `openai`. Fill set to white. |
 | `grok.svg` | Grok (xAI) | `https://grok.com/images/favicon.svg` | Official Grok favicon. Only the two glyph paths were kept; the rounded tile, blur filter and outline stroke were removed and the viewBox was fit to the glyph. `x.ai` returns 403 to non-browser clients and Simple Icons has no `grok` or `xai` slug. |
 | `openclaw.svg` | OpenClaw | `https://raw.githubusercontent.com/openclaw/openclaw/main/apps/linux/src-tauri/icons/tray-template.svg` | Official monochrome tray icon from the OpenClaw repo. Fill changed from black to white, comments stripped. |
-| `instinct.svg`, `instinct-icon.png` | Instinct (Spear Street Technology) | `https://instinct.co/favicon.svg`, `https://instinct.co/apple-touch-icon.png` | Official mark: a dark (#060A09) "I" glyph on a white rounded tile. Full app icon, so avatars show it edge to edge. Site theme color #0d0d0d. |
-| `muse-squiggle.svg` | Muse (Meta) | `https://muse.ai/landing/brand/muse-logo.svg` (byte-identical to `https://muse.ai/images/favicon/app-squiggle.svg`, their favicon) | The current Muse mark, Sept 2026: the blue squiggle "M" by Jessica Hische, gradient #0082FB → #0064E0 → #0040DC. muse.ai blocks non-browser clients; fetched through a real browser. |
-| `muse.svg` | Muse (Meta) | Composed here from `muse-squiggle.svg` after `https://muse.ai/landing/placeholders/sizzle.png` ("The Muse app icon") | The Muse app icon: the squiggle centered on a white rounded tile with a faint gray gradient. Used for avatars and the selector pill. |
-| `grok-bot-mark.svg` | Grok Bot (SpaceXAI) | The inline `svg.grok-bot-mark` on `https://x.ai/bot` (Sept 2026), composed here | The Grok Bot product mark: a black (#0a0a0a) blob with two white eye slits. Only the resting head path and the two eye paths were kept; the idle animation groups, empty circles and duplicate hidden paths were removed and the viewBox was fit to the head. x.ai blocks non-browser clients (Cloudflare 403); read through a real browser. Used for the Grok Bot pill, avatar, and approval header. |
-| `xai-mark.png` | SpaceXAI | `https://x.ai/apple-icon.png` (180×180) | The company mark on x.ai (the swooping X). Kept for reference; not used on the page. x.ai/bot brand notes: page is white #ffffff, ink #0a0a0a, muted rgba(20,20,20,0.6), light gray surfaces #f1f0ee, filled pill buttons #0a0a0a with white text, headline font "xVf" (weight 500, tight tracking). The product name is written "Grok Bot" (two words) and there is no wordmark file: the hero sets the mark inline before the text. The app's chat: bot bubbles light gray (rgba(10,10,10,0.055), 16px corners), user bubbles #111110 with white text (16px corners, 14px), centered gray timestamps and status lines, a pill composer with a + and a round dark mic button. |
+| `impulse.svg` | Impulse (example agent) | Drawn here. **Original GOAT mark.** | A dark (#141414) rounded tile with a white bolt. Full app icon, so avatars show it edge to edge. Not a real company. |
+| `lumen.svg` | Lumen (example agent) | Drawn here. **Original GOAT mark.** | A blue-to-violet gradient circle (#38bdf8 → #4f7cf5 → #8b5cf6) with a white four-point spark. Used for the avatar, the selector pill, and the approval header. Not a real company. |
+| `botbot.svg` | BotBot (example agent) | Drawn here. **Original GOAT mark.** | A black (#0a0a0a) rounded square with two round white eyes and a small antenna. Full app icon. Used for the avatar, the selector pill, and the approval header wordmark. Not a real company. |
+| `starbucks.svg` | Starbucks | `https://raw.githubusercontent.com/simple-icons/simple-icons/develop/icons/starbucks.svg` (the file behind `https://cdn.simpleicons.org/starbucks/ffffff`) | Simple Icons siren glyph, fill set to white. Only in the receipt card's merchant tile, white on Starbucks green #00704A. |
 | `hermes.svg` | Hermes (Nous Research) | Drawn here. **Placeholder.** | No official vector mark was obtainable: `nousresearch.com` has no logo image, its `safari-pinned-tab.svg` is a traced mascot illustration, the `hermes-agent` favicon is a text glyph, and Simple Icons has no `nousresearch` slug. Replace with an official mark when available. |
 
 `/brand/mark.png` (the GOAT example agent tile) lives in `public/brand/`.
 
 ## Powered-by strip
-- visa.svg, mastercard.svg, basis-theory.svg, crossmint-gray.svg: gray logotypes from lobster.cash (Crossmint's own site), same gray #959AA4.
-- adyen.svg: inline header SVG from adyen.com, fill set to #959AA4.
-- vercel.svg: Wikimedia Commons "Vercel logo 2025" (triangle + wordmark), recolored #959AA4.
+All six fill with `currentColor` and render as CSS masks (`components/landing/mask-logo.tsx`), so the page colors them with its `--muted-foreground` token.
+- visa.svg, mastercard.svg, basis-theory.svg, crossmint-gray.svg: logotypes from lobster.cash (Crossmint's own site); the original gray #959AA4 fills changed to `currentColor`. The `white` fills inside `<mask>` elements are luminance masks and stay white.
+- adyen.svg: inline header SVG from adyen.com, fill set to `currentColor`.
+- vercel.svg: Wikimedia Commons "Vercel logo 2025" (triangle + wordmark), fill set to `currentColor`.

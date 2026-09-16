@@ -2,9 +2,8 @@
 
 import type { CSSProperties, ReactNode } from "react";
 import { cn } from "@/lib/cn";
-import { type ChatMessage, IMessageScreen } from "./chat";
+import { type ChatMessage, IMessageScreen, ReceiptCard } from "./chat";
 import { CheckIcon, LockIcon } from "./chat/icons";
-import { Receipt } from "./message-thread-mock";
 import { PhoneFrame } from "./phone-frame";
 import { useStepLoop } from "./use-step-loop";
 
@@ -26,7 +25,7 @@ const T = {
 };
 
 const STEPS = ["Opened starbucks.com", "Signed in", "Grande Latte added", "Paid with Visa •••• 4242", "Order placed · Pickup in 6 min"];
-const OPTIONS = ["Visa •••• 4242", "Shop Pay", "Starbucks saved card"];
+const OPTIONS = ["Visa •••• 4242", "Starbucks saved card"];
 
 const delay = (ms: number) => ({ "--delay": `${ms}ms` }) as CSSProperties;
 
@@ -61,7 +60,7 @@ function messages(): ChatMessage[] {
     { key: "reply", from: "user", at: T.reply, node: <>Visa •••• 4242</> },
     { key: "card", from: "agent", at: T.card, card: <ProgressCard /> },
     { key: "done", from: "agent", at: T.receipt, node: <>Ordered. Pickup in 6 min.</> },
-    { key: "receipt", from: "agent", at: T.receiptCard, card: <Receipt /> },
+    { key: "receipt", from: "agent", at: T.receiptCard, bare: true, card: <ReceiptCard tone="light" /> },
   ];
 }
 

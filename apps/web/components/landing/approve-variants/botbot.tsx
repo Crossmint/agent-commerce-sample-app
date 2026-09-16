@@ -4,13 +4,13 @@ import { LockIcon } from "../chat/icons";
 import type { ApproveLayoutProps, ApproveVariant, CardFormTheme } from "./types";
 
 /*
- * Grok Bot (x.ai/bot, SpaceXAI), as the product page looks in September 2026:
- * a white page, #0a0a0a ink, muted text at 60% ink, light warm-gray surfaces,
+ * BotBot (botbot.dev), an example agent messaged in its own app. A white
+ * page, #0a0a0a ink, muted text at 60% ink, light warm-gray surfaces,
  * hairline borders, pill buttons filled #0a0a0a with white text, and the
- * Grok Bot mark (a black blob with two white eyes) set inline before the
- * name, which the page writes as two words.
+ * BotBot mark (a black rounded square with two round white eyes and a small
+ * antenna, original GOAT art) set inline before the name.
  */
-export const GROK_BOT_MARK = "/logos/grok-bot-mark.svg";
+export const BOTBOT_MARK = "/logos/botbot.svg";
 const BG = "#ffffff";
 const INK = "#0a0a0a";
 const MUTED = "rgba(20, 20, 20, 0.6)";
@@ -31,22 +31,22 @@ const form: CardFormTheme = {
   fieldRadius: 12,
 };
 
-/** The Grok Bot mark next to the name, as the x.ai/bot hero sets it. */
-export function GrokBotWordmark({ size = 18, className }: { size?: number; className?: string }) {
+/** The BotBot mark next to the name, one weight, tight tracking. */
+export function BotBotWordmark({ size = 18, className }: { size?: number; className?: string }) {
   return (
     <span className={className ? `inline-flex items-center gap-1.5 ${className}` : "inline-flex items-center gap-1.5"}>
-      <Image src={GROK_BOT_MARK} alt="" width={size} height={size} style={{ width: size, height: size }} />
+      <Image src={BOTBOT_MARK} alt="" width={size} height={size} className="rounded-[4px]" style={{ width: size, height: size }} />
       <span className="font-medium tracking-tight" style={{ fontSize: size * 0.78, color: INK }}>
-        Grok Bot
+        BotBot
       </span>
     </span>
   );
 }
 
-function GrokBotApprove({ agentName = "Grok Bot", state }: ApproveLayoutProps) {
+function BotBotApprove({ agentName = "BotBot", state }: ApproveLayoutProps) {
   return (
     <div className="flex h-full flex-col px-4 pt-3 pb-3 antialiased" style={{ background: BG, color: INK }}>
-      <GrokBotWordmark size={18} />
+      <BotBotWordmark size={18} />
 
       {state === "approved" ? (
         <div className="flex min-h-0 flex-1 flex-col justify-center gap-5">
@@ -123,4 +123,4 @@ function Row({ k, v }: { k: string; v: string }) {
   );
 }
 
-export const grokbot: ApproveVariant = { Screen: GrokBotApprove, form };
+export const botbot: ApproveVariant = { Screen: BotBotApprove, form };

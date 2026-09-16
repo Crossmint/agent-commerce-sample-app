@@ -26,7 +26,7 @@ export interface BrandSwitcherProps {
  * dots, all centered.
  */
 export function BrandSwitcher({ intro, cta }: BrandSwitcherProps) {
-  const [active, setActive] = useState<BrandId>("instinct");
+  const [active, setActive] = useState<BrandId>("impulse");
   const { ref, step, cycle, jump } = useStepLoop<HTMLDivElement>(STORY_STEPS, { durations: STORY_DURATIONS, hold: 1200, reducedSteps: STORY_REDUCED });
   const brand: AgentBrand = BRANDS.find((b) => b.id === active) ?? BRANDS[0]!;
   const phase = phaseOf(step);

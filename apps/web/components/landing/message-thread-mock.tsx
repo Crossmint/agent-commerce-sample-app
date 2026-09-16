@@ -1,4 +1,4 @@
-import { type ChatMessage, ChatScreen, type ChatStyle } from "./chat";
+import { type ChatMessage, ChatScreen, type ChatStyle, ReceiptCard } from "./chat";
 import { CheckIcon } from "./chat/icons";
 
 /**
@@ -55,21 +55,8 @@ function script(variant: ThreadVariant, domain: string, agentName: string): Chat
     ),
   };
   const done: ChatMessage = { key: "done", from: "agent", at: 1000, node: <>Ordered. Pickup in 6 min.</> };
-  const receipt: ChatMessage = { key: "receipt", from: "agent", at: CONFIRMATION_THREAD_END, card: <Receipt /> };
+  const receipt: ChatMessage = { key: "receipt", from: "agent", at: CONFIRMATION_THREAD_END, bare: true, card: <ReceiptCard tone="light" /> };
 
   if (variant === "request") return [ask, request, link];
   return [{ ...ask, at: 0 }, { ...request, at: 0 }, { ...link, at: 0 }, approved, done, receipt];
-}
-
-/** The order receipt as a small card. */
-export function Receipt({ merchant = "Starbucks", item = "Grande Latte", total = "$6.45" }: { merchant?: string; item?: string; total?: string }) {
-  return (
-    <span className="flex items-center justify-between gap-3 px-3 py-2.5 text-[12px]">
-      <span className="flex flex-col leading-tight">
-        <span className="font-semibold">{merchant}</span>
-        <span className="opacity-70">{item}</span>
-      </span>
-      <span className="font-semibold tabular-nums">{total}</span>
-    </span>
-  );
 }

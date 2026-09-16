@@ -1,8 +1,11 @@
+"use client";
+
 import type { ReactNode } from "react";
 import { cn } from "@/lib/cn";
 import { ContactAvatar } from "./avatar";
 import { CameraIcon, ChevronLeftIcon, ImageIcon, LockIcon, MicIcon, PhoneIcon, StickerIcon, VideoIcon } from "./icons";
-import { type ChatMessage, type ChatScreenProps, delayStyle, endsGroup, isLastFromUser } from "./model";
+import { type ChatMessage, type ChatScreenProps, delayStyle, endsGroup, isLastFromUser, startsGroup } from "./model";
+import { messageAttrs, useFollowLatest } from "./use-follow-latest";
 
 /*
  * Instagram Direct, light appearance. White canvas, #efefef received bubbles
@@ -17,17 +20,18 @@ const GRADIENT = "bg-[linear-gradient(160deg,#7a40f2_0%,#5b5cf0_45%,#3797f0_100%
 const GRAY = "text-[#737373]";
 
 export function InstagramScreen({ name, logo, logoStyle, messages }: ChatScreenProps) {
+  const thread = useFollowLatest<HTMLDivElement>();
   return (
     <div className="flex h-full flex-col bg-white text-[13px] leading-[1.3] text-black antialiased">
       <Header name={name} logo={logo} logoStyle={logoStyle} />
-      <div className="flex min-h-0 flex-1 flex-col justify-end overflow-hidden">
-        <div className="flex flex-col px-2.5 pt-2 pb-1">
+      <div ref={thread} className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
+        <div className="mt-auto flex flex-col px-2.5 pt-2 pb-1">
           <p className={cn("mb-3 text-center text-[10.5px] font-medium", GRAY)}>Today 9:41 AM</p>
           {messages.map((m, i) => {
-            const first = i === 0 || messages[i - 1]?.from !== m.from;
+            const first = startsGroup(messages, i);
             const last = endsGroup(messages, i);
             return (
-              <div key={m.key} className={cn("landing-bubble flex flex-col", last ? "mb-2.5" : "mb-[2px]")} style={delayStyle(m.at)}>
+              <div key={m.key} {...messageAttrs(m.at)} className={cn("landing-bubble flex flex-col", last ? "mb-2.5" : "mb-[2px]")} style={delayStyle(m.at)}>
                 <Message m={m} first={first} last={last} seen={isLastFromUser(messages, i)} logo={logo} logoStyle={logoStyle} />
               </div>
             );
@@ -69,6 +73,8 @@ function Message({ m, first, last, seen, logo, logoStyle }: { m: ChatMessage; fi
         <LinkPreview domain={m.link.domain} title={m.link.title} />
       </div>
     );
+  } else if (m.card && m.bare) {
+    body = <div className="flex min-w-0 flex-1">{m.card}</div>;
   } else if (m.card) {
     body = <div className={cn("w-[84%] overflow-hidden", radius, skin)}>{m.card}</div>;
   } else {

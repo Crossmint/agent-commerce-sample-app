@@ -2,6 +2,7 @@ import type { CSSProperties, ReactNode } from "react";
 import { CARD_T, delay, FauxButton, Typed, VisaMark } from "./approve-bits";
 import type { CardFormTheme } from "./approve-variants/types";
 import { LockIcon } from "./chat/icons";
+import { MaskLogo } from "./mask-logo";
 
 const NUMBER = "4242 4242 4242 4242";
 const EXPIRY = "12/29";
@@ -14,9 +15,10 @@ const ZIP = "10001";
  * form): Card number, Expiry, CVC, Name on card, ZIP, and a Save card
  * button. The digits type in one by one, the Visa mark appears once the
  * number is complete, and the focus ring moves down the form as each field
- * fills. `theme` restyles it for each brand. Not a real form: a picture.
+ * fills. `theme` restyles it for each brand; `tone` picks the Crossmint
+ * logotype that reads on it. Not a real form: a picture.
  */
-export function CardEntryScreen({ theme, agentName = "Your agent" }: { theme: CardFormTheme; agentName?: string }) {
+export function CardEntryScreen({ theme, tone = "light", agentName = "Your agent" }: { theme: CardFormTheme; tone?: "light" | "dark"; agentName?: string }) {
   const t = theme;
   return (
     <div className="flex h-full flex-col px-4 pt-3 pb-3.5 antialiased" style={{ background: t.bg, color: t.text }}>
@@ -55,8 +57,20 @@ export function CardEntryScreen({ theme, agentName = "Your agent" }: { theme: Ca
           <LockIcon width={10} height={10} strokeWidth={2.5} />
           Card details go straight to the PCI vault.
         </p>
+        <PoweredByCrossmint tone={tone} muted={t.muted} />
       </div>
     </div>
+  );
+}
+
+/** "Powered by" and the Crossmint logotype: the form's muted color on light forms, white at 70% on dark ones. */
+function PoweredByCrossmint({ tone, muted }: { tone: "light" | "dark"; muted: string }) {
+  const dark = tone === "dark";
+  return (
+    <p className="flex items-center justify-center gap-1.5 text-[10px]" style={{ color: muted }}>
+      Powered by
+      <MaskLogo src="/logos/crossmint-gray.svg" label="Crossmint" width={64} height={12} style={{ color: dark ? "rgba(255, 255, 255, 0.7)" : muted }} />
+    </p>
   );
 }
 

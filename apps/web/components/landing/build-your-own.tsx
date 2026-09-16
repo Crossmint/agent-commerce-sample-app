@@ -12,9 +12,9 @@ export function BuildYourOwn() {
         <BrandSwitcher
           intro={
             <div className="flex flex-col items-start gap-4">
-              <h2 className="text-4xl font-bold tracking-tight sm:text-5xl">Start building today</h2>
+              <h2 className="text-4xl font-bold tracking-tight sm:text-5xl">Build your own today</h2>
               <p className="max-w-2xl text-lg text-muted-foreground sm:text-xl">
-                Use Crossmint APIs to add Agent Cards, Agent Checkouts and adapters to your product. Copy the parts you need from the GOAT template and make it feel your own
+                Use Crossmint APIs to add Agent Cards, Agent Checkouts and adapters to your product. Copy the parts you need from the GOAT template and make it feel your own.
               </p>
             </div>
           }

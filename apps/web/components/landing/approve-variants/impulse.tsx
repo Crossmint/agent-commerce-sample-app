@@ -4,12 +4,12 @@ import { ChevronDownIcon, LockIcon } from "../chat/icons";
 import type { ApproveLayoutProps, ApproveVariant, CardFormTheme } from "./types";
 
 /*
- * Instinct (instinct.co). From a real screenshot of their approval page:
- * white background, black text, "Instinct is requesting to use your card",
- * plain "Purpose:" and "Limit:" lines, a "Choose card" heading over a select
- * with a small card thumbnail and a chevron, the lock line, and one large
+ * Impulse (impulse.app), an example agent that lives in iMessage. A white
+ * page, near-black text, "Impulse is requesting to use your card", plain
+ * "Purpose:" and "Limit:" lines, a "Choose card" heading over a select with
+ * a small card thumbnail and a chevron, the lock line, and one large
  * full-width orange Allow (#ff5a1f to #f4511e, 12px corners, bold white).
- * Their site theme color is #0d0d0d, used for the text.
+ * The mark is a dark rounded tile with a white bolt (original GOAT art).
  */
 const ORANGE = "linear-gradient(180deg, #ff5a1f 0%, #f4511e 100%)";
 const INK = "#0d0d0d";
@@ -30,7 +30,7 @@ const form: CardFormTheme = {
   fieldRadius: 12,
 };
 
-function InstinctApprove({ agentName = "Instinct", logo, state }: ApproveLayoutProps) {
+function ImpulseApprove({ agentName = "Impulse", logo, state }: ApproveLayoutProps) {
   return (
     <div className="flex h-full flex-col bg-white px-4 pt-3 pb-4 antialiased" style={{ color: INK }}>
       <div className="flex items-center gap-1.5 text-[12px] font-semibold tracking-tight">
@@ -102,4 +102,4 @@ function InstinctApprove({ agentName = "Instinct", logo, state }: ApproveLayoutP
   );
 }
 
-export const instinct: ApproveVariant = { Screen: InstinctApprove, form };
+export const impulse: ApproveVariant = { Screen: ImpulseApprove, form };

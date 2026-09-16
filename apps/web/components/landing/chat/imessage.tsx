@@ -1,7 +1,10 @@
+"use client";
+
 import { cn } from "@/lib/cn";
 import { ContactAvatar } from "./avatar";
 import { ArrowUpIcon, ChevronLeftIcon, ChevronRightIcon, LockIcon, PlusIcon, VideoIcon } from "./icons";
 import { type ChatMessage, type ChatScreenProps, delayStyle, endsGroup, isLastFromUser } from "./model";
+import { messageAttrs, useFollowLatest } from "./use-follow-latest";
 
 /*
  * iMessage, iOS 17/18, dark appearance. Black canvas, #262628 received
@@ -13,16 +16,17 @@ import { type ChatMessage, type ChatScreenProps, delayStyle, endsGroup, isLastFr
 const GRAY = "text-[#8e8e93]";
 
 export function IMessageScreen({ name, logo, logoStyle, messages }: ChatScreenProps) {
+  const thread = useFollowLatest<HTMLDivElement>();
   return (
     <div className="landing-im flex h-full flex-col bg-black text-[13px] leading-[1.3] text-white">
       <Header name={name} logo={logo} logoStyle={logoStyle} />
-      <div className="flex min-h-0 flex-1 flex-col justify-end overflow-hidden">
-        <div className="flex flex-col px-2.5 pt-3 pb-1">
+      <div ref={thread} className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
+        <div className="mt-auto flex flex-col px-2.5 pt-3 pb-1">
           <p className={cn("mb-2.5 text-center text-[10.5px]", GRAY)}>
             <span className="font-semibold">Today</span> 9:41
           </p>
           {messages.map((m, i) => (
-            <div key={m.key} className={cn("landing-bubble flex flex-col", endsGroup(messages, i) ? "mb-2" : "mb-[3px]")} style={delayStyle(m.at)}>
+            <div key={m.key} {...messageAttrs(m.at)} className={cn("landing-bubble flex flex-col", endsGroup(messages, i) ? "mb-2" : "mb-[3px]")} style={delayStyle(m.at)}>
               <Message m={m} tail={endsGroup(messages, i)} delivered={isLastFromUser(messages, i)} />
             </div>
           ))}
@@ -63,12 +67,18 @@ function Message({ m, tail, delivered }: { m: ChatMessage; tail: boolean; delive
       </div>
     );
   }
+  if (m.card && m.bare) {
+    return <div className={cn("mx-0.5 flex", side)}>{m.card}</div>;
+  }
   if (m.card) {
     return <div className={cn("landing-im-bubble w-[84%] overflow-hidden rounded-[17px]", side, color, tailCls)}>{m.card}</div>;
   }
   return (
     <>
-      <div className={cn("landing-im-bubble max-w-[78%] rounded-[17px] px-[11px] py-[6px]", side, color, tailCls)}>{m.node}</div>
+      <div className={cn("landing-im-bubble max-w-[78%] rounded-[17px] px-[11px] py-[6px]", side, color, tailCls)}>
+        {/* A span, so the text paints above the tail: the tail's blocks sit under every element child, not under bare text. */}
+        <span>{m.node}</span>
+      </div>
       {delivered ? <span className={cn("mt-[3px] pr-1 text-right text-[10px]", GRAY)}>Delivered</span> : null}
     </>
   );

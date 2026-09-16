@@ -1,15 +1,18 @@
+"use client";
+
 import { cn } from "@/lib/cn";
 import { ContactAvatar } from "./avatar";
 import { ChevronLeftIcon, MicIcon, MonitorIcon, PlusIcon } from "./icons";
 import { type ChatMessage, type ChatScreenProps, delayStyle } from "./model";
+import { messageAttrs, useFollowLatest } from "./use-follow-latest";
 
 /*
- * The Grok Bot app (x.ai/bot), as its product page shows it in September
- * 2026: a white canvas, #0a0a0a ink, the bot's avatar and name in the top
- * bar, a centered gray timestamp, the bot's messages in light gray rounded
- * bubbles on the left, the user's in near-black bubbles on the right,
- * centered gray status lines, and a pill composer with a + button, a
- * "Message <bot>" prompt, and a round dark mic button.
+ * A Grok-style bot app, used by the BotBot example: a white canvas, #0a0a0a
+ * ink, the bot's avatar and name in the top bar, a centered gray timestamp,
+ * the bot's messages in light gray rounded bubbles on the left, the user's
+ * in near-black bubbles on the right, centered gray status lines, and a
+ * pill composer with a + button, a "Message <bot>" prompt, and a round dark
+ * mic button.
  */
 
 const INK = "text-[#0a0a0a]";
@@ -19,14 +22,15 @@ const USER_BUBBLE = "bg-[#111110] text-white";
 const LINE = "border-[#e6e5e2]";
 
 export function GrokScreen({ name, logo, logoStyle, messages }: ChatScreenProps) {
+  const thread = useFollowLatest<HTMLDivElement>();
   return (
     <div className={cn("flex h-full flex-col bg-white text-[12.5px] leading-[1.35] antialiased", INK)}>
       <Header name={name} logo={logo} logoStyle={logoStyle} />
-      <div className="flex min-h-0 flex-1 flex-col justify-end overflow-hidden">
-        <div className="flex flex-col gap-2 px-3 pt-2 pb-2">
+      <div ref={thread} className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
+        <div className="mt-auto flex flex-col gap-2 px-3 pt-2 pb-2">
           <p className={cn("mb-1 text-center text-[10.5px]", GRAY)}>9:41 AM</p>
           {messages.map((m) => (
-            <div key={m.key} className="landing-bubble flex flex-col" style={delayStyle(m.at)}>
+            <div key={m.key} {...messageAttrs(m.at)} className="landing-bubble flex flex-col" style={delayStyle(m.at)}>
               <Message m={m} />
             </div>
           ))}
@@ -54,6 +58,9 @@ function Message({ m }: { m: ChatMessage }) {
   }
   if (m.from === "user") {
     return <div className={cn("ml-auto max-w-[82%] rounded-[16px] px-3 py-2", USER_BUBBLE)}>{m.node}</div>;
+  }
+  if (m.card && m.bare) {
+    return <div className="flex">{m.card}</div>;
   }
   return (
     <div className={cn("mr-auto flex max-w-[86%] flex-col gap-2 rounded-[16px] px-3 py-2", BOT_BUBBLE, m.card && "w-full max-w-[86%] p-1.5")}>

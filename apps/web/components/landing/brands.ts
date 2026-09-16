@@ -1,7 +1,7 @@
 import type { ChatStyle } from "./chat/model";
 
 /** The three agent brands in the "Make it feel like your brand" demo. */
-export type BrandId = "instinct" | "muse" | "grokbot";
+export type BrandId = "impulse" | "lumen" | "botbot";
 
 /** Which approval screen layout a brand uses. "goat" is the generic template screen. */
 export type ApprovalLayout = BrandId | "goat";
@@ -44,15 +44,17 @@ export interface AgentBrand extends Brand {
 }
 
 /*
- * Real products, real marks. Sources are in public/logos/SOURCES.md.
- * - Instinct lives in iMessage and WhatsApp, so its thread is iMessage.
- * - Muse is Meta's agent; the thread is Instagram Direct. Its avatar is the
- *   Muse app icon (the blue squiggle on a white tile).
- * - Grok Bot (x.ai/bot) is messaged in its own app. Its avatar is the Grok
- *   Bot mark: the black blob with two eyes from the product page.
+ * Three example agents. Not real companies: the names, domains, and marks
+ * are original GOAT art (see public/logos/SOURCES.md).
+ * - Impulse lives in iMessage. Its mark is a dark rounded tile with a
+ *   white bolt.
+ * - Lumen has a light, Meta-style UI; the thread is Instagram Direct. Its
+ *   mark is a blue-to-violet circle with a white spark.
+ * - BotBot is messaged in its own app. Its mark is a black rounded square
+ *   with two round white eyes and a small antenna.
  */
 export const BRANDS: AgentBrand[] = [
-  { id: "instinct", name: "Instinct", logo: "/logos/instinct.svg", logoStyle: "fill", domain: "instinct.co", chatStyle: "imessage", tone: "light", approval: "instinct" },
-  { id: "muse", name: "Muse", logo: "/logos/muse.svg", logoStyle: "fill", domain: "muse.ai", chatStyle: "instagram", tone: "light", approval: "muse" },
-  { id: "grokbot", name: "Grok Bot", logo: "/logos/grok-bot-mark.svg", logoStyle: "fill", domain: "x.ai", chatStyle: "grok", tone: "light", approval: "grokbot" },
+  { id: "impulse", name: "Impulse", logo: "/logos/impulse.svg", logoStyle: "fill", domain: "impulse.app", chatStyle: "imessage", tone: "light", approval: "impulse" },
+  { id: "lumen", name: "Lumen", logo: "/logos/lumen.svg", logoStyle: "fill", domain: "lumen.ai", chatStyle: "instagram", tone: "light", approval: "lumen" },
+  { id: "botbot", name: "BotBot", logo: "/logos/botbot.svg", logoStyle: "fill", domain: "botbot.dev", chatStyle: "grok", tone: "light", approval: "botbot" },
 ];
