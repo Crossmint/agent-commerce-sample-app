@@ -2,7 +2,9 @@
   "name": "goat-monorepo",
   "private": true,
   "packageManager": "pnpm@10.33.0",
-  "engines": { "node": ">=20" },
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "build": "turbo run build",
     "dev": "turbo run dev --parallel",
@@ -19,5 +21,10 @@
     "prettier": "^3.6.0",
     "turbo": "^2.10.0",
     "typescript": "^5.9.0"
+  },
+  "pnpm": {
+    "overrides": {
+      "axios": "^1.20.0"
+    }
   }
 }
