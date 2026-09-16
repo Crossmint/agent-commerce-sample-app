@@ -31,10 +31,10 @@ export function LandingNav() {
           >
             <XMark className="size-4" />
           </a>
-          <Button asChild size="sm" variant="outline" className="hidden sm:inline-flex">
+          <Button asChild size="sm" className="min-w-[8.5rem] justify-center">
             <Link href="#try">Try it live</Link>
           </Button>
-          <Button asChild size="sm">
+          <Button asChild size="sm" variant="outline" className="min-w-[8.5rem] justify-center">
             <Link href="#build">Build your own</Link>
           </Button>
         </nav>
