@@ -14,7 +14,9 @@
     "clean": "turbo run clean && rm -rf node_modules",
     "format": "prettier --write \"**/*.{ts,tsx,md,json,css}\"",
     "changeset": "changeset",
-    "release": "turbo run build && changeset publish"
+    "release": "turbo run build && changeset publish",
+    "plugin:validate": "node scripts/validate-cursor-plugin.mjs",
+    "plugin:sync": "cp skills/goat/SKILL.md plugins/cursor/skills/goat/SKILL.md"
   },
   "devDependencies": {
     "@changesets/cli": "^2.29.0",

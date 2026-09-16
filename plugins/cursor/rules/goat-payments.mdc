@@ -1,0 +1,13 @@
+---
+description: How to spend money on the user's behalf with GOAT. Applies whenever a task involves buying, ordering, paying, or checking out.
+alwaysApply: false
+globs:
+---
+
+goat-payments:
+
+- When a task needs money, use the GOAT tools (the `goat` MCP server or the `goat` CLI). Never ask the user for card numbers and never type card details into a site yourself.
+- Start with `list_agent_cards`. Reuse an active agent card whose description and remaining budget fit the purchase.
+- Otherwise call `request_agent_card` with a clear description and a tight amount, show the approval link to the user verbatim, and poll `get_agent_card_request` until it is `active`. The user approves once, in their browser.
+- Prefer `create_checkout` with the store URL. Crossmint completes the purchase and the card number never reaches you. Use `reveal_agent_card` only when a checkout is impossible, and then pass the merchant.
+- Report the outcome with the receipt. Never repeat a revealed card number, expiry, or CVC in chat, logs, or files.

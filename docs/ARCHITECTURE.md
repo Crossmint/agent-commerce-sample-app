@@ -70,6 +70,8 @@ goat/
 │   └── web/                        Reference website. Wallet pages + agent chat + API + MCP endpoint.
 ├── skills/
 │   └── goat/                       SKILL.md for Claude Code, OpenClaw and similar agents.
+├── plugins/
+│   └── cursor/                     Cursor plugin (marketplace manifest at .cursor-plugin/): MCP endpoint, skill, rule.
 └── docs/
 ```
 

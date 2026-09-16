@@ -1,0 +1,13 @@
+{
+  "name": "goat",
+  "displayName": "GOAT Wallet",
+  "version": "0.1.0",
+  "description": "Pay with the user's own card, with their approval. Request a bounded agent card, get it approved on the wallet, then check out at any store or mint a scoped card number. Powered by Crossmint.",
+  "author": {
+    "name": "Crossmint",
+    "email": "hello@crossmint.com"
+  },
+  "license": "MIT",
+  "keywords": ["payments", "agent cards", "checkout", "crossmint", "wallet", "mcp", "commerce"],
+  "logo": "assets/logo.svg"
+}
