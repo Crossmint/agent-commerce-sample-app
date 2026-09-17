@@ -173,26 +173,34 @@ html {
 }
 
 /*
- * Grid cells that fill with green pixels on hover. The pattern is 4px
- * squares on a 32px tile; a corner mask makes them denser toward the bottom
- * right, like the pixel textures on the brand board. Opacity steps in, so
- * the fill arrives as pixels, not as a fade.
+ * Grid cells on the dotted ground. On hover the dots grow into green
+ * pixels: an 11px square sits over each 22px dot, and a diagonal mask
+ * wipes the squares in from the top left in twelve steps, so the fill
+ * arrives pixel by pixel. Leaving reverses the wipe. The mark turns green
+ * with it; the name stays navy so it reads over the pixels.
  */
+.landing-pixel {
+  transition: color 0.3s ease;
+}
 .landing-pixel::before {
   content: "";
   position: absolute;
   inset: 0;
   pointer-events: none;
-  background-color: color-mix(in srgb, var(--primary) 6%, transparent);
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 32 32' fill='%2311ba4b'%3E%3Crect x='0' y='0' width='4' height='4' opacity='.55'/%3E%3Crect x='12' y='4' width='4' height='4' opacity='.35'/%3E%3Crect x='24' y='0' width='4' height='4' opacity='.7'/%3E%3Crect x='4' y='12' width='4' height='4' opacity='.3'/%3E%3Crect x='20' y='12' width='4' height='4' opacity='.55'/%3E%3Crect x='28' y='16' width='4' height='4' opacity='.4'/%3E%3Crect x='8' y='20' width='4' height='4' opacity='.65'/%3E%3Crect x='16' y='24' width='4' height='4' opacity='.35'/%3E%3Crect x='0' y='28' width='4' height='4' opacity='.45'/%3E%3Crect x='24' y='28' width='4' height='4' opacity='.75'/%3E%3C/svg%3E");
-  background-size: 32px 32px;
-  mask-image: linear-gradient(to top left, #000 30%, rgba(0, 0, 0, 0.35) 65%, transparent 100%);
-  opacity: 0;
-  transition: opacity 0.4s steps(6, end);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='22' height='22' viewBox='0 0 22 22' fill='%2311ba4b'%3E%3Crect x='5.5' y='5.5' width='11' height='11' opacity='.42'/%3E%3Crect x='0' y='0' width='5.5' height='5.5' opacity='.18'/%3E%3Crect x='16.5' y='16.5' width='5.5' height='5.5' opacity='.18'/%3E%3C/svg%3E");
+  background-size: 22px 22px;
+  mask-image: linear-gradient(135deg, #000 0%, #000 44%, transparent 56%, transparent 100%);
+  mask-size: 300% 300%;
+  mask-position: 100% 100%;
+  transition: mask-position 0.6s steps(12, end);
+}
+.landing-pixel:hover,
+.landing-pixel:focus-visible {
+  color: var(--primary);
 }
 .landing-pixel:hover::before,
 .landing-pixel:focus-visible::before {
-  opacity: 1;
+  mask-position: 0% 0%;
 }
 
 /*

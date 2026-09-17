@@ -14,7 +14,7 @@ const COLS = 3;
  * Section `#try`. Title on the left; on the right the agents in the site's
  * hairline grid, three across: two rows of agent tiles, then the GOAT row
  * that opens the example chat. A green diamond marks every line crossing,
- * and a tile fills with green pixels on hover.
+ * and on hover the dots of a tile grow into green pixels in a stepped wipe.
  */
 export function TryLive() {
   const agents = AGENT_LOGOS.filter((a) => !a.href);
@@ -35,7 +35,7 @@ export function TryLive() {
           }
         />
         <Reveal>
-          <ul className="grid border-t border-l border-hairline" style={{ gridTemplateColumns: `repeat(${COLS}, minmax(0, 1fr))` }}>
+          <ul className="goat-backdrop grid border-t border-l border-hairline" style={{ gridTemplateColumns: `repeat(${COLS}, minmax(0, 1fr))` }}>
             {agents.map((a, i) => (
               <li key={a.name} className="relative flex min-w-0 border-r border-b border-hairline">
                 <GridNode className="absolute top-0 left-0 z-10 -translate-x-1/2 -translate-y-1/2" />
@@ -58,7 +58,7 @@ export function TryLive() {
                   aria-label="GOAT example agent: try the example chat"
                 >
                   <Image src={goat.src} alt="" width={40} height={40} className="relative size-9 shrink-0 object-contain sm:size-10" />
-                  <span className="relative min-w-0 flex-1 text-sm leading-tight font-semibold sm:text-base">
+                  <span className="relative min-w-0 flex-1 text-sm leading-tight font-semibold text-foreground sm:text-base">
                     GOAT example agent, <span className="text-primary">try the example chat</span>
                   </span>
                   <ArrowUpRight className="relative size-5 shrink-0 text-primary" />
@@ -84,7 +84,7 @@ function AgentTile({ agent }: { agent: AgentLogo }) {
       ) : (
         <MaskLogo src={agent.src} label="" className="relative size-8 sm:size-10" />
       )}
-      <span className="relative w-full truncate text-left text-[13px] leading-tight font-semibold sm:text-sm">{agent.name}</span>
+      <span className="relative w-full truncate text-left text-[13px] leading-tight font-semibold text-foreground sm:text-sm">{agent.name}</span>
     </div>
   );
 }

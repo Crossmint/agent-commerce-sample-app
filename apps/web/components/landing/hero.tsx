@@ -1,7 +1,7 @@
 import type { CSSProperties } from "react";
 import Link from "next/link";
 import { Button } from "@goat-wallet/ui";
-import { CrossmintLogo, GoatWordmark } from "@/components/brand";
+import { GoatLockup } from "@/components/brand";
 import { GridCell } from "./grid";
 import { HeroPhone } from "./hero-phone";
 
@@ -28,20 +28,16 @@ export function Hero() {
       <div className="relative mx-auto w-full max-w-6xl px-4 py-10 sm:px-6 sm:py-14">
         <div className="relative">
           <GridCell />
-          <div className="grid items-center gap-14 px-5 py-12 sm:px-10 sm:py-20 lg:grid-cols-[1.1fr_1fr] lg:gap-10 lg:py-24">
+          <div className="grid items-center gap-14 px-5 py-12 sm:px-10 sm:py-20 lg:grid-cols-[1.3fr_1fr] lg:gap-10 lg:py-24">
             <div className="flex flex-col items-start gap-6">
-              <GoatWordmark className="landing-rise text-[28px] sm:text-[34px]" label="GOAT" />
-              <h1 className="landing-rise max-w-xl font-display text-4xl leading-[1.02] font-semibold tracking-[-0.035em] text-foreground sm:text-5xl lg:text-6xl" style={rise(60)}>
-                An open alternative to Stripe Link
-              </h1>
+              <div className="flex flex-col items-start gap-3 sm:gap-4">
+                <GoatLockup size="lg" className="landing-rise" />
+                <h1 className="landing-rise font-display text-4xl leading-[1.02] font-semibold tracking-[-0.035em] text-foreground sm:text-5xl lg:text-[3.5rem]" style={rise(60)}>
+                  <span className="whitespace-nowrap">An open alternative</span> <span className="whitespace-nowrap">to Stripe Link</span>
+                </h1>
+              </div>
               <p className="landing-rise max-w-xl text-lg leading-snug text-muted-foreground sm:text-xl" style={rise(110)}>
                 Give your agents a card and check out at millions of merchants. Your brand, your users.
-              </p>
-              <p className="landing-rise inline-flex items-center gap-2 text-sm text-muted-foreground" style={rise(160)}>
-                Built by
-                <a href="https://www.crossmint.com" target="_blank" rel="noreferrer" className="inline-flex text-foreground transition-colors hover:text-primary" aria-label="Crossmint">
-                  <CrossmintLogo height={16} label="" />
-                </a>
               </p>
               <div className="landing-rise flex w-full flex-col gap-3 pt-2 sm:w-auto sm:flex-row" style={rise(220)}>
                 <Button asChild size="lg">

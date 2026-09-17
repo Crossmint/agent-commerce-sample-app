@@ -37,20 +37,26 @@ export function GoatWordmark({ tone = "green", className, label = "GOAT" }: { to
 }
 
 export interface GoatLockupProps {
-  /** "sm" for the nav bars, "md" for the footer and the wallet pages. */
-  size?: "sm" | "md";
+  /** "sm" for the nav bars, "md" for the footer and the wallet pages, "lg" for the hero. */
+  size?: "sm" | "md" | "lg";
   className?: string;
 }
 
-/** The lockup: GOAT in the pixel font, then "by" and the Crossmint logotype in small. */
+const LOCKUP = {
+  sm: { gap: "gap-2", word: "text-[26px]", by: "text-[12px]", logo: 13 },
+  md: { gap: "gap-2.5", word: "text-[32px]", by: "text-[13px]", logo: 15 },
+  lg: { gap: "gap-3 sm:gap-4", word: "text-[56px] sm:text-[72px]", by: "text-base sm:text-lg", logo: 22 },
+} as const;
+
+/** The lockup: GOAT in the pixel font, then "by" and the Crossmint logotype in small, on the baseline. */
 export function GoatLockup({ size = "sm", className }: GoatLockupProps) {
-  const sm = size === "sm";
+  const t = LOCKUP[size];
   return (
-    <span className={cn("inline-flex items-baseline", sm ? "gap-2" : "gap-2.5", className)} aria-label="GOAT by Crossmint">
-      <GoatWordmark className={sm ? "text-[22px]" : "text-[30px]"} />
-      <span className={cn("inline-flex items-center gap-1 text-muted-foreground", sm ? "text-[11px]" : "text-[13px]")} aria-hidden>
+    <span className={cn("inline-flex items-baseline", t.gap, className)} aria-label="GOAT by Crossmint">
+      <GoatWordmark className={t.word} />
+      <span className={cn("inline-flex items-center gap-1.5 text-muted-foreground", t.by)} aria-hidden>
         by
-        <CrossmintLogo height={sm ? 12 : 15} label="" className="text-foreground" />
+        <CrossmintLogo height={t.logo} label="" className="text-foreground" />
       </span>
     </span>
   );

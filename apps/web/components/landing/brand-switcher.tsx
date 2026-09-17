@@ -11,20 +11,18 @@ import { useStepLoop } from "./use-step-loop";
 const LABELS = STORY_PHASES.map((p) => p.label);
 
 export interface BrandSwitcherProps {
-  /** Title and copy for the top of the left column. */
+  /** Title and copy for the left column. */
   intro: ReactNode;
-  /** Call to action for the bottom of the left column. */
+  /** Call to action under the intro. */
   cta?: ReactNode;
 }
 
 /**
- * "Start building today": one two-column block. Left, the intro, the three
- * numbered one-line steps (the current one lit), and the call to action.
- * Right, the brand pills over one phone that plays the whole story for the
- * selected brand, with the step dots under it; on desktop the column hugs
- * the right edge, like the hero phone. A brand switch
- * restarts the story. On small screens it stacks: text, then pills, phone,
- * dots, all centered.
+ * One two-column block. Left, the intro and the call to action. Right, an
+ * "Example platforms" label, the brand pills, one phone that plays the whole
+ * story for the selected brand, and the step dots, all centered on the
+ * phone; on desktop that stack hugs the right edge, like the hero phone. A
+ * brand switch restarts the story. On small screens the columns stack.
  */
 export function BrandSwitcher({ intro, cta }: BrandSwitcherProps) {
   const [active, setActive] = useState<BrandId>("impulse");
@@ -39,32 +37,15 @@ export function BrandSwitcher({ intro, cta }: BrandSwitcherProps) {
   };
 
   return (
-    <div ref={ref} className="grid items-start gap-12 lg:grid-cols-2 lg:gap-16">
+    <div ref={ref} className="grid items-center gap-12 lg:grid-cols-2 lg:gap-16">
       <div className="flex flex-col items-start gap-8">
         {intro}
-        <ol className="flex flex-col gap-2">
-          {STORY_PHASES.map((p, i) => (
-            <li key={p.label} className="flex">
-              <button
-                type="button"
-                onClick={() => jump(p.start)}
-                aria-current={i === phase ? "step" : undefined}
-                className={cn(
-                  "flex items-baseline gap-3 py-0.5 text-left text-base leading-snug transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring/60 sm:text-lg",
-                  i === phase ? "text-foreground" : "text-muted-foreground hover:text-foreground",
-                )}
-              >
-                <span className={cn("font-mono text-sm font-semibold tabular-nums", i === phase ? "text-primary" : "")}>{i + 1}</span>
-                <span>{p.label}</span>
-              </button>
-            </li>
-          ))}
-        </ol>
         {cta}
       </div>
 
-      <div className="flex w-full flex-col items-center gap-5 lg:items-end">
-        <div role="tablist" aria-label="Brand" className="flex w-fit max-w-full flex-wrap justify-center gap-1 rounded-md border border-border bg-card p-1">
+      <div className="mx-auto flex w-fit max-w-full flex-col items-center gap-5 lg:mr-0">
+        <p className="text-xs font-medium tracking-[0.18em] text-muted-foreground uppercase">Example platforms</p>
+        <div role="tablist" aria-label="Example platform" className="flex w-fit max-w-full flex-wrap justify-center gap-1 rounded-md border border-border bg-card p-1">
           {BRANDS.map((b) => (
             <button
               key={b.id}
@@ -83,7 +64,7 @@ export function BrandSwitcher({ intro, cta }: BrandSwitcherProps) {
           ))}
         </div>
         {/* Keyed on the brand: a switch remounts the phone and the story starts over. */}
-        <StoryPhone key={brand.id} brand={brand} step={step} cycle={cycle} className="mx-auto lg:mr-0" />
+        <StoryPhone key={brand.id} brand={brand} step={step} cycle={cycle} />
         <StepDots count={3} active={phase} onPick={(i) => jump(STORY_PHASES[i]?.start ?? 0)} labels={LABELS} className="ml-0" />
       </div>
     </div>
