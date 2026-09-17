@@ -3,43 +3,33 @@ import { GITHUB_URL, X_URL } from "./links";
 import { Container } from "./section";
 import { GitHubMark, XMark } from "./social-marks";
 
-/** The GOAT lockup, what the name stands for, and the GitHub and X links. */
+/** The GOAT lockup and the GitHub and X links, in the nav's icon buttons. */
 export function LandingFooter() {
   return (
     <footer className="py-12">
-      <Container className="flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between">
-        <div className="flex flex-col items-start gap-4">
-          <GoatLockup size="md" />
-          <p className="text-sm text-muted-foreground sm:text-base">
-            <Initial>G</Initial>reat <Initial>O</Initial>pen source <Initial>A</Initial>gentic payment <Initial>T</Initial>emplates
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
+      <Container className="flex flex-col items-start gap-6 sm:flex-row sm:items-center sm:justify-between">
+        <GoatLockup size="md" />
+        <nav aria-label="Social" className="flex items-center gap-1">
           <a
             href={GITHUB_URL}
             target="_blank"
             rel="noreferrer"
-            className="inline-flex items-center gap-2 rounded-md border border-border bg-card px-3 py-2 text-sm text-foreground transition-colors hover:bg-muted"
+            aria-label="GOAT on GitHub"
+            className="inline-flex size-9 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
           >
-            <GitHubMark className="size-4" />
-            GitHub
+            <GitHubMark className="size-5" />
           </a>
           <a
             href={X_URL}
             target="_blank"
             rel="noreferrer"
-            className="inline-flex items-center gap-2 rounded-md border border-border bg-card px-3 py-2 text-sm text-foreground transition-colors hover:bg-muted"
+            aria-label="Crossmint on X"
+            className="inline-flex size-9 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
           >
-            <XMark className="size-3.5" />
-            @crossmint_ai
+            <XMark className="size-4" />
           </a>
-        </div>
+        </nav>
       </Container>
     </footer>
   );
-}
-
-/** One letter of the acronym, set so it stands out from the muted words. */
-function Initial({ children }: { children: string }) {
-  return <span className="font-bold text-primary">{children}</span>;
 }

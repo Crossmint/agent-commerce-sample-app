@@ -32,7 +32,9 @@ export function Hero() {
             <div className="flex flex-col items-start gap-6">
               <div className="flex flex-col items-start gap-3 sm:gap-4">
                 <GoatLockup size="lg" className="landing-rise" />
-                <h1 className="landing-rise font-display text-4xl leading-[1.02] font-semibold tracking-[-0.035em] text-foreground sm:text-5xl lg:text-[3.5rem]" style={rise(60)}>
+                {/* Both lines are held unbroken, so the size is capped by the
+                    column: 56px fits the narrow lg column, 64px the full one. */}
+                <h1 className="landing-rise font-display text-[2.75rem]/[1.02] font-semibold tracking-[-0.035em] text-foreground sm:text-[3.5rem]/[1.02] min-[1152px]:text-[4rem]/[1]" style={rise(60)}>
                   <span className="whitespace-nowrap">An open alternative</span> <span className="whitespace-nowrap">to Stripe Link</span>
                 </h1>
               </div>

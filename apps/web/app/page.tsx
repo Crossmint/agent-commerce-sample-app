@@ -21,9 +21,11 @@ export default function LandingPage() {
       <LandingNav />
       <main className="landing flex flex-1 flex-col">
         <Hero />
-        <GridRule />
+        {/* On phones "Powered by" is a grid cell that draws its own top and
+            bottom rules; from sm up it is a plain row and needs these. */}
+        <GridRule className="hidden sm:block" />
         <PoweredBy />
-        <GridRule />
+        <GridRule className="hidden sm:block" />
         <CorePieces />
         <GridRule />
         <TryLive />

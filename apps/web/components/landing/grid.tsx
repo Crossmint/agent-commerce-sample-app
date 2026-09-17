@@ -34,18 +34,24 @@ export function GridRule({ className }: { className?: string }) {
 /**
  * The lines and corner diamonds of one grid cell. Put it first inside a
  * `relative` block: the vertical lines follow the block's left and right
- * edges and run past it, the horizontal lines follow its top and bottom and
- * bleed to the viewport edges. The parent section clips them.
+ * edges, the horizontal lines follow its top and bottom and bleed to the
+ * viewport edges. The parent section clips them, so it needs
+ * `overflow-hidden` and enough padding that the corner diamonds survive.
+ *
+ * `bleed` runs the verticals far past the block, for a cell tall enough that
+ * the section edge cuts them off (the hero). Without it they stop on the
+ * block's own rules, which is what a short cell wants.
  */
-export function GridCell() {
+export function GridCell({ bleed = true }: { bleed?: boolean } = {}) {
   const line = "pointer-events-none absolute bg-hairline";
   const node = "pointer-events-none absolute";
+  const vertical = bleed ? "-inset-y-[60rem]" : "inset-y-0";
   return (
     <div aria-hidden className="contents">
       <span className={cn(line, "top-0 left-1/2 h-px w-screen -translate-x-1/2")} />
       <span className={cn(line, "bottom-0 left-1/2 h-px w-screen -translate-x-1/2")} />
-      <span className={cn(line, "-inset-y-[60rem] left-0 w-px")} />
-      <span className={cn(line, "-inset-y-[60rem] right-0 w-px")} />
+      <span className={cn(line, vertical, "left-0 w-px")} />
+      <span className={cn(line, vertical, "right-0 w-px")} />
       <GridNode className={cn(node, "top-0 left-0 -translate-x-1/2 -translate-y-1/2")} />
       <GridNode className={cn(node, "top-0 right-0 translate-x-1/2 -translate-y-1/2")} />
       <GridNode className={cn(node, "bottom-0 left-0 -translate-x-1/2 translate-y-1/2")} />

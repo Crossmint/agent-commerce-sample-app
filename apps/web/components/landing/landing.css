@@ -173,37 +173,6 @@ html {
 }
 
 /*
- * Grid cells on the dotted ground. On hover the dots grow into green
- * pixels: an 11px square sits over each 22px dot, and a diagonal mask
- * wipes the squares in from the top left in twelve steps, so the fill
- * arrives pixel by pixel. Leaving reverses the wipe. The mark turns green
- * with it; the name stays navy so it reads over the pixels.
- */
-.landing-pixel {
-  transition: color 0.3s ease;
-}
-.landing-pixel::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='22' height='22' viewBox='0 0 22 22' fill='%2311ba4b'%3E%3Crect x='5.5' y='5.5' width='11' height='11' opacity='.42'/%3E%3Crect x='0' y='0' width='5.5' height='5.5' opacity='.18'/%3E%3Crect x='16.5' y='16.5' width='5.5' height='5.5' opacity='.18'/%3E%3C/svg%3E");
-  background-size: 22px 22px;
-  mask-image: linear-gradient(135deg, #000 0%, #000 44%, transparent 56%, transparent 100%);
-  mask-size: 300% 300%;
-  mask-position: 100% 100%;
-  transition: mask-position 0.6s steps(12, end);
-}
-.landing-pixel:hover,
-.landing-pixel:focus-visible {
-  color: var(--primary);
-}
-.landing-pixel:hover::before,
-.landing-pixel:focus-visible::before {
-  mask-position: 0% 0%;
-}
-
-/*
  * Phone frame. iPhone 15/16 proportions that shrink with the container.
  * Screens draw their own header under the status bar (they pad 44px) and
  * leave room for the home indicator at the bottom.
@@ -534,7 +503,6 @@ html {
   }
   .landing-reveal[data-reveal="shown"],
   .landing-tile,
-  .landing-pixel::before,
   .landing-screen-layer {
     transition: none;
   }
