@@ -198,6 +198,7 @@ function Part({
     case "tool-list_agent_cards":
     case "tool-get_agent_card":
     case "tool-reveal_agent_card":
+    case "tool-revoke_agent_card":
       return (
         <ToolCard
           title={toolTitle(part.type)}

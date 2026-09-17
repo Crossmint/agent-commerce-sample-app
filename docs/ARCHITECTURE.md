@@ -259,18 +259,18 @@ Two layers: headless hooks (`useAgentCardRequest`, `useCheckout`, ...) and style
 
 **Purpose.** Expose the GOAT API to MCP clients: ChatGPT, Claude, and any host that speaks MCP over streamable HTTP with OAuth.
 
-**Tools.** Names mirror the CLI one to one.
+**Tools.** Names mirror the CLI one to one. Titles, summaries and parameter docs come from `TOOL_DOCS` in `@goat-wallet/core` (`tool-docs.ts`), shared with the chat agent in `apps/web`; each surface appends one sentence about how the result reaches the user (a link to approve on MCP, an inline component in the chat; card fields shown on MCP, masked in the chat). A test in `packages/mcp` checks every description opens with the shared summary.
 
 - `list_payment_methods`
 - `request_agent_card({ amount, currency, description, merchant?, expiresInHours })` → approval URL. The tool result tells the model to show the link to the user.
-- `get_agent_card({ id })`
+- `get_agent_card({ agentCardId })`
 - `list_agent_cards`
-- `reveal_agent_card({ id, amount?, merchant? })` → card number, expiry, CVC. Gated by scope `credentials:mint`.
-- `create_checkout({ url, request?, agentCardId, maxCost })`
-- `get_checkout({ id })`
-- `answer_checkout({ id, requestId?, action?, values?, text? })`
-- `cancel_checkout({ id })`
-- `revoke_agent_card({ id })`
+- `reveal_agent_card({ agentCardId, amount?, currency?, merchant? })` → card number, expiry, CVC. Gated by scope `credentials:mint`.
+- `create_checkout({ startUrl, task?, agentCardId, maxCost, currency?, buyerProfileId?, browserProfileId?, merchantGuidance? })`
+- `get_checkout({ checkoutId })`
+- `answer_checkout({ checkoutId, requestId?, action?, values?, text? })`
+- `cancel_checkout({ checkoutId })`
+- `revoke_agent_card({ agentCardId })`
 
 Auth: OAuth 2.1 with Stytch Connected Apps as the authorization server. The MCP server is stateless. It forwards the bearer token to the GOAT API, which verifies it with `UserAuth.verify`.
 

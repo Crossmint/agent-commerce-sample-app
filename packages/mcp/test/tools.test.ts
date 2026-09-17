@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
+import { TOOL_DOCS } from "@goat-wallet/core";
 import { createGoatMcpServer, GOAT_TOOL_NAMES } from "../src/index.js";
 import { mockGoatFetch } from "./helpers.js";
 
@@ -19,7 +20,12 @@ describe("GOAT tools", () => {
     const { client } = await connect(mockGoatFetch({}));
     const { tools } = await client.listTools();
     expect(tools.map((t) => t.name).sort()).toEqual([...GOAT_TOOL_NAMES].sort());
-    for (const tool of tools) expect(tool.description).toBeTruthy();
+    // Every description opens with the summary shared with the chat agent (core TOOL_DOCS).
+    for (const tool of tools) {
+      const doc = TOOL_DOCS[tool.name as keyof typeof TOOL_DOCS];
+      expect(tool.description, tool.name).toMatch(new RegExp(`^${doc.summary.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`));
+      expect(tool.title).toBe(doc.title);
+    }
   });
 
   it("request_agent_card posts the request and returns the approval URL", async () => {
@@ -80,7 +86,7 @@ describe("GOAT tools", () => {
         },
       }),
     );
-    const result = await client.callTool({ name: "reveal_agent_card", arguments: { id: "oi_1" } });
+    const result = await client.callTool({ name: "reveal_agent_card", arguments: { agentCardId: "oi_1" } });
     const text = (result.content as Array<{ type: string; text: string }>)[0]!.text;
     expect(text).toContain("WARNING");
     expect(result.structuredContent).toMatchObject({ enforced: false, card: { number: "4111111111111111" } });
@@ -92,7 +98,7 @@ describe("GOAT tools", () => {
         "GET /v1/agent-cards/nope": { status: 404, body: { error: { code: "not_found", message: "No such agent card" } } },
       }),
     );
-    const result = await client.callTool({ name: "get_agent_card", arguments: { id: "nope" } });
+    const result = await client.callTool({ name: "get_agent_card", arguments: { agentCardId: "nope" } });
     expect(result.isError).toBe(true);
     expect((result.content as Array<{ type: string; text: string }>)[0]!.text).toContain("not_found");
   });

@@ -1,4 +1,5 @@
 import { tool } from "ai";
+import { describeTool, PARAM_DOCS, paramDoc, type ToolNameFor } from "@goat-wallet/core";
 import { z } from "zod";
 import { CHAT_REQUESTER } from "./config";
 import { GoatToolError, type GoatClient } from "./goat-client";
@@ -22,18 +23,27 @@ import { GoatToolError, type GoatClient } from "./goat-client";
  *
  * The outcome lives in the tool part, so history shows what happened, and the
  * model reads a real tool result instead of a synthetic user message.
+ *
+ * Descriptions: the shared facts come from `TOOL_DOCS` in core (the MCP
+ * server uses the same ones); this file adds the chat-specific sentence,
+ * such as approving inline instead of through a link.
  */
 
+/** The tools the chat offers. Adding or removing one here must match `TOOL_DOCS` surfaces. */
+type ChatTools = Record<ToolNameFor<"chat">, unknown>;
+
 const amountSchema = z.object({
-  value: z.string().regex(/^\d+(\.\d{1,2})?$/, 'Decimal string like "50.00"').describe("Decimal string, e.g. \"50.00\"."),
-  currency: z.string().length(3).describe("ISO 4217 code, e.g. \"USD\"."),
+  value: z.string().regex(/^\d+(\.\d{1,2})?$/, 'Decimal string like "50.00"').describe('Decimal string, e.g. "50.00".'),
+  currency: z.string().length(3).describe(PARAM_DOCS.currency),
 });
 
-const merchantSchema = z.object({
-  name: z.string().min(1),
-  url: z.string().min(1).describe("Merchant website, e.g. \"https://united.com\"."),
-  countryCode: z.string().length(2).describe("Two-letter country code."),
-});
+const merchantSchema = z
+  .object({
+    name: z.string().min(1).describe(PARAM_DOCS.merchantName),
+    url: z.string().min(1).describe(PARAM_DOCS.merchantUrl),
+    countryCode: z.string().length(2).describe(PARAM_DOCS.merchantCountryCode),
+  })
+  .describe(PARAM_DOCS.merchant);
 
 export const approvalOutcomeSchema = z.object({
   status: z.enum(["active", "denied", "expired", "failed"]),
@@ -77,7 +87,7 @@ function summarizeAgentCard(card: {
 export function createChatTools(goat: GoatClient) {
   return {
     list_payment_methods: tool({
-      description: "List the user's saved cards. Masked: brand, last four digits, expiry. Never a full number.",
+      description: describeTool("list_payment_methods"),
       inputSchema: z.object({}),
       execute: () =>
         guard(async () => {
@@ -95,27 +105,28 @@ export function createChatTools(goat: GoatClient) {
     }),
 
     list_agent_cards: tool({
-      description:
-        "List the user's agent cards (approved budgets) with status, total, available balance and expiry. Call this before requesting a new one.",
+      description: describeTool("list_agent_cards"),
       inputSchema: z.object({}),
       execute: () =>
         guard(async () => ({ agentCards: (await goat.listAgentCards()).map(summarizeAgentCard) })),
     }),
 
     get_agent_card: tool({
-      description: "Get one agent card by id: balance, status, rails, expiry.",
-      inputSchema: z.object({ agentCardId: z.string().min(1) }),
+      description: describeTool("get_agent_card"),
+      inputSchema: z.object({ agentCardId: z.string().min(1).describe(paramDoc("get_agent_card", "agentCardId")) }),
       execute: ({ agentCardId }) => guard(async () => summarizeAgentCard(await goat.getAgentCard(agentCardId))),
     }),
 
     request_agent_card: tool({
-      description:
-        "Ask the user to approve a new agent card: a budget on one of their saved cards. Returns a requestId. Immediately after, call await_agent_card_approval with that requestId so the user can approve in the chat.",
+      description: describeTool(
+        "request_agent_card",
+        "Immediately after, call await_agent_card_approval with that requestId so the user can approve in the chat.",
+      ),
       inputSchema: z.object({
-        amount: amountSchema,
-        description: z.string().min(1).max(200).describe("What the money is for, in the user's words. Shown on the approval screen."),
-        merchant: merchantSchema.optional().describe("Lock the card to one merchant when the store is known."),
-        expiresInHours: z.number().positive().max(24 * 30).optional().describe("Default 24."),
+        amount: amountSchema.describe(paramDoc("request_agent_card", "amount")),
+        description: z.string().min(1).max(200).describe(paramDoc("request_agent_card", "description")),
+        merchant: merchantSchema.optional().describe(paramDoc("request_agent_card", "merchant")),
+        expiresInHours: z.number().positive().max(24 * 30).optional().describe(paramDoc("request_agent_card", "expiresInHours")),
       }),
       execute: (input) =>
         guard(async () => {
@@ -136,19 +147,17 @@ export function createChatTools(goat: GoatClient) {
 
     // Client-side tool: no `execute`. The chat UI supplies the output after the user answers.
     await_agent_card_approval: tool({
-      description:
-        "Wait for the user to approve or deny an agent card request in the chat. Call it right after request_agent_card. The result carries the agentCardId when approved.",
-      inputSchema: z.object({ requestId: z.string().min(1) }),
+      description: describeTool("await_agent_card_approval"),
+      inputSchema: z.object({ requestId: z.string().min(1).describe(paramDoc("await_agent_card_approval", "requestId")) }),
       outputSchema: approvalOutcomeSchema,
     }),
 
     reveal_agent_card: tool({
-      description:
-        "Mint a scoped card credential from an active agent card. Returns only a masked summary: the full number never enters the chat. Use create_checkout instead when the target is a website. Check `enforced`: false means the limit is advisory on that rail.",
+      description: describeTool("reveal_agent_card", "Returns only a masked summary: the full number never enters the chat."),
       inputSchema: z.object({
-        agentCardId: z.string().min(1),
-        amount: amountSchema.optional().describe("Cap for this credential. Defaults to the agent card's remaining balance."),
-        merchant: merchantSchema.optional(),
+        agentCardId: z.string().min(1).describe(paramDoc("reveal_agent_card", "agentCardId")),
+        amount: amountSchema.optional().describe(paramDoc("reveal_agent_card", "amount")),
+        merchant: merchantSchema.optional().describe(paramDoc("reveal_agent_card", "merchant")),
       }),
       execute: ({ agentCardId, ...rest }) =>
         guard(async () => {
@@ -170,48 +179,57 @@ export function createChatTools(goat: GoatClient) {
         }),
     }),
 
-    create_checkout: tool({
-      description:
-        "Start a Crossmint Agent Checkout at a product URL, paid with an agent card. Crossmint drives the store's checkout in a real browser; maxCost is a hard cap. Returns the checkout id. Follow it with get_checkout every few seconds.",
-      inputSchema: z.object({
-        startUrl: z.string().url().describe("Product or cart page URL."),
-        task: z.string().max(20000).optional().describe('What to buy and how, e.g. "size M, black, cheapest shipping". The more you say, the fewer questions the agent asks.'),
-        agentCardId: z.string().min(1),
-        maxCost: z.object({
-          amount: z.string().regex(/^\d+(\.\d{1,2})?$/),
-          currency: z.string().length(3),
+    revoke_agent_card: tool({
+      description: describeTool("revoke_agent_card"),
+      inputSchema: z.object({ agentCardId: z.string().min(1).describe(paramDoc("revoke_agent_card", "agentCardId")) }),
+      execute: ({ agentCardId }) =>
+        guard(async () => {
+          await goat.revokeAgentCard(agentCardId);
+          return { agentCardId, revoked: true };
         }),
-        buyerProfileId: z.string().min(1).optional().describe("Saved buyer profile (name, contact, shipping)."),
+    }),
+
+    create_checkout: tool({
+      description: describeTool("create_checkout"),
+      inputSchema: z.object({
+        startUrl: z.string().url().describe(paramDoc("create_checkout", "startUrl")),
+        task: z.string().max(20000).optional().describe(paramDoc("create_checkout", "task")),
+        agentCardId: z.string().min(1).describe(paramDoc("create_checkout", "agentCardId")),
+        maxCost: z
+          .object({
+            amount: z.string().regex(/^\d+(\.\d{1,2})?$/).describe('Decimal string, e.g. "50.00".'),
+            currency: z.string().length(3).describe(PARAM_DOCS.currency),
+          })
+          .describe(paramDoc("create_checkout", "maxCost")),
+        buyerProfileId: z.string().min(1).optional().describe(paramDoc("create_checkout", "buyerProfileId")),
       }),
       execute: (input) => guard(() => goat.createCheckout(input)),
     }),
 
     get_checkout: tool({
-      description:
-        "Get a checkout: status (queued, running, awaiting_input, succeeded, blocked, failed, cancelled), the open question with its fields, the live browser URL, and the receipt or failure when done.",
-      inputSchema: z.object({ checkoutId: z.string().min(1) }),
+      description: describeTool("get_checkout"),
+      inputSchema: z.object({ checkoutId: z.string().min(1).describe(paramDoc("get_checkout", "checkoutId")) }),
       execute: ({ checkoutId }) => guard(() => goat.getCheckout(checkoutId)),
     }),
 
     answer_checkout: tool({
-      description:
-        "Answer a checkout's open question. Pass requestId with values keyed by field name to submit, action decline to refuse, or action alternative with text to suggest another way. Without requestId, text is a note to the agent. Never send card fields: the server pays.",
+      description: describeTool("answer_checkout"),
       inputSchema: z.object({
-        checkoutId: z.string().min(1),
-        requestId: z.string().min(1).optional(),
-        action: z.enum(["submit", "decline", "alternative"]).optional(),
-        values: z.record(z.string(), z.unknown()).optional(),
-        text: z.string().max(20000).optional(),
+        checkoutId: z.string().min(1).describe(paramDoc("answer_checkout", "checkoutId")),
+        requestId: z.string().min(1).optional().describe(paramDoc("answer_checkout", "requestId")),
+        action: z.enum(["submit", "decline", "alternative"]).optional().describe(paramDoc("answer_checkout", "action")),
+        values: z.record(z.string(), z.unknown()).optional().describe(paramDoc("answer_checkout", "values")),
+        text: z.string().max(20000).optional().describe(paramDoc("answer_checkout", "text")),
       }),
       execute: ({ checkoutId, ...input }) => guard(() => goat.answerCheckout(checkoutId, input)),
     }),
 
     cancel_checkout: tool({
-      description: "Stop a running checkout. It reaches cancelled on a later get_checkout.",
-      inputSchema: z.object({ checkoutId: z.string().min(1) }),
+      description: describeTool("cancel_checkout"),
+      inputSchema: z.object({ checkoutId: z.string().min(1).describe(paramDoc("cancel_checkout", "checkoutId")) }),
       execute: ({ checkoutId }) => guard(() => goat.cancelCheckout(checkoutId)),
     }),
-  };
+  } satisfies ChatTools;
 }
 
 export type ChatToolSet = ReturnType<typeof createChatTools>;

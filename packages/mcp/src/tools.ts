@@ -1,7 +1,7 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
-import { formatAmount, renderPendingAction, toDecimalString } from "@goat-wallet/core";
-import type { RenderedAction, RenderedField } from "@goat-wallet/core";
+import { describeTool, formatAmount, PARAM_DOCS, paramDoc, renderPendingAction, TOOL_DOCS, toDecimalString, toolNamesFor } from "@goat-wallet/core";
+import type { RenderedAction, RenderedField, ToolNameFor } from "@goat-wallet/core";
 import { GoatApiError } from "./goat-api.js";
 import type { AgentCard, AgentCardRequest, CheckoutView, CredentialResult, GoatApi } from "./goat-api.js";
 import * as z from "zod";
@@ -12,42 +12,32 @@ export interface GoatToolsContext {
   requester?: string;
 }
 
-export const GOAT_TOOL_NAMES = [
-  "list_payment_methods",
-  "request_agent_card",
-  "get_agent_card_request",
-  "list_agent_cards",
-  "get_agent_card",
-  "reveal_agent_card",
-  "revoke_agent_card",
-  "create_checkout",
-  "get_checkout",
-  "answer_checkout",
-  "cancel_checkout",
-] as const;
-
-export type GoatToolName = (typeof GOAT_TOOL_NAMES)[number];
+/**
+ * The tools this server offers. Names, summaries and parameter docs come
+ * from `TOOL_DOCS` in core, shared with the chat agent; this file adds the
+ * MCP-specific sentence to each description (links to show, fields returned)
+ * and the zod shapes.
+ */
+export type GoatToolName = ToolNameFor<"mcp">;
+export const GOAT_TOOL_NAMES: readonly GoatToolName[] = toolNamesFor("mcp");
 
 // ---------------------------------------------------------------------------
 // Shared schemas
 // ---------------------------------------------------------------------------
 
-const amountSchema = z
-  .union([z.number(), z.string()])
-  .describe('Decimal amount in major units, e.g. 50 or "50.00".');
+const amountSchema = z.union([z.number(), z.string()]).describe(PARAM_DOCS.amountMajor);
 
-const currencySchema = z
-  .string()
-  .length(3)
-  .describe("ISO 4217 currency code. Default USD.");
+const currencySchema = z.string().length(3).describe(PARAM_DOCS.currency);
 
 const merchantSchema = z
   .object({
-    name: z.string().describe("Merchant name, e.g. United Airlines."),
-    url: z.string().describe("Merchant website URL."),
-    countryCode: z.string().length(2).describe("ISO 3166-1 alpha-2 country code, e.g. US."),
+    name: z.string().describe(PARAM_DOCS.merchantName),
+    url: z.string().describe(PARAM_DOCS.merchantUrl),
+    countryCode: z.string().length(2).describe(PARAM_DOCS.merchantCountryCode),
   })
-  .describe("Restrict spending to one merchant.");
+  .describe(PARAM_DOCS.merchant);
+
+const title = (name: GoatToolName) => TOOL_DOCS[name].title;
 
 // ---------------------------------------------------------------------------
 // Registration
@@ -59,8 +49,8 @@ export function registerGoatTools(server: McpServer, ctx: GoatToolsContext): voi
   server.registerTool(
     "list_payment_methods",
     {
-      title: "List saved cards",
-      description: "List the user's saved cards (masked: brand and last 4). These are the cards an agent card can draw from.",
+      title: title("list_payment_methods"),
+      description: describeTool("list_payment_methods"),
       annotations: { readOnlyHint: true, openWorldHint: true },
     },
     guard(async () => {
@@ -79,17 +69,18 @@ export function registerGoatTools(server: McpServer, ctx: GoatToolsContext): voi
   server.registerTool(
     "request_agent_card",
     {
-      title: "Request an agent card",
-      description:
-        "Ask the user to approve a spending limit on one of their cards. Returns an approval URL. " +
-        "Show the URL to the user, then poll get_agent_card_request until status is active.",
+      title: title("request_agent_card"),
+      description: describeTool(
+        "request_agent_card",
+        "Returns an approval URL. Show the URL to the user, then poll get_agent_card_request until status is active.",
+      ),
       inputSchema: {
-        amount: amountSchema,
+        amount: amountSchema.describe(paramDoc("request_agent_card", "amount")),
         currency: currencySchema.optional(),
-        description: z.string().min(1).describe("What the money is for, in the user's words, e.g. Flight to SF."),
-        merchant: merchantSchema.optional(),
-        expiresInHours: z.number().positive().optional().describe("How long the agent card stays valid. Default set by the server (24h)."),
-        requester: z.string().optional().describe("Name of the agent shown to the user. Defaults to the server's label."),
+        description: z.string().min(1).describe(paramDoc("request_agent_card", "description")),
+        merchant: merchantSchema.optional().describe(paramDoc("request_agent_card", "merchant")),
+        expiresInHours: z.number().positive().optional().describe(paramDoc("request_agent_card", "expiresInHours")),
+        requester: z.string().optional().describe(`${paramDoc("request_agent_card", "requester")} Defaults to the server's label.`),
       },
     },
     guard(async (args) => {
@@ -122,9 +113,9 @@ export function registerGoatTools(server: McpServer, ctx: GoatToolsContext): voi
   server.registerTool(
     "get_agent_card_request",
     {
-      title: "Check an agent card request",
-      description: "Poll an agent card request. Status goes pending → approved → active, or denied / expired / failed.",
-      inputSchema: { requestId: z.string().describe("The requestId from request_agent_card.") },
+      title: title("get_agent_card_request"),
+      description: describeTool("get_agent_card_request"),
+      inputSchema: { requestId: z.string().describe(paramDoc("get_agent_card_request", "requestId")) },
       annotations: { readOnlyHint: true, openWorldHint: true },
     },
     guard(async ({ requestId }) => {
@@ -136,8 +127,8 @@ export function registerGoatTools(server: McpServer, ctx: GoatToolsContext): voi
   server.registerTool(
     "list_agent_cards",
     {
-      title: "List agent cards",
-      description: "List the user's agent cards with status, available balance and expiry.",
+      title: title("list_agent_cards"),
+      description: describeTool("list_agent_cards"),
       annotations: { readOnlyHint: true, openWorldHint: true },
     },
     guard(async () => {
@@ -150,13 +141,13 @@ export function registerGoatTools(server: McpServer, ctx: GoatToolsContext): voi
   server.registerTool(
     "get_agent_card",
     {
-      title: "Get an agent card",
-      description: "Get one agent card: status, balance, expiry, rails.",
-      inputSchema: { id: z.string().describe("Agent card id.") },
+      title: title("get_agent_card"),
+      description: describeTool("get_agent_card"),
+      inputSchema: { agentCardId: z.string().describe(paramDoc("get_agent_card", "agentCardId")) },
       annotations: { readOnlyHint: true, openWorldHint: true },
     },
-    guard(async ({ id }) => {
-      const agentCard = await api.getAgentCard(id);
+    guard(async ({ agentCardId }) => {
+      const agentCard = await api.getAgentCard(agentCardId);
       return ok(describeAgentCard(agentCard), { agentCard });
     }),
   );
@@ -164,29 +155,26 @@ export function registerGoatTools(server: McpServer, ctx: GoatToolsContext): voi
   server.registerTool(
     "reveal_agent_card",
     {
-      title: "Reveal card details",
-      description:
-        "Mint a scoped card number from an active agent card. Use it only to pay in a merchant's checkout form. " +
-        "Prefer create_checkout when the target is a website. Never repeat the card fields to the user.",
+      title: title("reveal_agent_card"),
+      description: describeTool(
+        "reveal_agent_card",
+        "Returns the card number, expiry and CVC. Use them only in the merchant's checkout form. Never repeat them to the user.",
+      ),
       inputSchema: {
-        id: z.string().describe("Agent card id."),
-        amount: amountSchema.optional().describe("Amount for this payment. Default: the agent card's available balance."),
-        currency: currencySchema.optional().describe("Currency for amount. Default: the agent card's currency."),
-        merchant: merchantSchema
-          .optional()
-          .describe(
-            "The store you are about to pay: name, url, countryCode. Required when the agent card has no merchant lock. Card networks issue a number per merchant.",
-          ),
+        agentCardId: z.string().describe(paramDoc("reveal_agent_card", "agentCardId")),
+        amount: amountSchema.optional().describe(paramDoc("reveal_agent_card", "amount")),
+        currency: currencySchema.optional().describe(paramDoc("reveal_agent_card", "currency")),
+        merchant: merchantSchema.optional().describe(paramDoc("reveal_agent_card", "merchant")),
       },
       annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true },
     },
     guard(async (args) => {
       let amount: { value: string; currency: string } | undefined;
       if (args.amount !== undefined) {
-        const currency = args.currency ?? (await api.getAgentCard(args.id)).amount.currency;
+        const currency = args.currency ?? (await api.getAgentCard(args.agentCardId)).amount.currency;
         amount = { value: toDecimalString(args.amount), currency: currency.toUpperCase() };
       }
-      const cred = await api.mintCredential(args.id, { amount, merchant: args.merchant, format: "card" });
+      const cred = await api.mintCredential(args.agentCardId, { amount, merchant: args.merchant, format: "card" });
       return ok(describeCredential(cred, amount), { ...cred, warning: cred.enforced ? undefined : enforcedWarning(cred, amount) });
     }),
   );
@@ -194,38 +182,31 @@ export function registerGoatTools(server: McpServer, ctx: GoatToolsContext): voi
   server.registerTool(
     "revoke_agent_card",
     {
-      title: "Revoke an agent card",
-      description: "Revoke an agent card. Existing card numbers stop working. Cannot be undone.",
-      inputSchema: { id: z.string().describe("Agent card id.") },
+      title: title("revoke_agent_card"),
+      description: describeTool("revoke_agent_card"),
+      inputSchema: { agentCardId: z.string().describe(paramDoc("revoke_agent_card", "agentCardId")) },
       annotations: { destructiveHint: true, idempotentHint: true, openWorldHint: true },
     },
-    guard(async ({ id }) => {
-      await api.revokeAgentCard(id);
-      return ok(`Agent card ${id} revoked.`, { id, revoked: true });
+    guard(async ({ agentCardId }) => {
+      await api.revokeAgentCard(agentCardId);
+      return ok(`Agent card ${agentCardId} revoked.`, { agentCardId, revoked: true });
     }),
   );
 
   server.registerTool(
     "create_checkout",
     {
-      title: "Create a checkout",
-      description:
-        "Buy at a product URL with an active agent card. Crossmint drives the store's checkout in a real browser and pays with the card; " +
-        "the card number never reaches you. maxCost is a hard cap: the run stops as blocked instead of paying more. " +
-        "Returns the checkout id. Poll get_checkout every few seconds until it is done or asks a question.",
+      title: title("create_checkout"),
+      description: describeTool("create_checkout"),
       inputSchema: {
-        startUrl: z.string().url().describe("Product or cart page URL to start from."),
-        task: z
-          .string()
-          .max(20000)
-          .optional()
-          .describe("What to buy and how, e.g. medium, black, cheapest shipping, pay by card. The more you say here, the fewer questions the agent stops to ask."),
-        agentCardId: z.string().describe("An active agent card id. It pays."),
-        maxCost: amountSchema.describe("Maximum total to pay, including shipping and tax. Enforced."),
+        startUrl: z.string().url().describe(paramDoc("create_checkout", "startUrl")),
+        task: z.string().max(20000).optional().describe(paramDoc("create_checkout", "task")),
+        agentCardId: z.string().describe(paramDoc("create_checkout", "agentCardId")),
+        maxCost: amountSchema.describe(paramDoc("create_checkout", "maxCost")),
         currency: currencySchema.optional(),
-        buyerProfileId: z.string().optional().describe("Saved buyer profile (name, contact, shipping)."),
-        browserProfileId: z.string().optional().describe("Saved merchant logins, for stores where the user is signed in."),
-        merchantGuidance: z.string().max(20000).optional().describe("Notes about this store for the agent."),
+        buyerProfileId: z.string().optional().describe(paramDoc("create_checkout", "buyerProfileId")),
+        browserProfileId: z.string().optional().describe(paramDoc("create_checkout", "browserProfileId")),
+        merchantGuidance: z.string().max(20000).optional().describe(paramDoc("create_checkout", "merchantGuidance")),
       },
       annotations: { openWorldHint: true },
     },
@@ -246,16 +227,13 @@ export function registerGoatTools(server: McpServer, ctx: GoatToolsContext): voi
   server.registerTool(
     "get_checkout",
     {
-      title: "Get a checkout",
-      description:
-        "Get a checkout's status: queued, running, awaiting_input, succeeded, blocked, failed or cancelled. " +
-        "When it is awaiting_input the result lists the question and its fields; answer with answer_checkout. " +
-        "Payment questions never appear: the server answers them from the agent card.",
-      inputSchema: { id: z.string().describe("Checkout id.") },
+      title: title("get_checkout"),
+      description: describeTool("get_checkout"),
+      inputSchema: { checkoutId: z.string().describe(paramDoc("get_checkout", "checkoutId")) },
       annotations: { readOnlyHint: true, openWorldHint: true },
     },
-    guard(async ({ id }) => {
-      const checkout = await api.getCheckout(id);
+    guard(async ({ checkoutId }) => {
+      const checkout = await api.getCheckout(checkoutId);
       const rendered = renderedAction(checkout);
       return ok(describeCheckout(checkout), { checkout: rendered ? { ...checkout, rendered } : checkout });
     }),
@@ -264,22 +242,19 @@ export function registerGoatTools(server: McpServer, ctx: GoatToolsContext): voi
   server.registerTool(
     "answer_checkout",
     {
-      title: "Answer a checkout question",
-      description:
-        "Answer the open question on a checkout. Pass requestId with values keyed by field name (as listed by get_checkout) to submit, " +
-        "action decline to refuse it, or action alternative with text to suggest another way (e.g. use the cheapest shipping). " +
-        "Without requestId, text is a note to the agent mid-run. Never send card fields.",
+      title: title("answer_checkout"),
+      description: describeTool("answer_checkout"),
       inputSchema: {
-        id: z.string().describe("Checkout id."),
-        requestId: z.string().optional().describe("The pending request id from get_checkout."),
-        action: z.enum(["submit", "decline", "alternative"]).optional().describe("Default submit."),
-        values: z.record(z.string(), z.unknown()).optional().describe("Field values keyed by field name, for submit."),
-        text: z.string().max(20000).optional().describe("Free text: the alternative, or a note for the agent."),
+        checkoutId: z.string().describe(paramDoc("answer_checkout", "checkoutId")),
+        requestId: z.string().optional().describe(paramDoc("answer_checkout", "requestId")),
+        action: z.enum(["submit", "decline", "alternative"]).optional().describe(paramDoc("answer_checkout", "action")),
+        values: z.record(z.string(), z.unknown()).optional().describe(paramDoc("answer_checkout", "values")),
+        text: z.string().max(20000).optional().describe(paramDoc("answer_checkout", "text")),
       },
       annotations: { openWorldHint: true },
     },
-    guard(async ({ id, ...input }) => {
-      const checkout = await api.answerCheckout(id, input);
+    guard(async ({ checkoutId, ...input }) => {
+      const checkout = await api.answerCheckout(checkoutId, input);
       return ok(describeCheckout(checkout), { checkout });
     }),
   );
@@ -287,13 +262,13 @@ export function registerGoatTools(server: McpServer, ctx: GoatToolsContext): voi
   server.registerTool(
     "cancel_checkout",
     {
-      title: "Cancel a checkout",
-      description: "Stop a running checkout. It reaches cancelled on a later get_checkout.",
-      inputSchema: { id: z.string().describe("Checkout id.") },
+      title: title("cancel_checkout"),
+      description: describeTool("cancel_checkout"),
+      inputSchema: { checkoutId: z.string().describe(paramDoc("cancel_checkout", "checkoutId")) },
       annotations: { openWorldHint: true },
     },
-    guard(async ({ id }) => {
-      const checkout = await api.cancelCheckout(id);
+    guard(async ({ checkoutId }) => {
+      const checkout = await api.cancelCheckout(checkoutId);
       return ok(describeCheckout(checkout), { checkout });
     }),
   );
@@ -426,7 +401,7 @@ function describeCheckout(checkout: CheckoutView): string {
     }
     if (action.expiresAt) lines.push(`Answer before ${action.expiresAt}, or the checkout fails.`);
     lines.push(
-      `Ask the user if you do not know a value. Then call answer_checkout with id "${checkout.id}" and requestId "${action.id}" ` +
+      `Ask the user if you do not know a value. Then call answer_checkout with checkoutId "${checkout.id}" and requestId "${action.id}" ` +
         `(values to submit, or action "decline" / "alternative").`,
     );
   }

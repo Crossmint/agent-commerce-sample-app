@@ -83,6 +83,7 @@ export function goatClient(jwt: string) {
       (await call<{ paymentMethods: PaymentMethod[] }>("GET", "/payment-methods")).paymentMethods,
     listAgentCards: async () => (await call<{ agentCards: AgentCard[] }>("GET", "/agent-cards")).agentCards,
     getAgentCard: (id: string) => call<AgentCard>("GET", `/agent-cards/${enc(id)}`),
+    revokeAgentCard: (id: string) => call<void>("DELETE", `/agent-cards/${enc(id)}`),
     mintCredentials: (id: string, input: Record<string, unknown>) =>
       call<MintCredentialsResult>("POST", `/agent-cards/${enc(id)}/credentials`, input),
     createAgentCardRequest: (input: Record<string, unknown>) =>
