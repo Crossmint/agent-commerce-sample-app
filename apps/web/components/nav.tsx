@@ -1,5 +1,5 @@
-import Image from "next/image";
 import Link from "next/link";
+import { GoatLockup } from "./brand";
 import { SignOutButton } from "./sign-out-button";
 
 export interface NavProps {
@@ -9,10 +9,10 @@ export interface NavProps {
 
 export function Nav({ email, chatEnabled = false }: NavProps) {
   return (
-    <header className="sticky top-0 z-20 border-b border-border bg-background/80 backdrop-blur">
+    <header className="sticky top-0 z-20 border-b border-hairline bg-background/85 backdrop-blur">
       <div className="mx-auto flex h-16 w-full max-w-4xl items-center gap-6 px-4 sm:px-6">
         <Link href="/" className="flex items-center" aria-label="GOAT home">
-          <Image src="/brand/logo.png" alt="GOAT" width={96} height={32} priority className="h-8 w-auto" />
+          <GoatLockup size="sm" />
         </Link>
         <nav className="flex items-center gap-4 text-sm font-medium text-muted-foreground">
           <Link href="/wallet" className="hover:text-foreground">

@@ -32,7 +32,7 @@ export interface GoatProviderProps {
   crossmintEnvironment?: CrossmintEnvironment;
   /** How often to re-read the JWT for the Crossmint components. Default 30s. */
   jwtRefreshMs?: number;
-  /** Default "/brand/mark.png". */
+  /** Default "/brand/agents/crossmint-agents-mark.svg". */
   mascotSrc?: string;
   children: React.ReactNode;
 }
@@ -48,7 +48,7 @@ export function GoatProvider({
   crossmintClientApiKey,
   crossmintEnvironment = "staging",
   jwtRefreshMs = 30_000,
-  mascotSrc = "/brand/mark.png",
+  mascotSrc = "/brand/agents/crossmint-agents-mark.svg",
   children,
 }: GoatProviderProps) {
   const getJwtRef = React.useRef(getJwt);

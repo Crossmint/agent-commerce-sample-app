@@ -3,15 +3,15 @@ import { cn } from "../lib/utils.js";
 import { useGoatOptional } from "../provider.js";
 
 export interface MascotProps extends Omit<React.ComponentProps<"img">, "src"> {
-  /** Defaults to the provider's `mascotSrc`, then "/brand/mark.png". */
+  /** Defaults to the provider's `mascotSrc`, then "/brand/agents/crossmint-agents-mark.svg". */
   src?: string;
   size?: number;
 }
 
-/** The GOAT head. Used in empty states, success states, and small in navs. */
-export function Mascot({ src, size = 96, className, alt = "GOAT", ...props }: MascotProps) {
+/** The Crossmint Agents mark. Used in empty states, success states, and small in navs. */
+export function Mascot({ src, size = 96, className, alt = "Crossmint Agents", ...props }: MascotProps) {
   const ctx = useGoatOptional();
-  const resolved = src ?? ctx?.mascotSrc ?? "/brand/mark.png";
+  const resolved = src ?? ctx?.mascotSrc ?? "/brand/agents/crossmint-agents-mark.svg";
   return (
     // eslint-disable-next-line @next/next/no-img-element
     <img
@@ -19,7 +19,7 @@ export function Mascot({ src, size = 96, className, alt = "GOAT", ...props }: Ma
       width={size}
       height={size}
       alt={alt}
-      className={cn("select-none rounded-full object-cover", className)}
+      className={cn("select-none object-contain", className)}
       draggable={false}
       {...props}
     />
@@ -46,7 +46,7 @@ export function EmptyState({
   return (
     <div
       className={cn(
-        "goat-backdrop flex flex-col items-center gap-3 rounded-2xl border border-dashed border-border px-6 py-10 text-center",
+        "goat-backdrop flex flex-col items-center gap-3 rounded-md border border-dashed border-border px-6 py-10 text-center",
         className,
       )}
       {...props}

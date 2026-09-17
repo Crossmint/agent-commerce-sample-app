@@ -6,6 +6,8 @@ export interface AgentLogo {
   src: string;
   /** Internal link. Only the example agent has one. */
   href?: string;
+  /** The file carries its own colors (the Crossmint Agents mark). Other marks are one color and take the text color. */
+  colored?: boolean;
 }
 
 export const AGENT_LOGOS: AgentLogo[] = [
@@ -15,5 +17,5 @@ export const AGENT_LOGOS: AgentLogo[] = [
   { name: "Claude Code", by: "Anthropic", src: "/logos/claude-code.svg" },
   { name: "OpenClaw", src: "/logos/openclaw.svg" },
   { name: "Hermes", by: "Nous Research", src: "/logos/hermes.svg" },
-  { name: "GOAT agent", src: "/brand/mark.png", href: "/chat" },
+  { name: "GOAT example agent", src: "/brand/agents/crossmint-agents-mark.svg", href: "/chat", colored: true },
 ];

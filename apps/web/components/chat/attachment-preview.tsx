@@ -18,7 +18,7 @@ export function AttachmentPreview({
   const isImage = attachment.contentType.startsWith("image/");
   return (
     <div
-      className={cn("group relative size-20 shrink-0 overflow-hidden rounded-xl border border-border bg-muted", className)}
+      className={cn("group relative size-20 shrink-0 overflow-hidden rounded-md border border-border bg-muted", className)}
       title={attachment.name}
     >
       {isImage && attachment.url ? (

@@ -21,15 +21,15 @@ export function readThemeColors(el?: Element | null): ThemeColors | undefined {
   const cs = getComputedStyle(target);
   const v = (name: string, fallback: string) => cs.getPropertyValue(name).trim() || fallback;
   return {
-    background: v("--background", "#14140f"),
-    card: v("--card", "#1c1c15"),
-    foreground: v("--foreground", "#f3efe6"),
-    mutedForeground: v("--muted-foreground", "#a39e90"),
-    primary: v("--primary", "#e8632b"),
-    border: v("--border", "#2f2f26"),
-    destructive: v("--destructive", "#e05a48"),
-    success: v("--success", "#57b37f"),
-    radius: v("--radius", "1rem"),
+    background: v("--background", "#f2f3ef"),
+    card: v("--card", "#ffffff"),
+    foreground: v("--foreground", "#0a1825"),
+    mutedForeground: v("--muted-foreground", "#5b6670"),
+    primary: v("--primary", "#11ba4b"),
+    border: v("--border", "rgba(10, 24, 37, 0.12)"),
+    destructive: v("--destructive", "#c8402f"),
+    success: v("--success", "#11ba4b"),
+    radius: v("--radius", "0.5rem"),
     fontFamily: cs.fontFamily || "system-ui, sans-serif",
   };
 }

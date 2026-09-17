@@ -45,7 +45,7 @@ export function SavedCards() {
   }
 
   return (
-    <ul className="flex flex-col divide-y divide-border rounded-2xl border border-border bg-card">
+    <ul className="flex flex-col divide-y divide-border rounded-md border border-border bg-card">
       {data.map((pm) => (
         <li key={pm.paymentMethodId} className="flex items-center gap-4 px-5 py-4">
           <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">

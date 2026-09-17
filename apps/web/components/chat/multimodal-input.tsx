@@ -99,7 +99,7 @@ export function MultimodalInput({ status, attachmentsEnabled, onSend, onStop, on
 
   return (
     <form
-      className={cn("rounded-2xl border border-border bg-card shadow-sm transition-colors focus-within:border-ring/60", className)}
+      className={cn("rounded-md border border-border bg-card shadow-sm transition-colors focus-within:border-ring/60", className)}
       onSubmit={(e) => {
         e.preventDefault();
         submit();

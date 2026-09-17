@@ -122,7 +122,7 @@ export function SaveCard({
 
   if (phase === "done" && result && showResult) {
     return (
-      <div className={cn("flex flex-col gap-4 rounded-2xl border border-border bg-card p-5", className)}>
+      <div className={cn("flex flex-col gap-4 rounded-md border border-border bg-card p-5", className)}>
         <div className="flex items-center gap-3">
           <CircleCheck className="size-6 text-success" />
           <div>

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { BuildYourOwn } from "@/components/landing/build-your-own";
 import { CorePieces } from "@/components/landing/core-pieces";
+import { GridRule } from "@/components/landing/grid";
 import { Hero } from "@/components/landing/hero";
 import { LandingFooter } from "@/components/landing/landing-footer";
 import { LandingNav } from "@/components/landing/landing-nav";
@@ -20,11 +21,16 @@ export default function LandingPage() {
       <LandingNav />
       <main className="landing flex flex-1 flex-col">
         <Hero />
+        <GridRule />
         <PoweredBy />
+        <GridRule />
         <CorePieces />
+        <GridRule />
         <TryLive />
+        <GridRule />
         <BuildYourOwn />
       </main>
+      <GridRule />
       <LandingFooter />
     </>
   );

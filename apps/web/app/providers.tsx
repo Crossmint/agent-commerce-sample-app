@@ -50,7 +50,7 @@ function GoatBridge({ crossmintClientApiKey, crossmintEnvironment, children }: P
       getJwt={getJwt}
       crossmintClientApiKey={crossmintClientApiKey}
       crossmintEnvironment={crossmintEnvironment}
-      mascotSrc="/brand/mark.png"
+      mascotSrc="/brand/agents/crossmint-agents-mark.svg"
     >
       {children}
     </GoatProvider>

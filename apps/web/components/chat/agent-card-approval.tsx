@@ -40,7 +40,7 @@ export function AgentCardApproval({
             ? "The request expired."
             : "The card could not be set up.";
     return (
-      <div className="flex w-full max-w-lg items-center gap-3 rounded-2xl border border-border bg-card px-4 py-3 text-sm">
+      <div className="flex w-full max-w-lg items-center gap-3 rounded-md border border-border bg-card px-4 py-3 text-sm">
         <Badge variant={output.status === "active" ? "success" : output.status === "denied" ? "destructive" : "muted"}>
           {output.status}
         </Badge>
@@ -52,7 +52,7 @@ export function AgentCardApproval({
 
   return (
     <div className="w-full max-w-lg">
-      <ApproveAgentCard requestId={requestId} onDone={handleDone} className="max-w-none rounded-2xl p-5 sm:p-6" />
+      <ApproveAgentCard requestId={requestId} onDone={handleDone} className="max-w-none rounded-md p-5 sm:p-6" />
     </div>
   );
 }

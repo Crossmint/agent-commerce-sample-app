@@ -30,11 +30,11 @@ export interface Brand {
 export const DEFAULT_BRAND: Brand = {
   id: "goat",
   name: "Your agent",
-  logo: "/brand/mark.png",
+  logo: "/brand/agents/crossmint-agents-mark.svg",
   logoStyle: "mark",
   domain: "yourplatform.com",
   chatStyle: "imessage",
-  tone: "dark",
+  tone: "light",
   approval: "goat",
 };
 

@@ -86,7 +86,7 @@ export function ApproveAgentCardPreview({
         {/* Looks like the real select. Not a control: this is a picture of one. */}
         <div
           aria-hidden
-          className="relative flex h-11 w-full items-center rounded-xl border border-input bg-background pr-10 pl-10 text-sm text-foreground shadow-xs"
+          className="relative flex h-11 w-full items-center rounded-md border border-input bg-background pr-10 pl-10 text-sm text-foreground shadow-xs"
         >
           <CreditCard className="absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-muted-foreground" />
           <span className="truncate">{cardLabel}</span>

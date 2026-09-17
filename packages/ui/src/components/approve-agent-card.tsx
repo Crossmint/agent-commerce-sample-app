@@ -32,7 +32,7 @@ export interface ApproveAgentCardProps {
   requestId: string;
   /** Called once the request reaches a final state. */
   onDone?: (outcome: ApproveOutcome) => void;
-  /** Mascot for the success state. Default "/brand/mark.png". */
+  /** Mascot for the success state. Default "/brand/agents/crossmint-agents-mark.svg". */
   mascotSrc?: string;
   /** Country for card registration. Default "US". */
   countryCode?: string;
@@ -364,7 +364,7 @@ export function ApproveAgentCard({
           onComplete={() => void verified(phase.agentCard)}
         />
       ) : phase.kind === "confirming" || (req.status === "approved" && phase.kind === "choose") ? (
-        <div className="flex items-center gap-3 rounded-xl border border-border bg-muted/40 p-4 text-sm">
+        <div className="flex items-center gap-3 rounded-md border border-border bg-muted/40 p-4 text-sm">
           <Spinner className="text-primary" />
           <span>Almost there. Waiting for the card network to confirm.</span>
         </div>
@@ -388,7 +388,7 @@ function Shell({ className, children }: { className?: string; children: React.Re
   return (
     <div
       className={cn(
-        "mx-auto flex w-full max-w-md flex-col gap-6 rounded-3xl border border-border bg-card p-6 text-card-foreground shadow-sm sm:p-8",
+        "mx-auto flex w-full max-w-md flex-col gap-6 rounded-md border border-border bg-card p-6 text-card-foreground shadow-sm sm:p-8",
         className,
       )}
     >

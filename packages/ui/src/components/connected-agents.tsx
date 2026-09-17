@@ -58,7 +58,7 @@ export function ConnectedAgents({ sessions, loading = false, onRevoke, className
   }
 
   return (
-    <ul className={cn("flex flex-col divide-y divide-border rounded-2xl border border-border bg-card", className)}>
+    <ul className={cn("flex flex-col divide-y divide-border rounded-md border border-border bg-card", className)}>
       {sessions.map((s) => (
         <li key={s.id} className="flex items-center gap-4 px-5 py-4">
           <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">

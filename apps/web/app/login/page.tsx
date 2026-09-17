@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Image from "next/image";
+import { GoatLockup } from "@/components/brand";
 import { LoginForm } from "@/components/login-form";
 
 export const metadata: Metadata = { title: "Sign in" };
@@ -20,8 +20,8 @@ export default async function LoginPage({
   return (
     <main className="goat-backdrop flex flex-1 flex-col items-center justify-center gap-8 px-4 py-16">
       <div className="flex flex-col items-center gap-3 text-center">
-        <Image src="/brand/logo.png" alt="GOAT" width={160} height={50} priority className="h-12 w-auto" />
-        <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">Sign in</h1>
+        <GoatLockup size="md" className="mb-2" />
+        <h1 className="font-display text-3xl font-semibold tracking-[-0.03em] sm:text-4xl">Sign in</h1>
         <p className="max-w-sm text-muted-foreground">Your cards. Your agents. You approve every budget.</p>
       </div>
       <LoginForm next={next} />

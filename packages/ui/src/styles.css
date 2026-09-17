@@ -1,69 +1,82 @@
 /*
- * GOAT theme tokens.
+ * GOAT theme tokens: the Crossmint Agents system.
  *
  * shadcn token names on top of Tailwind v4. Import this file once in your app
  * CSS, after `@import "tailwindcss"`. Retheme by overriding the variables in
  * `:root` and `.dark`. Nothing else needs to change.
  *
- * Dark is the default look: a warm near-black ground with a hint of olive,
- * light text, one warm accent for primary actions. Squared corners, soft borders.
+ * Light is the default look: a warm off-white ground, navy text, white cards
+ * with hairline borders, mint panels, and Crossmint green as the one accent.
+ * 8px corners, no pills, shadows soft or none.
  */
 
 :root {
-  /* Squared corners: 6px cards and buttons. The ladder below derives from it. */
-  --radius: 0.375rem;
+  /* 8px cards, inputs and buttons. The ladder below derives from it. */
+  --radius: 0.5rem;
 
-  /* Light mode: warm paper. */
-  --background: #f7f3ea;
-  --foreground: #1c1b16;
-  --card: #fffdf8;
-  --card-foreground: #1c1b16;
-  --popover: #fffdf8;
-  --popover-foreground: #1c1b16;
-  --primary: #e8632b;
-  --primary-foreground: #fff8f2;
-  --secondary: #ebe6d9;
-  --secondary-foreground: #1c1b16;
-  --muted: #ece7da;
-  --muted-foreground: #6b675c;
-  --accent: #efe9dc;
-  --accent-foreground: #1c1b16;
+  /* Light mode: Crossmint Agents. */
+  --background: #f2f3ef;
+  --foreground: #0a1825;
+  --card: #ffffff;
+  --card-foreground: #0a1825;
+  --popover: #ffffff;
+  --popover-foreground: #0a1825;
+  --primary: #11ba4b;
+  --primary-hover: #0fa843;
+  --primary-foreground: #ffffff;
+  --secondary: #e9f0d6;
+  --secondary-foreground: #0a1825;
+  --muted: #e9f0d6;
+  --muted-strong: #dfe9c9;
+  --muted-foreground: #5b6670;
+  --accent: #e9f0d6;
+  --accent-foreground: #0a1825;
   --destructive: #c8402f;
-  --destructive-foreground: #fff8f2;
-  --success: #2f8a5b;
-  --success-foreground: #f2fff7;
+  --destructive-foreground: #ffffff;
+  --success: #11ba4b;
+  --success-foreground: #ffffff;
   --warning: #c98a17;
-  --warning-foreground: #1c1b16;
-  --border: #ddd6c6;
-  --input: #ddd6c6;
-  --ring: #e8632b;
+  --warning-foreground: #0a1825;
+  --border: rgba(10, 24, 37, 0.12);
+  --input: rgba(10, 24, 37, 0.12);
+  --ring: #11ba4b;
+  /* Hairlines and grid lines: 1px black at 20%. */
+  --hairline: rgba(0, 0, 0, 0.2);
+  /* The brand mark's gradient and the pixel wordmark green. */
+  --brand-green-a: #05ce6c;
+  --brand-green-b: #5edd4d;
+  --brand-wordmark: #32d55d;
 }
 
+/* Dark palette, for hosts that opt in with `.dark`. The site does not force it. */
 .dark,
 [data-theme="dark"] {
-  --background: #14140f;
-  --foreground: #f3efe6;
-  --card: #1c1c15;
-  --card-foreground: #f3efe6;
-  --popover: #1c1c15;
-  --popover-foreground: #f3efe6;
-  --primary: #e8632b;
-  --primary-foreground: #fff8f2;
-  --secondary: #26261e;
-  --secondary-foreground: #f3efe6;
-  --muted: #23231b;
-  --muted-foreground: #a39e90;
-  --accent: #2b2b22;
-  --accent-foreground: #f3efe6;
+  --background: #0a1825;
+  --foreground: #f2f3ef;
+  --card: #10202f;
+  --card-foreground: #f2f3ef;
+  --popover: #10202f;
+  --popover-foreground: #f2f3ef;
+  --primary: #11ba4b;
+  --primary-hover: #0fa843;
+  --primary-foreground: #ffffff;
+  --secondary: #16283a;
+  --secondary-foreground: #f2f3ef;
+  --muted: #16283a;
+  --muted-strong: #1c3247;
+  --muted-foreground: #9aa6b0;
+  --accent: #16283a;
+  --accent-foreground: #f2f3ef;
   --destructive: #e05a48;
-  --destructive-foreground: #fff8f2;
-  --success: #57b37f;
-  --success-foreground: #0f1a13;
+  --destructive-foreground: #ffffff;
+  --success: #5edd4d;
+  --success-foreground: #0a1825;
   --warning: #e0a63a;
-  --warning-foreground: #1c1b16;
-  --border: #2f2f26;
-  --input: #34342a;
-  --ring: #e8632b;
+  --warning-foreground: #0a1825;
+  --border: rgba(242, 243, 239, 0.14);
+  --input: rgba(242, 243, 239, 0.18);
+  --ring: #11ba4b;
+  --hairline: rgba(255, 255, 255, 0.2);
 }
 
 @theme inline {
@@ -74,10 +87,12 @@
   --color-popover: var(--popover);
   --color-popover-foreground: var(--popover-foreground);
   --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
   --color-primary-foreground: var(--primary-foreground);
   --color-secondary: var(--secondary);
   --color-secondary-foreground: var(--secondary-foreground);
   --color-muted: var(--muted);
+  --color-muted-strong: var(--muted-strong);
   --color-muted-foreground: var(--muted-foreground);
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
@@ -90,6 +105,8 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
+  --color-hairline: var(--hairline);
+  --color-brand-wordmark: var(--brand-wordmark);
 
   --radius-sm: calc(var(--radius) - 2px);
   --radius-md: var(--radius);
@@ -110,21 +127,19 @@
   }
 }
 
-/* A textured backdrop for hero areas and empty states. Subtle dots. */
+/* A textured backdrop for hero areas and empty states: a light dotted grid. */
 .goat-backdrop {
-  background-image: radial-gradient(
-    color-mix(in srgb, var(--foreground) 7%, transparent) 1px,
-    transparent 1px
-  );
-  background-size: 18px 18px;
+  background-image: radial-gradient(color-mix(in srgb, var(--foreground) 10%, transparent) 1px, transparent 1px);
+  background-size: 22px 22px;
 }
 
-/* Small window frame with three dots, for product surfaces. */
+/* Small window frame with three muted dots, for product surfaces. */
 .goat-window {
   position: relative;
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   background: var(--card);
+  box-shadow: 0 1px 2px rgba(10, 24, 37, 0.06);
   overflow: hidden;
 }
 .goat-window::before {
@@ -133,7 +148,7 @@
   height: 2.25rem;
   border-bottom: 1px solid var(--border);
   background:
-    radial-gradient(circle at 1rem 50%, #e06a5a 0.3rem, transparent 0.35rem),
-    radial-gradient(circle at 2.1rem 50%, #e0b25a 0.3rem, transparent 0.35rem),
-    radial-gradient(circle at 3.2rem 50%, #5ab38a 0.3rem, transparent 0.35rem);
+    radial-gradient(circle at 1rem 50%, var(--muted-strong) 0.3rem, transparent 0.35rem),
+    radial-gradient(circle at 2.1rem 50%, var(--muted-strong) 0.3rem, transparent 0.35rem),
+    radial-gradient(circle at 3.2rem 50%, var(--muted-strong) 0.3rem, transparent 0.35rem);
 }

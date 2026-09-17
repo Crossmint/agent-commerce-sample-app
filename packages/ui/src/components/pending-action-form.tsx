@@ -133,7 +133,7 @@ function Field({
   switch (field.kind) {
     case "object":
       return (
-        <fieldset className="flex flex-col gap-3 rounded-xl border border-border p-4">
+        <fieldset className="flex flex-col gap-3 rounded-md border border-border p-4">
           <legend className="px-1 text-sm font-medium">{field.label}</legend>
           {help}
           <FieldList fields={field.children ?? []} values={values} update={update} disabled={disabled} />

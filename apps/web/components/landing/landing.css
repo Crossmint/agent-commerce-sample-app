@@ -169,7 +169,30 @@ html {
 .landing-tile:hover {
   transform: translateY(-3px);
   border-color: color-mix(in srgb, var(--primary) 55%, var(--border));
-  box-shadow: 0 12px 28px -16px rgba(0, 0, 0, 0.7);
+  box-shadow: 0 12px 28px -18px rgba(10, 24, 37, 0.35);
+}
+
+/*
+ * Grid cells that fill with green pixels on hover. The pattern is 4px
+ * squares on a 32px tile; a corner mask makes them denser toward the bottom
+ * right, like the pixel textures on the brand board. Opacity steps in, so
+ * the fill arrives as pixels, not as a fade.
+ */
+.landing-pixel::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-color: color-mix(in srgb, var(--primary) 6%, transparent);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 32 32' fill='%2311ba4b'%3E%3Crect x='0' y='0' width='4' height='4' opacity='.55'/%3E%3Crect x='12' y='4' width='4' height='4' opacity='.35'/%3E%3Crect x='24' y='0' width='4' height='4' opacity='.7'/%3E%3Crect x='4' y='12' width='4' height='4' opacity='.3'/%3E%3Crect x='20' y='12' width='4' height='4' opacity='.55'/%3E%3Crect x='28' y='16' width='4' height='4' opacity='.4'/%3E%3Crect x='8' y='20' width='4' height='4' opacity='.65'/%3E%3Crect x='16' y='24' width='4' height='4' opacity='.35'/%3E%3Crect x='0' y='28' width='4' height='4' opacity='.45'/%3E%3Crect x='24' y='28' width='4' height='4' opacity='.75'/%3E%3C/svg%3E");
+  background-size: 32px 32px;
+  mask-image: linear-gradient(to top left, #000 30%, rgba(0, 0, 0, 0.35) 65%, transparent 100%);
+  opacity: 0;
+  transition: opacity 0.4s steps(6, end);
+}
+.landing-pixel:hover::before,
+.landing-pixel:focus-visible::before {
+  opacity: 1;
 }
 
 /*
@@ -213,9 +236,9 @@ html {
   border-radius: calc(var(--phone-screen-r) + var(--phone-bezel));
   background: linear-gradient(160deg, #2c2c2c 0%, #0c0c0c 38%, #161616 100%);
   box-shadow:
-    0 0 0 1px rgba(255, 255, 255, 0.09),
+    0 0 0 1px rgba(10, 24, 37, 0.12),
     inset 0 0 0 1.5px rgba(255, 255, 255, 0.05),
-    0 40px 80px -30px rgba(0, 0, 0, 0.75);
+    0 32px 64px -32px rgba(10, 24, 37, 0.4);
 }
 .landing-phone-screen {
   position: relative;
@@ -453,9 +476,9 @@ html {
   background-color: color-mix(in srgb, var(--primary) 8%, transparent);
 }
 
-/* A soft warm glow behind hero art. */
+/* A soft green glow behind hero art. Quiet on the light ground. */
 .landing-glow {
-  background: radial-gradient(closest-side, color-mix(in srgb, var(--primary) 22%, transparent), transparent 70%);
+  background: radial-gradient(closest-side, color-mix(in srgb, var(--primary) 12%, transparent), transparent 70%);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -503,6 +526,7 @@ html {
   }
   .landing-reveal[data-reveal="shown"],
   .landing-tile,
+  .landing-pixel::before,
   .landing-screen-layer {
     transition: none;
   }

@@ -94,7 +94,7 @@ export function CardPicker({
       </div>
 
       {adding && allowAdd ? (
-        <div className="rounded-2xl border border-border bg-card p-4">
+        <div className="rounded-md border border-border bg-card p-4">
           <p className="mb-3 flex items-center gap-2 text-sm font-medium">
             <Plus className="size-4" /> New card
           </p>

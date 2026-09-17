@@ -92,7 +92,7 @@ export function AgentCardList({
         return (
           <li
             key={card.orderIntentId}
-            className="flex flex-col gap-3 rounded-2xl border border-border bg-card p-5"
+            className="flex flex-col gap-3 rounded-md border border-border bg-card p-5"
           >
            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div className="min-w-0 flex-1 space-y-2">
@@ -142,7 +142,7 @@ export function AgentCardList({
             </div>
            </div>
             {isVerifying ? (
-              <div className="rounded-xl border border-border bg-background p-4">
+              <div className="rounded-md border border-border bg-background p-4">
                 <p className="mb-3 text-sm text-muted-foreground">
                   Confirm with your card network so agents can get a card number.
                 </p>

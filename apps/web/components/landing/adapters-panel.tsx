@@ -29,7 +29,7 @@ export function AdaptersPanel({ className }: { className?: string }) {
         aria-label="A node labeled Your agent wallet, wired to three adapter cards: Agent tools, MCP server, and CLI + Skills. The wires light up one at a time."
         className="grid w-full grid-cols-[auto_44px_minmax(0,1fr)] items-stretch py-6 lg:min-h-[calc((var(--phone-w)-20px)*852/393+20px)] lg:grid-cols-[auto_64px_minmax(0,1fr)]"
       >
-        <div className="flex w-[92px] flex-col items-center justify-center gap-2 self-center rounded-md border border-border bg-black/40 px-2 py-3.5 text-center">
+        <div className="flex w-[92px] flex-col items-center justify-center gap-2 self-center rounded-md border border-border bg-card px-2 py-3.5 text-center">
           <Wallet className="size-5 text-primary" strokeWidth={1.75} />
           <span className="text-[11.5px] leading-tight font-semibold">Your agent wallet</span>
         </div>
@@ -45,7 +45,7 @@ export function AdaptersPanel({ className }: { className?: string }) {
 
         <div className="grid grid-rows-3 gap-3">
           {ADAPTERS.map((a, i) => (
-            <div key={a.title} data-active={i === step} className="landing-adapter flex min-w-0 flex-col justify-center gap-2 rounded-md border border-border bg-black/40 p-3.5">
+            <div key={a.title} data-active={i === step} className="landing-adapter flex min-w-0 flex-col justify-center gap-2 rounded-md border border-border bg-card p-3.5">
               <span className="flex items-center gap-2 text-sm font-semibold">
                 <a.Icon className={cn("size-4 shrink-0", i === step ? "text-primary" : "text-muted-foreground")} strokeWidth={1.75} />
                 {a.title}

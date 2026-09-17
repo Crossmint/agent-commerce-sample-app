@@ -21,10 +21,10 @@ export function Section({ id, className, children }: SectionProps) {
 }
 
 /** A section title with an optional line under it. Left-aligned, like all landing copy. */
-export function SectionHeading({ title, sub }: { title: string; sub?: ReactNode }) {
+export function SectionHeading({ title, sub, className }: { title: string; sub?: ReactNode; className?: string }) {
   return (
-    <Reveal className="mb-12 flex flex-col items-start gap-3 sm:mb-16">
-      <h2 className="text-4xl font-bold tracking-tight sm:text-5xl">{title}</h2>
+    <Reveal className={cn("mb-12 flex flex-col items-start gap-3 sm:mb-16", className)}>
+      <h2 className="font-display text-4xl font-semibold tracking-[-0.03em] text-foreground sm:text-5xl">{title}</h2>
       {sub ? <p className="max-w-2xl text-lg text-muted-foreground sm:text-xl">{sub}</p> : null}
     </Reveal>
   );

@@ -117,7 +117,7 @@ export function CheckoutView({ checkoutId, poll = true, onDone, className, frame
       ) : null}
 
       {data.status === "succeeded" ? (
-        <div className="goat-backdrop flex flex-col items-center gap-4 rounded-2xl border border-border bg-card px-6 py-10 text-center">
+        <div className="goat-backdrop flex flex-col items-center gap-4 rounded-md border border-border bg-card px-6 py-10 text-center">
           <Mascot size={88} />
           <div className="space-y-1">
             <p className="flex items-center justify-center gap-2 text-2xl font-semibold tracking-tight">
@@ -140,7 +140,7 @@ export function CheckoutView({ checkoutId, poll = true, onDone, className, frame
       ) : null}
 
       {!terminal && data.rendered ? (
-        <div className="rounded-2xl border border-border bg-card p-6">
+        <div className="rounded-md border border-border bg-card p-6">
           {actionError ? (
             <Alert variant="destructive" className="mb-4">
               <TriangleAlert />

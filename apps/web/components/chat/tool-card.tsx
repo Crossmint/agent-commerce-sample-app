@@ -38,7 +38,7 @@ export function ToolCard({ title, state, summary, errorText, input, output, chil
   const hasDetails = input !== undefined || output !== undefined;
 
   return (
-    <div className={cn("w-full max-w-lg overflow-hidden rounded-2xl border border-border bg-card text-sm", className)}>
+    <div className={cn("w-full max-w-lg overflow-hidden rounded-md border border-border bg-card text-sm", className)}>
       <button
         type="button"
         disabled={!hasDetails}

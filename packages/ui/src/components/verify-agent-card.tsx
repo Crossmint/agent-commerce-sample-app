@@ -74,7 +74,7 @@ export function VerifyAgentCard({ agentCard, onComplete, onError, appearance, di
 
   return (
     <div className={cn("flex flex-col gap-3", className)}>
-      <div className="flex items-start gap-3 rounded-xl border border-border bg-muted/40 p-4">
+      <div className="flex items-start gap-3 rounded-md border border-border bg-muted/40 p-4">
         {error ? <TriangleAlert className="mt-0.5 size-5 text-destructive" /> : <Spinner className="mt-0.5 size-5 text-primary" />}
         <div className="flex-1 space-y-1">
           <p className="font-semibold">{error ? "Verification did not finish" : "Confirm with your bank"}</p>

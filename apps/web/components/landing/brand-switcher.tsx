@@ -20,8 +20,9 @@ export interface BrandSwitcherProps {
 /**
  * "Start building today": one two-column block. Left, the intro, the three
  * numbered one-line steps (the current one lit), and the call to action.
- * Right, the brand pills centered over one phone that plays the whole story
- * for the selected brand, with the step dots under it. A brand switch
+ * Right, the brand pills over one phone that plays the whole story for the
+ * selected brand, with the step dots under it; on desktop the column hugs
+ * the right edge, like the hero phone. A brand switch
  * restarts the story. On small screens it stacks: text, then pills, phone,
  * dots, all centered.
  */
@@ -62,8 +63,8 @@ export function BrandSwitcher({ intro, cta }: BrandSwitcherProps) {
         {cta}
       </div>
 
-      <div className="flex w-full flex-col items-center gap-5">
-        <div role="tablist" aria-label="Brand" className="flex w-fit max-w-full flex-wrap justify-center gap-1 rounded-md border border-border bg-background p-1">
+      <div className="flex w-full flex-col items-center gap-5 lg:items-end">
+        <div role="tablist" aria-label="Brand" className="flex w-fit max-w-full flex-wrap justify-center gap-1 rounded-md border border-border bg-card p-1">
           {BRANDS.map((b) => (
             <button
               key={b.id}
@@ -82,7 +83,7 @@ export function BrandSwitcher({ intro, cta }: BrandSwitcherProps) {
           ))}
         </div>
         {/* Keyed on the brand: a switch remounts the phone and the story starts over. */}
-        <StoryPhone key={brand.id} brand={brand} step={step} cycle={cycle} className="mx-auto" />
+        <StoryPhone key={brand.id} brand={brand} step={step} cycle={cycle} className="mx-auto lg:mr-0" />
         <StepDots count={3} active={phase} onPick={(i) => jump(STORY_PHASES[i]?.start ?? 0)} labels={LABELS} className="ml-0" />
       </div>
     </div>

@@ -470,15 +470,9 @@ For the platform, the CLI is `npm i -g goat`. The MCP URL is `https://wallet.exa
 
 ## 7. Design
 
-**Brand.** The GOAT mascot logo: a white cartoon goat head with tan horns and pink ears, next to the wordmark GOAT in a heavy italic sans. Source file is `docs/logo.png`. The web app uses copies at `apps/web/public/brand/logo.png` and a square crop of the head at `apps/web/public/brand/mark.png` for favicons and avatars.
+**Brand.** GOAT is part of Crossmint Agents and uses its visual system. The site is light: a warm off-white ground (`#f2f3ef`), navy text (`#0a1825`), white cards with hairline borders (`rgba(10,24,37,0.12)`), mint panels (`#e9f0d6`) behind product visuals, and Crossmint green (`#11ba4b`) as the one accent. The signature motif is a loose grid of 1px hairlines with a small green diamond at each intersection; content sits in the cells. Textures are subtle: a dotted grid on the ground, a halftone green dot field bleeding into the hero, and one small blue pixel block. Headlines use Plus Jakarta Sans, medium to bold, tight tracking. The lockup is "GOAT" in the pixel font VCR OSD Mono in `#32d55d` (see `apps/web/app/fonts/SOURCES.md`; outlines at `apps/web/public/brand/goat-wordmark.svg`), then "by" and the Crossmint logotype in small (`apps/web/components/brand.tsx`). The hero repeats the pixel wordmark as a large eyebrow over the headline and a "Built by Crossmint" line under the copy. Corners are 8px, no pills, shadows soft or none. Assets live in `apps/web/public/brand/agents/`.
 
-**Reference.** Bento (bentonow.com) is the style reference. Take the feel, not the pixels:
-
-- Dark warm ground, near-black with a hint of olive. Light text. One warm accent for primary actions.
-- Mascot as a character. It appears in empty states, in the chat as the agent avatar, and small in the nav.
-- Product surfaces drawn as small window frames with three dots, on top of textured backdrops.
-- Big, plain headlines. Short subheads. Few words per screen.
-- Rounded pill buttons. Soft borders. Nothing glassy.
+The goat mascot is retired. "GOAT" survives as the product name in text and in the pixel wordmark. The Crossmint Agents mark stands in wherever an avatar or icon is needed: favicons, the chat agent avatar, empty and success states. `docs/logo*.png` stay as the historical files for the README.
 
 **Components.** shadcn/ui on Tailwind, installed into `@goat-wallet/ui` so the web app and any adopter get the same primitives. AI Elements for chat, which is shadcn-based too. Theme tokens live in one CSS file in `@goat-wallet/ui` so a platform can retheme without forking.
 
@@ -490,7 +484,7 @@ For the platform, the CLI is `npm i -g goat`. The MCP URL is `https://wallet.exa
 4. One reassurance line with a lock icon: "Your card number is never shared with the agent or the store."
 5. One full-width primary button: Allow. A quiet text link under it: Deny.
 
-Verification, when a rail needs it, replaces the button area in place. Success replaces the whole card with the mascot and "Active. <Agent> can spend up to <limit> until <date>."
+Verification, when a rail needs it, replaces the button area in place. Success replaces the whole card with the Crossmint Agents mark and "Active. <Agent> can spend up to <limit> until <date>."
 
 ---
 

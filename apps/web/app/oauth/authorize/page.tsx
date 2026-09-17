@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Image from "next/image";
+import { GoatLockup } from "@/components/brand";
 import { OAuthConsent } from "@/components/oauth-consent";
 
 export const metadata: Metadata = { title: "Authorize an agent" };
@@ -14,7 +14,7 @@ export const metadata: Metadata = { title: "Authorize an agent" };
 export default function OAuthAuthorizePage() {
   return (
     <main className="goat-backdrop flex flex-1 flex-col items-center justify-center gap-8 px-4 py-16">
-      <Image src="/brand/logo.png" alt="GOAT" width={160} height={50} priority className="h-12 w-auto" />
+      <GoatLockup size="md" />
       <div className="goat-window w-full max-w-md p-0">
         <div className="p-5">
           <OAuthConsent />

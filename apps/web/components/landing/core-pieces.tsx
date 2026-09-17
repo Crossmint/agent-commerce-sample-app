@@ -28,16 +28,16 @@ const adapters: ReactNode[] = [
     One endpoint with OAuth for ChatGPT, Claude, and any MCP host.
   </Item>,
   <Item key="cli" title="CLI + Skills">
-    A <code className="rounded-sm bg-white/8 px-1 py-0.5 font-mono text-[0.85em]">goat</code> CLI and a skill for Claude Code, OpenClaw, and Hermes.
+    A <code className="rounded-sm bg-muted px-1 py-0.5 font-mono text-[0.85em]">goat</code> CLI and a skill for Claude Code, OpenClaw, and Hermes.
   </Item>,
 ];
 
-/** The three pieces of the template, each with its live mock. Text and visual alternate sides; the visual sits centered in its column. */
+/** The three pieces of the template, each with its live mock. Text in a white card, the visual centered on a mint panel; they alternate sides. */
 export function CorePieces() {
   return (
-    <Section id="how" className="border-t border-border/70">
+    <Section id="how">
       <SectionHeading title="Three core pieces" />
-      <div className="flex flex-col gap-24 sm:gap-32">
+      <div className="flex flex-col gap-10 sm:gap-14">
         <Block index="01" title="Agent Cards" bullets={cards} visual={<AgentCardsDemo className="mx-auto w-full max-w-[var(--phone-w)]" />} />
         <Block index="02" title="Agent Checkouts" bullets={checkouts} visual={<CheckoutRunMock className="mx-auto w-full max-w-[var(--phone-w)]" />} flip />
         <Block index="03" title="Adapters for any agent" bullets={adapters} visual={<AdaptersPanel className="mx-auto w-full max-w-[520px]" />} />
@@ -56,23 +56,23 @@ function Item({ title, children }: { title: string; children: ReactNode }) {
 
 function Block({ index, title, bullets, visual, flip = false }: { index: string; title: string; bullets: ReactNode[]; visual: ReactNode; flip?: boolean }) {
   return (
-    <article className="grid items-start gap-12 lg:grid-cols-2 lg:gap-16">
-      <Reveal className={cn("flex flex-col gap-6", flip && "lg:order-2")}>
+    <article className="grid items-stretch gap-6 lg:grid-cols-2 lg:gap-8">
+      <Reveal className={cn("flex flex-col justify-center gap-6 rounded-lg border border-border bg-card p-6 sm:p-10", flip && "lg:order-2")}>
         <p className="font-mono text-sm font-semibold tracking-wider text-primary">{index}</p>
-        <h3 className="text-3xl font-bold tracking-tight sm:text-4xl">{title}</h3>
+        <h3 className="font-display text-3xl font-semibold tracking-[-0.03em] text-foreground sm:text-4xl">{title}</h3>
         <ul className="flex flex-col gap-3.5">
           {bullets.map((b, i) => (
             <li key={i} className="flex items-start gap-3">
               <span className="mt-0.5 inline-flex size-5 shrink-0 items-center justify-center rounded-sm bg-primary/15 text-primary">
                 <Check className="size-3" strokeWidth={3} />
               </span>
-              <span className="text-base leading-snug text-foreground/90 sm:text-lg">{b}</span>
+              <span className="text-base leading-snug text-foreground/85 sm:text-lg">{b}</span>
             </li>
           ))}
         </ul>
       </Reveal>
-      <Reveal delay={120} className={cn("min-w-0", flip && "lg:order-1")}>
-        {visual}
+      <Reveal delay={120} className={cn("flex min-w-0 items-center justify-center rounded-lg bg-muted px-6 py-10 sm:px-10 sm:py-14", flip && "lg:order-1")}>
+        <div className="w-full">{visual}</div>
       </Reveal>
     </article>
   );

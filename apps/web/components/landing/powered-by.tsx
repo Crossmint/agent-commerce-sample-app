@@ -2,7 +2,8 @@ import { MaskLogo } from "./mask-logo";
 import { Container } from "./section";
 
 /**
- * One row of the rails and infrastructure under GOAT. Full logotypes at one
+ * The rails and infrastructure under GOAT: a two-column hairline grid on
+ * phones, one row from sm up. Full logotypes at one
  * height, in the page's muted text color: the files fill with
  * `currentColor` and render as masks, so they follow the theme. `w` and
  * `h` are each file's intrinsic size, for the aspect ratio.
@@ -20,12 +21,12 @@ const HEIGHT = 24;
 
 export function PoweredBy() {
   return (
-    <section aria-label="Powered by" className="border-y border-border/60">
+    <section aria-label="Powered by">
       <Container className="flex flex-col gap-5 py-8 sm:flex-row sm:items-center sm:gap-10">
         <p className="shrink-0 text-xs font-medium tracking-[0.18em] text-muted-foreground uppercase">Powered by</p>
-        <ul className="flex flex-wrap items-center gap-x-10 gap-y-5 sm:gap-x-12">
+        <ul className="grid grid-cols-2 border-t border-l border-hairline sm:flex sm:flex-wrap sm:items-center sm:gap-x-12 sm:gap-y-5 sm:border-0">
           {LOGOS.map((logo) => (
-            <li key={logo.name} className="flex h-6 items-center">
+            <li key={logo.name} className="flex h-16 items-center justify-center border-r border-b border-hairline sm:h-6 sm:justify-start sm:border-0">
               <a
                 href={logo.href}
                 target="_blank"

@@ -8,7 +8,7 @@ export function ApproveScreen({ requestId }: { requestId: string }) {
   const [outcome, setOutcome] = useState<ApproveOutcome | null>(null);
   return (
     <div className="flex w-full max-w-md flex-col items-center gap-6">
-      <ApproveAgentCard requestId={requestId} onDone={setOutcome} mascotSrc="/brand/mark.png" />
+      <ApproveAgentCard requestId={requestId} onDone={setOutcome} mascotSrc="/brand/agents/crossmint-agents-mark.svg" />
       {outcome ? (
         <Button asChild variant="outline">
           <Link href="/wallet">Back to wallet</Link>

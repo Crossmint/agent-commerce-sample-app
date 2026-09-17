@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { OAuthProviders, Products, StytchLogin, useStytchSession, type StytchLoginConfig } from "@stytch/nextjs";
 import { Spinner } from "@goat-wallet/ui";
 import { SESSION_MINUTES } from "@/lib/stytch-client";
+import { stytchPresentation } from "@/lib/stytch-styles";
 
 export const NEXT_COOKIE = "goat_next";
 
@@ -65,7 +66,7 @@ export function LoginForm({ next }: { next: string }) {
   return (
     <div className="goat-window w-full max-w-md">
       <div className="p-2">
-        <StytchLogin config={config} />
+        <StytchLogin config={config} presentation={stytchPresentation} />
       </div>
     </div>
   );

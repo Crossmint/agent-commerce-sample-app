@@ -4,19 +4,20 @@ import { LockIcon } from "../chat/icons";
 import type { ApproveLayoutProps, ApproveVariant, CardFormTheme } from "./types";
 
 /*
- * The template's own theme: dark warm ground, one orange accent, square
+ * The template's own theme: the Crossmint Agents system. Off-white ground,
+ * white card with a hairline border, navy text, one green accent, 8px
  * corners. Same structure as `ApproveAgentCard` in @goat-wallet/ui: headline,
  * Purpose and Limit, "Choose card", a lock line, full-width Allow, quiet Deny.
  */
 const C = {
-  bg: "#14140f",
-  card: "#1c1c15",
-  text: "#f3efe6",
-  muted: "#a39e90",
-  border: "#2f2f26",
-  input: "#34342a",
-  primary: "#e8632b",
-  onPrimary: "#fff8f2",
+  bg: "#f2f3ef",
+  card: "#ffffff",
+  text: "#0a1825",
+  muted: "#5b6670",
+  border: "rgba(10, 24, 37, 0.12)",
+  input: "rgba(10, 24, 37, 0.16)",
+  primary: "#11ba4b",
+  onPrimary: "#ffffff",
 };
 
 const form: CardFormTheme = {
@@ -26,24 +27,24 @@ const form: CardFormTheme = {
   border: C.input,
   field: C.card,
   focus: C.primary,
-  ring: "rgba(232, 99, 43, 0.28)",
+  ring: "rgba(17, 186, 75, 0.28)",
   button: C.primary,
   buttonText: C.onPrimary,
-  radius: 6,
-  fieldRadius: 6,
+  radius: 8,
+  fieldRadius: 8,
 };
 
 function GoatApprove({ agentName = "Your agent", state }: ApproveLayoutProps) {
   return (
     <div className="flex h-full flex-col p-3 antialiased" style={{ background: C.bg, color: C.text }}>
       <div className="flex items-center gap-2 px-1 pt-0.5 text-[12px] font-semibold tracking-tight">
-        <Image src="/brand/mark.png" alt="" width={18} height={18} className="size-[18px] rounded-sm" />
+        <Image src="/brand/agents/crossmint-agents-mark.svg" alt="" width={18} height={18} className="size-[18px]" />
         yourplatform
       </div>
 
       <div className="flex min-h-0 flex-1 flex-col justify-center">
         {state === "approved" ? (
-          <div className="flex flex-col items-start gap-4 rounded-md border p-4" style={{ background: C.card, borderColor: C.border }}>
+          <div className="flex flex-col items-start gap-4 rounded-lg border p-4" style={{ background: C.card, borderColor: C.border }}>
             <CheckBurst fill={C.primary} color={C.onPrimary} size={52} />
             <div className="landing-fade flex flex-col gap-1.5" style={delay(APPROVE_T.copy)}>
               <p className="text-[19px] leading-tight font-semibold tracking-tight">Approved.</p>
@@ -57,7 +58,7 @@ function GoatApprove({ agentName = "Your agent", state }: ApproveLayoutProps) {
             </p>
           </div>
         ) : (
-          <div className="flex flex-col gap-3.5 rounded-md border p-3.5" style={{ background: C.card, borderColor: C.border }}>
+          <div className="flex flex-col gap-3.5 rounded-lg border p-3.5" style={{ background: C.card, borderColor: C.border }}>
             <p className="text-[16px] leading-tight font-semibold tracking-tight">{agentName} is requesting to use your card</p>
             <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-[12px]">
               <dt style={{ color: C.muted }}>Purpose</dt>
@@ -69,9 +70,9 @@ function GoatApprove({ agentName = "Your agent", state }: ApproveLayoutProps) {
             <div className="flex flex-col gap-1.5">
               <span className="text-[12px] font-medium">Choose card</span>
               {state === "empty" ? (
-                <CardSelect radius={form.fieldRadius} background={C.bg} border={C.input} color={C.text} iconColor={C.muted} />
+                <CardSelect radius={form.fieldRadius} background={C.card} border={C.input} color={C.text} iconColor={C.muted} />
               ) : (
-                <div aria-hidden className="landing-fade flex h-10 items-center gap-2 rounded-md border px-3 text-[12px]" style={{ borderColor: C.input, background: C.bg }}>
+                <div aria-hidden className="landing-fade flex h-10 items-center gap-2 rounded-lg border px-3 text-[12px]" style={{ borderColor: C.input, background: C.card }}>
                   <VisaMark />
                   <span className="min-w-0 flex-1 truncate">Visa •••• 4242</span>
                   <AddedTag color={C.primary} />
@@ -89,8 +90,8 @@ function GoatApprove({ agentName = "Your agent", state }: ApproveLayoutProps) {
                 disabled={state === "empty"}
                 ready={state === "card"}
                 press={state === "card" ? APPROVE_T.allowPress : undefined}
-                ringColor="rgba(232, 99, 43, 0.35)"
-                className="h-10 w-full rounded-md text-[14px]"
+                ringColor="rgba(17, 186, 75, 0.35)"
+                className="h-10 w-full rounded-lg text-[14px]"
                 style={{ background: C.primary, color: C.onPrimary }}
               >
                 Allow
