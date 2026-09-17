@@ -126,7 +126,7 @@ Rules:
 - `selectRail(orderIntent, preference)`: picks the rail to use. Fixed order: `agentic-token` (VIC or Agent Pay) if active, then `encrypted-card`. The Stripe `spt` rail is never used or shown.
 - `EncryptedCardRail` helpers: generate an RSA-2048 JWK pair, pass the public key, decrypt the response with the private key.
 - `EncryptedCardRail` fallback is best effort. Crossmint enforces the amount on network rails. It does **not** enforce it on `encrypted-card`. GOAT passes the amount through, marks the response `enforced: false`, and documents this.
-- `renderPendingAction(responseSchema)`: walks the JSON Schema of a checkout `pendingUserAction` into a neutral field list. UI and CLI both render from it.
+- `pendingActionOf(checkout)` flattens a run's `requiredAction` into `{ id: requestId, question, expiresAt, responseSchema }`; `renderPendingAction` walks that JSON Schema into a neutral field list. UI and CLI both render from it. `submitResponse` / `declineResponse` / `alternativeResponse` build the `input_response` message parts.
 - `pollCheckout(id, { interval: 1500 })`: async iterator over status changes. Agent Checkouts have no webhooks.
 
 **Runs on.** Server. Browser for types only.
@@ -215,8 +215,10 @@ A request from an agent is a request from the user. An agent sees every agent ca
 | `POST /v1/agent-cards/:id/credentials` | agent | Mint a scoped card number. Server picks the rail. |
 | `DELETE /v1/agent-cards/:id` | user, agent | Revoke. |
 | `POST /v1/checkouts` | agent | Create an Agent Checkout. Server uses the **server** Crossmint key plus `x-crossmint-user-id`. |
-| `GET /v1/checkouts/:id` | agent, user | Status. Includes `pendingUserAction` and `browser.embedUrl`. |
-| `POST /v1/checkouts/:id/actions/:actionId` | agent | Answer a pending action. For payment actions the server mints a credential itself. The agent never sees the PAN. |
+| `GET /v1/checkouts/:id` | agent, user | Status. Includes the open `pendingUserAction` and `embedUrl`. When the open request asks for card fields the server mints a credential and answers it itself. The agent never sees the PAN. |
+| `POST /v1/checkouts/:id/messages` | agent, user | Answer the open request (`submit` values, `decline`, `alternative` text) or send the agent a note. Card fields are refused. |
+| `GET /v1/checkouts/:id/messages` | agent, user | The run's transcript. |
+| `POST /v1/checkouts/:id/cancel` | agent, user | Stop the run. |
 
 **Storage.** One interface, two implementations.
 
@@ -248,7 +250,7 @@ Credential issuance is logged, not stored: rail, amount, merchant, agent card id
 - `<ApproveAgentCard requestId>`: the full approval screen. Shows who asks, how much, for what. `CardPicker` inside. On approve, calls the server, receives the order intent, mounts `<VerifyAgentCard>` if a rail is `pending_verification`. Ends in an "Active" state.
 - `<VerifyAgentCard orderIntent>`: wraps `OrderIntentVerification`. Accepts the `appearance` prop.
 - `<AgentCardList>`: list, balance, revoke.
-- `<CheckoutView checkoutId>`: polls, renders `browser.embedUrl` in an iframe, renders any `pendingUserAction` from its JSON Schema via `<PendingActionForm>`.
+- `<CheckoutView checkoutId>`: polls, renders `embedUrl` in a view-only iframe, renders the open `pendingUserAction` from its JSON Schema via `<PendingActionForm>` (with skip and cancel), and ends with the receipt or the blocked/failed summary.
 - `<ConnectedAgents>`: the user's Stytch sessions, with labels and a revoke button.
 
 Two layers: headless hooks (`useAgentCardRequest`, `useCheckout`, ...) and styled components on top. Styled with CSS variables so a platform can retheme without forking.
@@ -266,7 +268,8 @@ Two layers: headless hooks (`useAgentCardRequest`, `useCheckout`, ...) and style
 - `reveal_agent_card({ id, amount?, merchant? })` → card number, expiry, CVC. Gated by scope `credentials:mint`.
 - `create_checkout({ url, request?, agentCardId, maxCost })`
 - `get_checkout({ id })`
-- `answer_checkout_action({ id, actionId, values })`
+- `answer_checkout({ id, requestId?, action?, values?, text? })`
+- `cancel_checkout({ id })`
 - `revoke_agent_card({ id })`
 
 Auth: OAuth 2.1 with Stytch Connected Apps as the authorization server. The MCP server is stateless. It forwards the bearer token to the GOAT API, which verifies it with `UserAuth.verify`.
@@ -284,8 +287,9 @@ goat agent-card request --amount 50 --description "Flight to SF"  [--merchant un
 goat agent-card status <requestId> [--wait]        # resume waiting after a timeout
 goat agent-card list | get <id> | revoke <id>
 goat agent-card reveal <id> [--amount 25]       # prints card number, expiry, cvc; --json
-goat checkout create --url <product url> --agent-card <id> --max-cost 100 [--request "medium, black"] [--wait]
-goat checkout get <id> | answer <id> <actionId> --values '{...}'
+goat checkout create --url <product url> --agent-card <id> --max-cost 100 [--task "medium, black"] [--buyer-profile <id>] [--wait]
+goat checkout get <id> | answer <id> <requestId> --values '{...}' | --decline | --alternative "<text>"
+goat checkout message <id> "<note>" | cancel <id>
 goat whoami | logout
 ```
 
@@ -386,9 +390,9 @@ sequenceDiagram
   end
   Note over S: status awaiting_user_action, type payment
   S->>X: POST order-intents/:id/credentials
-  S->>X: POST agent-checkouts/:id/actions/:actionId {card}
+  S->>X: POST agent-checkouts/:id/messages {input_response: card}
   Note over A: a shipping or size question comes back to the agent instead
-  A->>S: POST /checkouts/:id/actions/:actionId {values}
+  A->>S: POST /checkouts/:id/messages {requestId, values}
   S-->>A: status succeeded, receipt
 ```
 

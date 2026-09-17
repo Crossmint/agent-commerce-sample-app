@@ -26,18 +26,19 @@ export interface RenderedAction {
 }
 
 /**
- * Walk a pending action's JSON Schema into a flat, neutral field list.
+ * Walk an input request's JSON Schema into a flat, neutral field list.
  * The UI renders inputs from it. The CLI prints prompts from it. Neither
  * hardcodes field names, so shipping, sizes, and payment all render the same way.
  */
 export function renderPendingAction(action: PendingUserAction): RenderedAction {
+  const schema = action.responseSchema ?? {};
   return {
     id: action.id,
-    type: action.type ?? action.kind ?? "input",
-    title: action.title ?? action.responseSchema.title ?? humanize(action.type ?? action.kind ?? "Input needed"),
-    description: action.description ?? action.responseSchema.description,
+    type: "input_response",
+    title: action.question || schema.title || "Input needed",
+    description: action.question && schema.title ? schema.title : schema.description,
     expiresAt: action.expiresAt,
-    fields: renderSchemaFields(action.responseSchema),
+    fields: renderSchemaFields(schema),
   };
 }
 
@@ -108,12 +109,14 @@ export function humanize(key: string): string {
     .replace(/^./, (c) => c.toUpperCase());
 }
 
-/** Is this pending action asking for card details? Used to let the server answer it. */
+/**
+ * Is this input request asking for card details? Used to let the server
+ * answer it with a minted card. Decided by the field names, never by the
+ * question text alone: "which card" as a choice is not a payment form.
+ */
 export function isPaymentAction(action: PendingUserAction): boolean {
-  const type = `${action.type ?? ""} ${action.kind ?? ""}`.toLowerCase();
-  if (/payment|card/.test(type)) return true;
-  const keys = Object.keys(action.responseSchema.properties ?? {}).map((k) => k.toLowerCase());
-  return keys.some((k) => /cardnumber|card_number|^pan$|^number$|cvc|cvv|expir/.test(k));
+  const keys = Object.keys(action.responseSchema?.properties ?? {}).map((k) => k.toLowerCase());
+  return keys.some((k) => /cardnumber|card_number|^pan$|^number$|cvc|cvv|securitycode|security_code|expir/.test(k));
 }
 
 /**
@@ -125,7 +128,7 @@ export function fillPaymentAction(
   card: { number: string; expirationMonth: string; expirationYear: string; cvc: string; holderName?: string },
 ): Record<string, unknown> {
   const values: Record<string, unknown> = {};
-  const props = action.responseSchema.properties ?? {};
+  const props = action.responseSchema?.properties ?? {};
   for (const key of Object.keys(props)) {
     const k = key.toLowerCase();
     if (/cardnumber|card_number|^pan$|^number$/.test(k)) values[key] = card.number;

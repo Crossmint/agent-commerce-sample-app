@@ -69,7 +69,7 @@ export function statusColor(status: string): string {
       return pc.red(status);
     case "pending":
     case "running":
-    case "awaiting_user_action":
+    case "awaiting_input":
       return pc.yellow(status);
     default:
       return status;

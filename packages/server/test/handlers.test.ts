@@ -381,47 +381,69 @@ describe("POST /v1/agent-cards/:id/credentials", () => {
 });
 
 describe("checkouts", () => {
-  const paymentAction = {
-    id: "act_pay",
-    type: "payment",
-    title: "Enter card",
-    responseSchema: {
-      type: "object",
-      properties: {
-        cardNumber: { type: "string" },
-        expirationMonth: { type: "string" },
-        expirationYear: { type: "string" },
-        cvc: { type: "string" },
+  const run = (over: Record<string, unknown>) => ({
+    runId: "run_1",
+    revision: 1,
+    createdAt: "2026-09-17T00:00:00.000Z",
+    input: {
+      request: { startUrl: "https://www.shop.example/products/tee", task: "medium, black" },
+      constraints: { maxCost: { amount: "30.00", currency: "USD" } },
+    },
+    browser: null,
+    requiredAction: null,
+    ...over,
+  });
+  const paymentRequest = {
+    type: "input_response",
+    requestId: "req_pay",
+    messageId: "msg_pay",
+    request: {
+      question: "Enter the card to pay with",
+      expiresAt: "2026-09-18T00:00:00.000Z",
+      interaction: {
+        kind: "form",
+        responseSchema: {
+          type: "object",
+          properties: {
+            cardNumber: { type: "string" },
+            expirationMonth: { type: "string" },
+            expirationYear: { type: "string" },
+            cvc: { type: "string" },
+          },
+          required: ["cardNumber", "expirationMonth", "expirationYear", "cvc"],
+        },
+        uiSchema: {},
       },
-      required: ["cardNumber", "expirationMonth", "expirationYear", "cvc"],
     },
   };
 
-  it("creates with the server key and links the agent card", async () => {
+  it("creates with the server key, Crossmint's request shape, and links the agent card", async () => {
     const { handlers, calls } = makeServer([
       {
         method: "POST",
-        path: "/unstable/agent-checkouts",
+        path: /\/unstable\/agent-checkouts$/,
         reply: {
-          status: 201,
-          body: { id: "co_1", status: "running", browser: { embedUrl: "/embed/co_1" } },
+          status: 202,
+          body: run({ status: "running", browser: { embedUrl: "/embed/run_1", permissions: ["read"] } }),
         },
       },
     ]);
     const res = await call(handlers, "POST", "/v1/checkouts", {
       body: {
-        url: "https://shop.example/p/1",
-        request: "medium, black",
+        startUrl: "https://shop.example/p/1",
+        task: "medium, black",
         agentCardId: "oi_1",
         maxCost: { amount: "100.00", currency: "USD" },
+        buyerProfileId: "bp_1",
       },
     });
     expect(res.status).toBe(201);
     expect(await res.json()).toEqual({
-      id: "co_1",
+      id: "run_1",
       status: "running",
       agentCardId: "oi_1",
-      embedUrl: "https://www.crossmint.com/embed/co_1",
+      embedUrl: "https://www.crossmint.com/embed/run_1",
+      createdAt: "2026-09-17T00:00:00.000Z",
     });
     const create = calls[0]!;
     expect(create.url).toBe("https://www.crossmint.com/api/unstable/agent-checkouts");
@@ -430,32 +452,36 @@ describe("checkouts", () => {
       "x-crossmint-user-id": "user-test-1",
     });
     expect(create.body).toEqual({
-      target: { kind: "direct_url", url: "https://shop.example/p/1", request: "medium, black" },
+      request: { startUrl: "https://shop.example/p/1", task: "medium, black" },
       constraints: { maxCost: { amount: "100.00", currency: "USD" } },
+      buyerProfileId: "bp_1",
     });
   });
 
-  it("answers a payment action with a minted card and hides it from the caller", async () => {
+  it("still accepts the older url and request field names", async () => {
+    const { handlers, calls } = makeServer([
+      { method: "POST", path: /\/unstable\/agent-checkouts$/, reply: { status: 202, body: run({ status: "queued" }) } },
+    ]);
+    const res = await call(handlers, "POST", "/v1/checkouts", {
+      body: { url: "https://shop.example/p/1", request: "blue", agentCardId: "oi_1", maxCost: { amount: "5.00", currency: "USD" } },
+    });
+    expect(res.status).toBe(201);
+    expect(calls[0]!.body).toMatchObject({ request: { startUrl: "https://shop.example/p/1", task: "blue" } });
+  });
+
+  it("answers a payment request with a minted card and hides it from the caller", async () => {
     vi.spyOn(console, "info").mockImplementation(() => {});
     const { handlers, calls } = makeServer([
       {
         method: "POST",
-        path: "/unstable/agent-checkouts",
-        reply: { status: 201, body: { id: "co_1", status: "running" } },
+        path: /\/unstable\/agent-checkouts$/,
+        reply: { status: 202, body: run({ status: "queued" }) },
       },
       {
         method: "GET",
-        path: "/unstable/agent-checkouts/co_1",
+        path: "/unstable/agent-checkouts/run_1",
         once: true,
-        reply: {
-          body: {
-            id: "co_1",
-            status: "awaiting_user_action",
-            target: { kind: "direct_url", url: "https://www.shop.example/products/tee" },
-            constraints: { maxCost: { amount: "30.00", currency: "USD" } },
-            pendingUserAction: paymentAction,
-          },
-        },
+        reply: { body: run({ status: "awaiting_input", requiredAction: paymentRequest }) },
       },
       { method: "GET", path: "/unstable/order-intents/oi_1", reply: { body: activeOrderIntent() } },
       {
@@ -465,86 +491,150 @@ describe("checkouts", () => {
       },
       {
         method: "POST",
-        path: "/unstable/agent-checkouts/co_1/actions/act_pay",
-        reply: { body: { id: "co_1", status: "running" } },
+        path: "/unstable/agent-checkouts/run_1/messages",
+        reply: { status: 202, body: { messageId: "m_1", status: "accepted" } },
       },
       {
         method: "GET",
-        path: "/unstable/agent-checkouts/co_1",
-        reply: { body: { id: "co_1", status: "succeeded", receipt: { merchantOrderId: "ord_9" } } },
+        path: "/unstable/agent-checkouts/run_1",
+        reply: {
+          body: run({
+            status: "succeeded",
+            result: {
+              outcome: "succeeded",
+              summary: "Bought the tee.",
+              purchase: { kind: "receipt_captured", receipt: { total: { amount: "28.00", currency: "USD" }, merchantOrderId: "ord_9" } },
+            },
+            knownSpentUsdMicros: 28_000_000,
+          }),
+        },
       },
     ]);
     await call(handlers, "POST", "/v1/checkouts", {
       body: {
-        url: "https://shop.example/p/1",
+        startUrl: "https://shop.example/p/1",
         agentCardId: "oi_1",
         maxCost: { amount: "30.00", currency: "USD" },
       },
     });
 
-    const res = await call(handlers, "GET", "/v1/checkouts/co_1");
+    const res = await call(handlers, "GET", "/v1/checkouts/run_1");
     expect(res.status).toBe(200);
     const text = await res.text();
     expect(text).not.toContain("4111111111111111");
     expect(JSON.parse(text)).toEqual({
-      id: "co_1",
+      id: "run_1",
       status: "succeeded",
       agentCardId: "oi_1",
-      receipt: { merchantOrderId: "ord_9" },
+      result: {
+        outcome: "succeeded",
+        summary: "Bought the tee.",
+        purchase: { kind: "receipt_captured", receipt: { total: { amount: "28.00", currency: "USD" }, merchantOrderId: "ord_9" } },
+      },
+      receipt: { total: { amount: "28.00", currency: "USD" }, merchantOrderId: "ord_9" },
+      spentUsd: "28.00",
+      createdAt: "2026-09-17T00:00:00.000Z",
     });
 
     const mint = calls.find((c) => c.path.endsWith("/credentials"))!;
     // Capped at the checkout's max cost, below the card's 50.00.
-    expect(mint.body).toMatchObject({ amount: { value: "30.00", currency: "USD" } });
-    const submit = calls.find((c) => c.path.endsWith("/actions/act_pay"))!;
-    expect(submit.body).toEqual({
-      action: "submit",
-      values: {
-        cardNumber: "4111111111111111",
-        expirationMonth: "12",
-        expirationYear: "2030",
-        cvc: "123",
-      },
+    expect(mint.body).toMatchObject({ amount: { value: "30.00", currency: "USD" }, merchant: { name: "shop.example" } });
+    const message = calls.find((c) => c.path.endsWith("/run_1/messages"))!;
+    expect(message.body).toMatchObject({
+      parts: [
+        {
+          type: "input_response",
+          requestId: "req_pay",
+          action: "submit",
+          response: {
+            kind: "form",
+            values: { cardNumber: "4111111111111111", expirationMonth: "12", expirationYear: "2030", cvc: "123" },
+          },
+        },
+      ],
     });
+    expect(typeof (message.body as { id: string }).id).toBe("string");
     vi.restoreAllMocks();
   });
 
-  it("passes non-payment actions through with a rendered form", async () => {
-    const { handlers } = makeServer([
+  it("passes other input requests through with a rendered form and relays the answer as a message", async () => {
+    let answered = false;
+    const sizeRequest = {
+      type: "input_response",
+      requestId: "req_size",
+      messageId: "msg_size",
+      request: {
+        question: "Which size?",
+        expiresAt: "2026-09-18T00:00:00.000Z",
+        interaction: {
+          kind: "form",
+          responseSchema: { type: "object", properties: { size: { type: "string", enum: ["s", "m"] } }, required: ["size"] },
+          uiSchema: {},
+        },
+      },
+    };
+    const { handlers, calls } = makeServer([
       {
         method: "GET",
-        path: "/unstable/agent-checkouts/co_2",
-        reply: {
-          body: {
-            id: "co_2",
-            status: "awaiting_user_action",
-            pendingUserAction: {
-              id: "act_size",
-              type: "options",
-              responseSchema: {
-                type: "object",
-                properties: { size: { type: "string", enum: ["s", "m"] } },
-                required: ["size"],
-              },
-            },
-          },
-        },
+        path: "/unstable/agent-checkouts/run_2",
+        reply: () => ({ body: run({ runId: "run_2", status: answered ? "running" : "awaiting_input", requiredAction: answered ? null : sizeRequest }) }),
       },
       {
         method: "POST",
-        path: "/actions/act_size",
-        reply: { body: { id: "co_2", status: "running" } },
+        path: "/unstable/agent-checkouts/run_2/messages",
+        reply: () => {
+          answered = true;
+          return { status: 202, body: { messageId: "m_2", status: "accepted" } };
+        },
       },
     ]);
-    const res = await call(handlers, "GET", "/v1/checkouts/co_2");
+    const res = await call(handlers, "GET", "/v1/checkouts/run_2");
     const body = await res.json();
-    expect(body.status).toBe("awaiting_user_action");
-    expect(body.pendingUserAction.id).toBe("act_size");
+    expect(body.status).toBe("awaiting_input");
+    expect(body.pendingUserAction).toMatchObject({ id: "req_size", question: "Which size?" });
+    expect(body.rendered.title).toBe("Which size?");
     expect(body.rendered.fields[0]).toMatchObject({ name: "size", kind: "select", required: true });
 
-    const answered = await call(handlers, "POST", "/v1/checkouts/co_2/actions/act_size", {
-      body: { values: { size: "m" } },
+    const reply = await call(handlers, "POST", "/v1/checkouts/run_2/messages", {
+      body: { requestId: "req_size", values: { size: "m" }, messageId: "client-1" },
     });
-    expect((await answered.json()).status).toBe("running");
+    expect((await reply.json()).status).toBe("running");
+    const sent = calls.find((c) => c.path.endsWith("/run_2/messages"))!;
+    expect(sent.body).toEqual({
+      id: "client-1",
+      parts: [{ type: "input_response", requestId: "req_size", action: "submit", response: { kind: "form", values: { size: "m" } } }],
+    });
+  });
+
+  it("refuses card fields from callers and maps blocked runs to a failure", async () => {
+    const { handlers } = makeServer([
+      {
+        method: "GET",
+        path: "/unstable/agent-checkouts/run_3",
+        once: true,
+        reply: { body: run({ runId: "run_3", status: "awaiting_input", requiredAction: paymentRequest }) },
+      },
+      {
+        method: "GET",
+        path: "/unstable/agent-checkouts/run_3",
+        reply: {
+          body: run({
+            runId: "run_3",
+            status: "blocked",
+            result: { outcome: "blocked", code: "policy.max_cost_exceeded", summary: "The total was 31.00, above the 30.00 cap." },
+          }),
+        },
+      },
+    ]);
+    const refused = await call(handlers, "POST", "/v1/checkouts/run_3/messages", {
+      body: { requestId: "req_pay", values: { cardNumber: "4242" } },
+    });
+    expect(refused.status).toBe(409);
+    expect((await refused.json()).error.code).toBe("payment_handled_by_server");
+
+    const res = await call(handlers, "GET", "/v1/checkouts/run_3");
+    const body = await res.json();
+    expect(body.status).toBe("blocked");
+    expect(body.failure).toEqual({ reason: "policy.max_cost_exceeded", message: "The total was 31.00, above the 30.00 cap." });
   });
 });

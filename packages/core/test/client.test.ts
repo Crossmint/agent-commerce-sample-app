@@ -26,15 +26,26 @@ describe("CrossmintClient", () => {
     expect((init as RequestInit).headers).toMatchObject({ "X-API-KEY": "ck_test", Authorization: "Bearer jwt1", Origin: "https://wallet.test" });
   });
   it("sends server key and user id for checkouts, always to production", async () => {
-    const f = mockFetch(201, { id: "co_1", status: "pending" });
+    const f = mockFetch(202, { runId: "run_1", status: "queued" });
     const c = new CrossmintClient({ serverApiKey: "sk_test", environment: "staging", fetch: f });
     await c.checkouts.create({ userId: "u1" }, {
-      target: { kind: "direct_url", url: "https://shop.example/p" },
+      request: { startUrl: "https://shop.example/p" },
       constraints: { maxCost: { amount: "10.00", currency: "USD" } },
     });
     const [url, init] = (f as unknown as ReturnType<typeof vi.fn>).mock.calls[0]!;
     expect(url).toBe("https://www.crossmint.com/api/unstable/agent-checkouts");
     expect((init as RequestInit).headers).toMatchObject({ "X-API-KEY": "sk_test", "x-crossmint-user-id": "u1" });
+  });
+  it("answers an input request with one input_response message", async () => {
+    const f = mockFetch(202, { messageId: "m1", status: "accepted" });
+    const c = new CrossmintClient({ serverApiKey: "sk_test", fetch: f });
+    await c.checkouts.respond({ userId: "u1" }, "run_1", "req_1", { size: "m" }, "my-id");
+    const [url, init] = (f as unknown as ReturnType<typeof vi.fn>).mock.calls[0]!;
+    expect(url).toBe("https://www.crossmint.com/api/unstable/agent-checkouts/run_1/messages");
+    expect(JSON.parse((init as RequestInit).body as string)).toEqual({
+      id: "my-id",
+      parts: [{ type: "input_response", requestId: "req_1", action: "submit", response: { kind: "form", values: { size: "m" } } }],
+    });
   });
   it("throws CrossmintApiError on non-2xx", async () => {
     const c = new CrossmintClient({ clientApiKey: "ck", fetch: mockFetch(401, { message: "nope" }) });

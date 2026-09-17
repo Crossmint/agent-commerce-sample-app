@@ -2,7 +2,7 @@
  * Shapes the CLI reads from the GOAT HTTP API. They mirror docs/API.md.
  * Crossmint shapes (AgentCard, PaymentMethod, PendingUserAction) come from @goat-wallet/core.
  */
-import type { Amount, Merchant, PendingUserAction, RenderedAction } from "@goat-wallet/core";
+import type { Amount, CheckoutReceipt, CheckoutResult, CheckoutStatus, Merchant, PendingUserAction, RenderedAction } from "@goat-wallet/core";
 
 export interface PublicConfig {
   name: string;
@@ -74,22 +74,35 @@ export interface CredentialResponse {
 }
 
 export interface CreateCheckoutBody {
-  url: string;
-  request?: string;
+  startUrl: string;
+  task?: string;
   agentCardId: string;
   maxCost: { amount: string; currency: string };
   buyerProfileId?: string;
+  browserProfileId?: string;
+  merchantGuidance?: string;
+}
+
+/** Body of POST /v1/checkouts/:id/messages. */
+export interface CheckoutMessageBody {
+  requestId?: string;
+  action?: "submit" | "decline" | "alternative";
+  values?: Record<string, unknown>;
+  text?: string;
 }
 
 export interface CheckoutView {
   id: string;
-  status: string;
+  status: CheckoutStatus;
   agentCardId?: string;
   pendingUserAction?: PendingUserAction;
   rendered?: RenderedAction;
   embedUrl?: string;
-  receipt?: Record<string, unknown>;
+  result?: CheckoutResult;
+  receipt?: CheckoutReceipt;
   failure?: { reason: string; message?: string };
+  spentUsd?: string;
+  createdAt?: string;
 }
 
 export interface ApiErrorEnvelope {

@@ -108,11 +108,14 @@ export async function mintFromAgentCard(
       };
       break;
     }
+    default:
+      // `agentRails` strips spt, so this never runs; it keeps the switch total.
+      throw new HttpError(409, "no_usable_rail", `Unsupported rail ${rail.rail}`);
   }
 
   const credential = await ctx.crossmint.orderIntents.mintCredential(jwt, agentCardId, input);
 
-  const response: CredentialResponse = { agentCardId, rail: rail.rail, enforced };
+  const response: CredentialResponse = { agentCardId, rail: rail.rail as CredentialResponse["rail"], enforced };
   let card: CardCredentialValue | undefined;
 
   if (credential.rail === "agentic-token") {

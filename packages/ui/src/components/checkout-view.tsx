@@ -31,10 +31,14 @@ function statusBadge(status: string): { label: string; variant: BadgeProps["vari
       return { label: "Done", variant: "success" };
     case "failed":
       return { label: "Failed", variant: "destructive" };
+    case "blocked":
+      return { label: "Stopped", variant: "destructive" };
     case "cancelled":
       return { label: "Cancelled", variant: "muted" };
-    case "awaiting_user_action":
+    case "awaiting_input":
       return { label: "Needs your answer", variant: "warning" };
+    case "queued":
+      return { label: "Starting", variant: "secondary" };
     case "running":
       return { label: "Buying", variant: "secondary" };
     default:
@@ -42,15 +46,8 @@ function statusBadge(status: string): { label: string; variant: BadgeProps["vari
   }
 }
 
-function receiptTotal(receipt: Record<string, unknown> | undefined): string | undefined {
-  const total = receipt?.total;
-  if (!total) return undefined;
-  if (typeof total === "string") return total;
-  if (typeof total === "object" && total !== null && "amount" in total) {
-    const t = total as { amount: string; currency?: string };
-    return t.currency ? `${t.amount} ${t.currency}` : t.amount;
-  }
-  return undefined;
+function receiptTotal(receipt: CheckoutViewData["receipt"]): string | undefined {
+  return receipt ? `${receipt.total.amount} ${receipt.total.currency}` : undefined;
 }
 
 /**
@@ -59,7 +56,7 @@ function receiptTotal(receipt: Record<string, unknown> | undefined): string | un
  * Payment questions never reach this component. The server answers them.
  */
 export function CheckoutView({ checkoutId, poll = true, onDone, className, frameHeight = 560 }: CheckoutViewProps) {
-  const { data, error, loading, refetch, submitAction, submitting } = useCheckout(checkoutId, { poll });
+  const { data, error, loading, refetch, submitAction, decline, cancel, submitting } = useCheckout(checkoutId, { poll });
   const [actionError, setActionError] = React.useState<unknown>(undefined);
 
   const doneRef = React.useRef(false);
@@ -97,7 +94,8 @@ export function CheckoutView({ checkoutId, poll = true, onDone, className, frame
   const badge = statusBadge(data.status);
   const terminal = isTerminalCheckoutView(data);
   const total = receiptTotal(data.receipt);
-  const merchantOrderId = typeof data.receipt?.merchantOrderId === "string" ? data.receipt.merchantOrderId : undefined;
+  const merchantOrderId = data.receipt?.merchantOrderId;
+  const summary = data.result?.summary;
 
   return (
     <div className={cn("flex flex-col gap-5", className)}>
@@ -123,18 +121,18 @@ export function CheckoutView({ checkoutId, poll = true, onDone, className, frame
             <p className="flex items-center justify-center gap-2 text-2xl font-semibold tracking-tight">
               <CircleCheck className="size-6 text-success" /> Bought.
             </p>
-            {total ? <p className="text-muted-foreground">Total {total}</p> : null}
+            {total ? <p className="text-muted-foreground">Total {total}</p> : summary ? <p className="text-muted-foreground">{summary}</p> : null}
             {merchantOrderId ? <p className="font-mono text-xs text-muted-foreground">Order {merchantOrderId}</p> : null}
           </div>
         </div>
       ) : null}
 
-      {data.status === "failed" || data.status === "cancelled" ? (
+      {data.status === "failed" || data.status === "blocked" || data.status === "cancelled" ? (
         <Alert variant="destructive">
           <CircleX />
-          <AlertTitle>{data.status === "cancelled" ? "Cancelled" : "Did not go through"}</AlertTitle>
+          <AlertTitle>{data.status === "cancelled" ? "Cancelled" : data.status === "blocked" ? "Stopped before buying" : "Did not go through"}</AlertTitle>
           <AlertDescription>
-            {data.failure?.message ?? data.failure?.reason?.replace(/_/g, " ") ?? "The store did not complete the order."}
+            {data.failure?.message ?? summary ?? data.failure?.reason?.replace(/[_.]/g, " ") ?? "The store did not complete the order."}
           </AlertDescription>
         </Alert>
       ) : null}
@@ -160,6 +158,23 @@ export function CheckoutView({ checkoutId, poll = true, onDone, className, frame
               }
             }}
           />
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            disabled={submitting}
+            className="mt-2 text-muted-foreground"
+            onClick={async () => {
+              setActionError(undefined);
+              try {
+                await decline(data.rendered!.id);
+              } catch (e) {
+                setActionError(e);
+              }
+            }}
+          >
+            Skip this question
+          </Button>
         </div>
       ) : null}
 
@@ -177,6 +192,26 @@ export function CheckoutView({ checkoutId, poll = true, onDone, className, frame
 
       {!terminal && !data.embedUrl && !data.rendered ? (
         <p className="text-sm text-muted-foreground">The agent is working on it. This page updates on its own.</p>
+      ) : null}
+
+      {!terminal ? (
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          disabled={submitting}
+          className="self-start"
+          onClick={async () => {
+            setActionError(undefined);
+            try {
+              await cancel();
+            } catch (e) {
+              setActionError(e);
+            }
+          }}
+        >
+          Cancel checkout
+        </Button>
       ) : null}
     </div>
   );

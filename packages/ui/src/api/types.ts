@@ -6,6 +6,9 @@ import type {
   AgentCard,
   Amount,
   BuyerProfileInput,
+  CheckoutReceipt,
+  CheckoutResult,
+  CheckoutStatus,
   CrossmintEnvironment,
   Merchant,
   PaymentMethod,
@@ -117,22 +120,36 @@ export interface MintCredentialsResult {
 }
 
 export interface CreateCheckoutInput {
-  url: string;
-  request?: string;
+  startUrl: string;
+  task?: string;
   agentCardId: string;
   maxCost: { amount: string; currency: string };
   buyerProfileId?: string;
+  browserProfileId?: string;
+  merchantGuidance?: string;
+}
+
+/** Body of POST /v1/checkouts/:id/messages. */
+export interface CheckoutMessageInput {
+  requestId?: string;
+  action?: "submit" | "decline" | "alternative";
+  values?: Record<string, unknown>;
+  text?: string;
+  messageId?: string;
 }
 
 export interface CheckoutView {
   id: string;
-  status: string;
+  status: CheckoutStatus;
   agentCardId?: string;
   pendingUserAction?: PendingUserAction;
   rendered?: RenderedAction;
   embedUrl?: string;
-  receipt?: Record<string, unknown>;
+  result?: CheckoutResult;
+  receipt?: CheckoutReceipt;
   failure?: { reason: string; message?: string };
+  spentUsd?: string;
+  createdAt?: string;
 }
 
 export type { PaymentMethod, AgentCard, RegisterCardInput, RegisterCardResult, BuyerProfileInput };

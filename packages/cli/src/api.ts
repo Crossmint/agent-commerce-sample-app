@@ -5,6 +5,7 @@ import { EXIT, CliExit } from "./output.js";
 import type {
   AgentCardRequest,
   ApiErrorEnvelope,
+  CheckoutMessageBody,
   CheckoutView,
   CreateAgentCardRequestBody,
   CreateCheckoutBody,
@@ -163,15 +164,12 @@ export class GoatApi {
     return this.get(`/v1/checkouts/${encodeURIComponent(id)}`);
   }
 
-  answerCheckout(
-    id: string,
-    actionId: string,
-    values: Record<string, unknown>,
-  ): Promise<CheckoutView> {
-    return this.post(
-      `/v1/checkouts/${encodeURIComponent(id)}/actions/${encodeURIComponent(actionId)}`,
-      { values },
-    );
+  answerCheckout(id: string, body: CheckoutMessageBody): Promise<CheckoutView> {
+    return this.post(`/v1/checkouts/${encodeURIComponent(id)}/messages`, body);
+  }
+
+  cancelCheckout(id: string): Promise<CheckoutView> {
+    return this.post(`/v1/checkouts/${encodeURIComponent(id)}/cancel`, {});
   }
 
   createBuyerProfile(body: BuyerProfileInput): Promise<{ id: string }> {

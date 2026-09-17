@@ -175,11 +175,13 @@ function Part({
 
     case "tool-create_checkout":
     case "tool-get_checkout":
-    case "tool-answer_checkout_action": {
+    case "tool-answer_checkout":
+    case "tool-cancel_checkout": {
       const titles = {
         "tool-create_checkout": "Starting a checkout",
         "tool-get_checkout": "Checking the checkout",
-        "tool-answer_checkout_action": "Answering the checkout",
+        "tool-answer_checkout": "Answering the checkout",
+        "tool-cancel_checkout": "Cancelling the checkout",
       } as const;
       return (
         <CheckoutCard

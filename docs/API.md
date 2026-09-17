@@ -132,30 +132,57 @@ Server picks the rail (`selectRail`), mints, decrypts the encrypted-card rail wi
 
 ## Checkouts
 
+Wraps [Crossmint Agent Checkouts](https://docs.crossmint.com/api-reference/agent-checkouts/create-agent-checkout): a run that drives the store's checkout in a real browser. GOAT adds the agent card that pays and hides the payment step.
+
 `POST /v1/checkouts` (agent) body:
 
 ```json
-{ "url": "https://shop.example/p/1", "request"?: "medium, black", "agentCardId": "…", "maxCost": { "amount": "100.00", "currency": "USD" }, "buyerProfileId"?: "…" }
+{ "startUrl": "https://shop.example/p/1", "task"?: "medium, black", "agentCardId": "…", "maxCost": { "amount": "100.00", "currency": "USD" }, "buyerProfileId"?: "…", "browserProfileId"?: "…", "merchantGuidance"?: "…" }
 ```
 
-→ `201 CheckoutView`.
+`url` and `request` are accepted as older names for `startUrl` and `task`. → `201 CheckoutView`.
 
 ```ts
 interface CheckoutView {
-  id: string;
-  status: string;                       // Crossmint status
+  id: string;                            // Crossmint runId
+  status: "queued" | "running" | "awaiting_input" | "succeeded" | "blocked" | "failed" | "cancelled";
   agentCardId?: string;
-  pendingUserAction?: PendingUserAction; // Crossmint shape, only non-payment actions reach callers
-  rendered?: RenderedAction;            // from renderPendingAction, for UIs
-  embedUrl?: string;                    // absolute URL for an iframe
-  receipt?: object;
-  failure?: { reason: string; message?: string };
+  pendingUserAction?: {                  // the open input request; never a payment one
+    id: string;                          // requestId to answer
+    messageId?: string;
+    question: string;
+    expiresAt?: string;                  // answer before this or the run fails with input_expired
+    responseSchema: JsonSchema;
+    uiSchema?: object;
+  };
+  rendered?: RenderedAction;             // from renderPendingAction, for UIs
+  embedUrl?: string;                     // absolute URL for a view-only iframe of the agent's browser
+  result?: { outcome; summary; code?; purchase? }; // on succeeded, blocked, cancelled
+  receipt?: { total: { amount; currency }; merchantOrderId? }; // on succeeded, when captured
+  failure?: { reason: string; message?: string }; // failed: Crossmint reason; blocked: the code; cancelled
+  spentUsd?: string;
+  createdAt?: string;
 }
 ```
 
-`GET /v1/checkouts/:id` → `CheckoutView`. While polling, if Crossmint reports a **payment** action and the checkout has an `agentCardId`, the server mints a credential and answers the action itself before returning. Callers never see card fields.
+`GET /v1/checkouts/:id` → `CheckoutView`. Poll it about every 1.5s; there are no webhooks. While polling, if the open input request asks for **card fields** and the checkout has an `agentCardId`, the server mints a credential from that agent card and answers the request itself before returning. Callers never see card fields; while the payment step is in flight the view reports `running`.
 
-`POST /v1/checkouts/:id/actions/:actionId` body `{ "values": {...} }` → `CheckoutView`.
+`POST /v1/checkouts/:id/messages` body, one of:
+
+```json
+{ "requestId": "…", "values": { "fullName": "Ada Lovelace" } }          // submit the form (action defaults to "submit")
+{ "requestId": "…", "action": "decline" }                               // refuse the request
+{ "requestId": "…", "action": "alternative", "text": "cheapest shipping" }
+{ "text": "prefer the blue one if the black is out" }                   // a note to the agent, no request
+```
+
+Optional `messageId` (≤200 chars) makes a retry idempotent. → `CheckoutView`. If the `requestId` names a payment request: `409 payment_handled_by_server`.
+
+`GET /v1/checkouts/:id/messages?cursor&limit` → Crossmint's message list (progress, activity, input requests, result, and what was sent) as is.
+
+`POST /v1/checkouts/:id/cancel` → `CheckoutView`. The run reaches `cancelled` on a later poll.
+
+`POST /v1/checkouts/:id/actions/:actionId` body `{ "values": {...} }` → `CheckoutView`. Older route, same as a `submit` message with `requestId = actionId`.
 
 `POST /v1/buyer-profiles` body `BuyerProfileInput` (core) → `{ "id": "…" }`.
 

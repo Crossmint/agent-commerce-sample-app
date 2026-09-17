@@ -47,21 +47,27 @@ Use `--json` when you need to read fields programmatically.
 ## Step 2: pay with a checkout (preferred)
 
 ```sh
-goat checkout create --url <product url> --agent-card <id> --max-cost 60 --request "size 10, blue" --wait
+goat checkout create --url <product url> --agent-card <id> --max-cost 60 --task "size 10, blue, cheapest shipping" --wait
 ```
 
-Crossmint runs the shop's checkout. It fills in the card itself. You never see the number. `--max-cost` is enforced.
+Crossmint drives the shop's checkout in a real browser. It fills in the card itself. You never see the number. `--max-cost` is a hard cap: the run stops as `blocked` instead of paying more. Put everything you know in `--task` (size, color, shipping choice, "pay by card"): the more you say, the fewer questions the agent stops to ask.
 
 Exit codes while waiting:
 
 - Exit 0: succeeded. The output shows the total and the order id. Report both to the user.
-- Exit 2: the shop asked a question (shipping address, size, gift options). The output lists the fields, marks required ones with `*`, and prints a ready `goat checkout answer` command with a values template. Fill it in from what you know; ask the user for anything you do not know. Then run:
+- Exit 2: the agent asked a question (shipping address, size, a confirmation). The output shows the question, lists the fields, marks required ones with `*`, and prints a ready `goat checkout answer` command with a values template. Fill it in from what you know; ask the user for anything you do not know. Answer before the printed expiry or the checkout fails. Then run:
 
 ```sh
-goat checkout answer <checkoutId> <actionId> --values '{"fullName":"Ada Lovelace","country":"US"}' --wait
+goat checkout answer <checkoutId> <requestId> --values '{"fullName":"Ada Lovelace","country":"US"}' --wait
 ```
 
-- Exit 1: failed or cancelled. The output has the reason. Tell the user.
+To refuse a question use `--decline`; to suggest another way use `--alternative "use the cheapest shipping"`. To steer the agent mid-run without a question pending, `goat checkout message <checkoutId> "<note>"`.
+
+```sh
+goat checkout cancel <checkoutId>   # if the user changes their mind
+```
+
+- Exit 1: blocked, failed or cancelled. `blocked` means the agent stopped on purpose (over the cap, item unavailable, store blocked it); `failed` means the run broke. The output has the code or reason and a summary. Tell the user.
 
 Shipping details repeat across purchases. Create a buyer profile once with `goat buyer-profile create --json-file profile.json` and pass `--buyer-profile <id>` to `checkout create`.
 
@@ -110,7 +116,7 @@ goat agent-card request --amount 35 --description "Book: The Pragmatic Programme
 # → show the approval URL; wait; read the agent card id oi_abc
 goat checkout create --url https://bookshop.example/p/pragmatic --agent-card oi_abc --max-cost 35 --wait
 # → exit 2: shipping fields
-goat checkout answer co_123 act_1 --values '{"fullName":"Ada Lovelace","addressLine1":"1 Main St","city":"Austin","postalCode":"78701","country":"US"}' --wait
+goat checkout answer run_123 req_1 --values '{"fullName":"Ada Lovelace","addressLine1":"1 Main St","city":"Austin","postalCode":"78701","country":"US"}' --wait
 # → exit 0: succeeded, order ORD-9
 goat agent-card revoke oi_abc
 ```

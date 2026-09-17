@@ -10,6 +10,7 @@ export type ErrorCode =
   | "no_usable_rail"
   | "verification_required"
   | "merchant_required"
+  | "payment_handled_by_server"
   | "crossmint_error"
   | "internal";
 

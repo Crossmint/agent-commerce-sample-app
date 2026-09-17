@@ -172,34 +172,44 @@ export function createChatTools(goat: GoatClient) {
 
     create_checkout: tool({
       description:
-        "Start a Crossmint Agent Checkout at a product URL, paid with an agent card. Crossmint enforces maxCost. Follow it with get_checkout.",
+        "Start a Crossmint Agent Checkout at a product URL, paid with an agent card. Crossmint drives the store's checkout in a real browser; maxCost is a hard cap. Returns the checkout id. Follow it with get_checkout every few seconds.",
       inputSchema: z.object({
-        url: z.string().url().describe("Product page URL."),
-        request: z.string().max(2000).optional().describe("Free text for the buyer agent, e.g. \"size M, black\"."),
+        startUrl: z.string().url().describe("Product or cart page URL."),
+        task: z.string().max(20000).optional().describe('What to buy and how, e.g. "size M, black, cheapest shipping". The more you say, the fewer questions the agent asks.'),
         agentCardId: z.string().min(1),
         maxCost: z.object({
           amount: z.string().regex(/^\d+(\.\d{1,2})?$/),
           currency: z.string().length(3),
         }),
+        buyerProfileId: z.string().min(1).optional().describe("Saved buyer profile (name, contact, shipping)."),
       }),
       execute: (input) => guard(() => goat.createCheckout(input)),
     }),
 
     get_checkout: tool({
-      description: "Get a checkout's status, any pending user action, and the receipt or failure when done.",
+      description:
+        "Get a checkout: status (queued, running, awaiting_input, succeeded, blocked, failed, cancelled), the open question with its fields, the live browser URL, and the receipt or failure when done.",
       inputSchema: z.object({ checkoutId: z.string().min(1) }),
       execute: ({ checkoutId }) => guard(() => goat.getCheckout(checkoutId)),
     }),
 
-    answer_checkout_action: tool({
+    answer_checkout: tool({
       description:
-        "Answer a checkout's pending user action with values that match its schema (shipping address, options). Never payment data: the server handles payment.",
+        "Answer a checkout's open question. Pass requestId with values keyed by field name to submit, action decline to refuse, or action alternative with text to suggest another way. Without requestId, text is a note to the agent. Never send card fields: the server pays.",
       inputSchema: z.object({
         checkoutId: z.string().min(1),
-        actionId: z.string().min(1),
-        values: z.record(z.string(), z.unknown()),
+        requestId: z.string().min(1).optional(),
+        action: z.enum(["submit", "decline", "alternative"]).optional(),
+        values: z.record(z.string(), z.unknown()).optional(),
+        text: z.string().max(20000).optional(),
       }),
-      execute: ({ checkoutId, actionId, values }) => guard(() => goat.submitCheckoutAction(checkoutId, actionId, values)),
+      execute: ({ checkoutId, ...input }) => guard(() => goat.answerCheckout(checkoutId, input)),
+    }),
+
+    cancel_checkout: tool({
+      description: "Stop a running checkout. It reaches cancelled on a later get_checkout.",
+      inputSchema: z.object({ checkoutId: z.string().min(1) }),
+      execute: ({ checkoutId }) => guard(() => goat.cancelCheckout(checkoutId)),
     }),
   };
 }

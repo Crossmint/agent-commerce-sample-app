@@ -5,7 +5,7 @@ import type { CheckoutView } from "../api/types.js";
 import { useGoat } from "../provider.js";
 import { useResource, type Resource } from "./use-resource.js";
 
-const TERMINAL = new Set(["succeeded", "failed", "cancelled"]);
+const TERMINAL = new Set(["succeeded", "blocked", "failed", "cancelled"]);
 
 export function isTerminalCheckoutView(view: CheckoutView | undefined): boolean {
   return Boolean(view && TERMINAL.has(view.status));
@@ -19,8 +19,12 @@ export interface UseCheckoutOptions {
 }
 
 export interface UseCheckoutResult extends Resource<CheckoutView> {
-  /** Answer a pending user action. Replaces the local view with the server's response. */
-  submitAction: (actionId: string, values: Record<string, unknown>) => Promise<CheckoutView>;
+  /** Submit form values for the open request. Replaces the local view with the server's response. */
+  submitAction: (requestId: string, values: Record<string, unknown>) => Promise<CheckoutView>;
+  /** Refuse the open request. */
+  decline: (requestId: string) => Promise<CheckoutView>;
+  /** Stop the checkout. It reaches `cancelled` on a later poll. */
+  cancel: () => Promise<CheckoutView>;
   submitting: boolean;
 }
 
@@ -35,19 +39,29 @@ export function useCheckout(checkoutId: string | undefined, { poll = true, pollM
     shouldPoll: (view) => !isTerminalCheckoutView(view),
   });
 
-  const submitAction = React.useCallback(
-    async (actionId: string, values: Record<string, unknown>) => {
+  const send = React.useCallback(
+    async (run: () => Promise<CheckoutView>) => {
       setSubmitting(true);
       try {
-        const next = await api.submitCheckoutAction(checkoutId as string, actionId, values);
+        const next = await run();
         resource.setData(next);
         return next;
       } finally {
         setSubmitting(false);
       }
     },
-    [api, checkoutId, resource],
+    [resource],
   );
 
-  return { ...resource, submitAction, submitting };
+  const submitAction = React.useCallback(
+    (requestId: string, values: Record<string, unknown>) => send(() => api.answerCheckout(checkoutId as string, { requestId, action: "submit", values })),
+    [api, checkoutId, send],
+  );
+  const decline = React.useCallback(
+    (requestId: string) => send(() => api.answerCheckout(checkoutId as string, { requestId, action: "decline" })),
+    [api, checkoutId, send],
+  );
+  const cancel = React.useCallback(() => send(() => api.cancelCheckout(checkoutId as string)), [api, checkoutId, send]);
+
+  return { ...resource, submitAction, decline, cancel, submitting };
 }

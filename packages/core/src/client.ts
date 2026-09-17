@@ -1,3 +1,4 @@
+import { newMessageId, submitResponse } from "./checkout-messages.js";
 import { CrossmintApiError } from "./errors.js";
 import type {
   BuyerProfile,
@@ -13,7 +14,11 @@ import type {
   PaymentMethodList,
   RegisterCardInput,
   RegisterCardResult,
-  SubmitCheckoutActionInput,
+  CancelCheckoutResult,
+  CheckoutList,
+  CheckoutMessageList,
+  SendCheckoutMessageInput,
+  SendCheckoutMessageResult,
 } from "./types.js";
 
 const BASE_URLS: Record<CrossmintEnvironment, string> = {
@@ -188,6 +193,7 @@ export class CrossmintClient {
   // ---------------------------------------------------------------------
 
   readonly checkouts = {
+    /** Start a run. Returns 202 with the run in `queued`. */
     create: (ctx: CheckoutContext, input: CreateCheckoutInput): Promise<Checkout> =>
       this.request<Checkout>("POST", "/unstable/agent-checkouts", {
         auth: this.checkoutAuth(ctx),
@@ -195,23 +201,56 @@ export class CrossmintClient {
         baseUrl: this.checkoutsBaseUrl,
       }),
 
-    get: (ctx: CheckoutContext, checkoutId: string): Promise<Checkout> =>
-      this.request<Checkout>(
+    get: (ctx: CheckoutContext, runId: string): Promise<Checkout> =>
+      this.request<Checkout>("GET", `/unstable/agent-checkouts/${encodeURIComponent(runId)}`, {
+        auth: this.checkoutAuth(ctx),
+        baseUrl: this.checkoutsBaseUrl,
+      }),
+
+    list: (ctx: CheckoutContext, opts: { cursor?: string; limit?: number } = {}): Promise<CheckoutList> =>
+      this.request<CheckoutList>("GET", `/unstable/agent-checkouts${pageQuery(opts)}`, {
+        auth: this.checkoutAuth(ctx),
+        baseUrl: this.checkoutsBaseUrl,
+      }),
+
+    /** The run's transcript: progress, activity, input requests, result, and what the caller sent. */
+    listMessages: (
+      ctx: CheckoutContext,
+      runId: string,
+      opts: { cursor?: string; limit?: number } = {},
+    ): Promise<CheckoutMessageList> =>
+      this.request<CheckoutMessageList>(
         "GET",
-        `/unstable/agent-checkouts/${encodeURIComponent(checkoutId)}`,
+        `/unstable/agent-checkouts/${encodeURIComponent(runId)}/messages${pageQuery(opts)}`,
         { auth: this.checkoutAuth(ctx), baseUrl: this.checkoutsBaseUrl },
       ),
 
-    submitAction: (
-      ctx: CheckoutContext,
-      checkoutId: string,
-      actionId: string,
-      input: SubmitCheckoutActionInput,
-    ): Promise<Checkout> =>
-      this.request<Checkout>(
+    /** Send input responses or free text. Returns as soon as the message is accepted. */
+    sendMessage: (ctx: CheckoutContext, runId: string, input: SendCheckoutMessageInput): Promise<SendCheckoutMessageResult> =>
+      this.request<SendCheckoutMessageResult>(
         "POST",
-        `/unstable/agent-checkouts/${encodeURIComponent(checkoutId)}/actions/${encodeURIComponent(actionId)}`,
+        `/unstable/agent-checkouts/${encodeURIComponent(runId)}/messages`,
         { auth: this.checkoutAuth(ctx), body: input, baseUrl: this.checkoutsBaseUrl },
+      ),
+
+    /** Answer an open input request with form values. One message, one part. */
+    respond: (
+      ctx: CheckoutContext,
+      runId: string,
+      requestId: string,
+      values: Record<string, unknown>,
+      messageId?: string,
+    ): Promise<SendCheckoutMessageResult> =>
+      this.checkouts.sendMessage(ctx, runId, {
+        id: messageId ?? newMessageId(),
+        parts: [submitResponse(requestId, values)],
+      }),
+
+    cancel: (ctx: CheckoutContext, runId: string): Promise<CancelCheckoutResult> =>
+      this.request<CancelCheckoutResult>(
+        "POST",
+        `/unstable/agent-checkouts/${encodeURIComponent(runId)}/cancel`,
+        { auth: this.checkoutAuth(ctx), baseUrl: this.checkoutsBaseUrl },
       ),
 
     createBuyerProfile: (ctx: CheckoutContext, input: BuyerProfileInput): Promise<BuyerProfile> =>
@@ -291,4 +330,13 @@ function normalizePaymentMethodList(raw: unknown): PaymentMethodList {
     }
   }
   return { paymentMethods: [] };
+}
+
+/** `?cursor=…&limit=…` or an empty string. */
+function pageQuery(opts: { cursor?: string; limit?: number }): string {
+  const q = new URLSearchParams();
+  if (opts.cursor) q.set("cursor", opts.cursor);
+  if (opts.limit !== undefined) q.set("limit", String(opts.limit));
+  const str = q.toString();
+  return str ? `?${str}` : "";
 }

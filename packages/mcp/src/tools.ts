@@ -22,7 +22,8 @@ export const GOAT_TOOL_NAMES = [
   "revoke_agent_card",
   "create_checkout",
   "get_checkout",
-  "answer_checkout_action",
+  "answer_checkout",
+  "cancel_checkout",
 ] as const;
 
 export type GoatToolName = (typeof GOAT_TOOL_NAMES)[number];
@@ -209,25 +210,34 @@ export function registerGoatTools(server: McpServer, ctx: GoatToolsContext): voi
     {
       title: "Create a checkout",
       description:
-        "Buy a product at a URL with an active agent card. Crossmint runs the checkout and pays with the card. " +
-        "The card number never reaches you. Poll get_checkout for progress and questions.",
+        "Buy at a product URL with an active agent card. Crossmint drives the store's checkout in a real browser and pays with the card; " +
+        "the card number never reaches you. maxCost is a hard cap: the run stops as blocked instead of paying more. " +
+        "Returns the checkout id. Poll get_checkout every few seconds until it is done or asks a question.",
       inputSchema: {
-        url: z.string().url().describe("Product page URL."),
-        request: z.string().optional().describe("Instructions for the checkout, e.g. medium, black, ship to home."),
-        agentCardId: z.string().describe("An active agent card id."),
+        startUrl: z.string().url().describe("Product or cart page URL to start from."),
+        task: z
+          .string()
+          .max(20000)
+          .optional()
+          .describe("What to buy and how, e.g. medium, black, cheapest shipping, pay by card. The more you say here, the fewer questions the agent stops to ask."),
+        agentCardId: z.string().describe("An active agent card id. It pays."),
         maxCost: amountSchema.describe("Maximum total to pay, including shipping and tax. Enforced."),
         currency: currencySchema.optional(),
         buyerProfileId: z.string().optional().describe("Saved buyer profile (name, contact, shipping)."),
+        browserProfileId: z.string().optional().describe("Saved merchant logins, for stores where the user is signed in."),
+        merchantGuidance: z.string().max(20000).optional().describe("Notes about this store for the agent."),
       },
       annotations: { openWorldHint: true },
     },
     guard(async (args) => {
       const checkout = await api.createCheckout({
-        url: args.url,
-        request: args.request,
+        startUrl: args.startUrl,
+        task: args.task,
         agentCardId: args.agentCardId,
         maxCost: { amount: toDecimalString(args.maxCost), currency: (args.currency ?? "USD").toUpperCase() },
         buyerProfileId: args.buyerProfileId,
+        browserProfileId: args.browserProfileId,
+        merchantGuidance: args.merchantGuidance,
       });
       return ok(`Checkout ${checkout.id} created.\n${describeCheckout(checkout)}`, { checkout });
     }),
@@ -238,8 +248,9 @@ export function registerGoatTools(server: McpServer, ctx: GoatToolsContext): voi
     {
       title: "Get a checkout",
       description:
-        "Get checkout status. If it needs an answer (shipping, size, confirmation), the result lists the fields. " +
-        "Answer with answer_checkout_action. Payment questions are answered by the server.",
+        "Get a checkout's status: queued, running, awaiting_input, succeeded, blocked, failed or cancelled. " +
+        "When it is awaiting_input the result lists the question and its fields; answer with answer_checkout. " +
+        "Payment questions never appear: the server answers them from the agent card.",
       inputSchema: { id: z.string().describe("Checkout id.") },
       annotations: { readOnlyHint: true, openWorldHint: true },
     },
@@ -251,19 +262,38 @@ export function registerGoatTools(server: McpServer, ctx: GoatToolsContext): voi
   );
 
   server.registerTool(
-    "answer_checkout_action",
+    "answer_checkout",
     {
       title: "Answer a checkout question",
-      description: "Answer a pending checkout action with values keyed by field name, as listed by get_checkout.",
+      description:
+        "Answer the open question on a checkout. Pass requestId with values keyed by field name (as listed by get_checkout) to submit, " +
+        "action decline to refuse it, or action alternative with text to suggest another way (e.g. use the cheapest shipping). " +
+        "Without requestId, text is a note to the agent mid-run. Never send card fields.",
       inputSchema: {
         id: z.string().describe("Checkout id."),
-        actionId: z.string().describe("The pending action id from get_checkout."),
-        values: z.record(z.string(), z.unknown()).describe("Field values keyed by field name."),
+        requestId: z.string().optional().describe("The pending request id from get_checkout."),
+        action: z.enum(["submit", "decline", "alternative"]).optional().describe("Default submit."),
+        values: z.record(z.string(), z.unknown()).optional().describe("Field values keyed by field name, for submit."),
+        text: z.string().max(20000).optional().describe("Free text: the alternative, or a note for the agent."),
       },
       annotations: { openWorldHint: true },
     },
-    guard(async ({ id, actionId, values }) => {
-      const checkout = await api.answerCheckoutAction(id, actionId, values);
+    guard(async ({ id, ...input }) => {
+      const checkout = await api.answerCheckout(id, input);
+      return ok(describeCheckout(checkout), { checkout });
+    }),
+  );
+
+  server.registerTool(
+    "cancel_checkout",
+    {
+      title: "Cancel a checkout",
+      description: "Stop a running checkout. It reaches cancelled on a later get_checkout.",
+      inputSchema: { id: z.string().describe("Checkout id.") },
+      annotations: { openWorldHint: true },
+    },
+    guard(async ({ id }) => {
+      const checkout = await api.cancelCheckout(id);
       return ok(describeCheckout(checkout), { checkout });
     }),
   );
@@ -390,19 +420,29 @@ function describeCheckout(checkout: CheckoutView): string {
   const lines = [`Checkout ${checkout.id}: status ${checkout.status}.`];
   const action = renderedAction(checkout);
   if (action) {
-    lines.push(
-      `Action needed (actionId "${action.id}", type ${action.type}): ${action.title}${action.description ? ` — ${action.description}` : ""}`,
-    );
+    lines.push(`Question (requestId "${action.id}"): ${action.title}${action.description ? ` — ${action.description}` : ""}`);
     if (action.fields.length) {
       lines.push("Fields:", ...action.fields.map((f) => describeField(f)));
     }
-    if (action.expiresAt) lines.push(`Answer before ${action.expiresAt}.`);
-    lines.push(`Ask the user if you do not know a value. Then call answer_checkout_action with id "${checkout.id}" and actionId "${action.id}".`);
+    if (action.expiresAt) lines.push(`Answer before ${action.expiresAt}, or the checkout fails.`);
+    lines.push(
+      `Ask the user if you do not know a value. Then call answer_checkout with id "${checkout.id}" and requestId "${action.id}" ` +
+        `(values to submit, or action "decline" / "alternative").`,
+    );
   }
-  if (checkout.embedUrl) lines.push(`The user can watch or take over at: ${checkout.embedUrl}`);
-  if (checkout.failure) lines.push(`Failed: ${checkout.failure.reason}${checkout.failure.message ? ` — ${checkout.failure.message}` : ""}.`);
-  if (checkout.receipt) lines.push(`Receipt: ${JSON.stringify(checkout.receipt)}`);
-  if (!action && !checkout.failure && !checkout.receipt && /pending|running|awaiting/.test(checkout.status)) {
+  if (checkout.embedUrl) lines.push(`The user can watch the agent's browser at: ${checkout.embedUrl}`);
+  if (checkout.receipt) {
+    lines.push(`Receipt: total ${checkout.receipt.total.amount} ${checkout.receipt.total.currency}${checkout.receipt.merchantOrderId ? `, order ${checkout.receipt.merchantOrderId}` : ""}.`);
+  } else if (checkout.status === "succeeded") {
+    lines.push("Succeeded. The order went through but no receipt could be read.");
+  }
+  if (checkout.result?.summary) lines.push(`Summary: ${checkout.result.summary}`);
+  if (checkout.failure) {
+    const label = checkout.status === "blocked" ? "Blocked" : checkout.status === "cancelled" ? "Cancelled" : "Failed";
+    lines.push(`${label}: ${checkout.failure.reason}${checkout.failure.message ? ` — ${checkout.failure.message}` : ""}.`);
+  }
+  if (checkout.spentUsd) lines.push(`Spent so far: ${checkout.spentUsd} USD.`);
+  if (!action && !checkout.failure && checkout.status !== "succeeded") {
     lines.push("Still running. Poll get_checkout again in a few seconds.");
   }
   return lines.join("\n");

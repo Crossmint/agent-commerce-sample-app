@@ -8,6 +8,9 @@ import type {
   AgentCard,
   Amount,
   BuyerProfileInput,
+  CheckoutReceipt,
+  CheckoutResult,
+  CheckoutStatus,
   Merchant,
   PendingUserAction,
   RenderedAction,
@@ -97,22 +100,36 @@ export interface CredentialResult {
 }
 
 export interface CreateCheckoutInput {
-  url: string;
-  request?: string;
+  startUrl: string;
+  task?: string;
   agentCardId: string;
   maxCost: { amount: string; currency: string };
   buyerProfileId?: string;
+  browserProfileId?: string;
+  merchantGuidance?: string;
+}
+
+/** Body of POST /v1/checkouts/:id/messages. */
+export interface CheckoutMessageInput {
+  requestId?: string;
+  action?: "submit" | "decline" | "alternative";
+  values?: Record<string, unknown>;
+  text?: string;
+  messageId?: string;
 }
 
 export interface CheckoutView {
   id: string;
-  status: string;
+  status: CheckoutStatus;
   agentCardId?: string;
   pendingUserAction?: PendingUserAction;
   rendered?: RenderedAction;
   embedUrl?: string;
-  receipt?: Record<string, unknown>;
+  result?: CheckoutResult;
+  receipt?: CheckoutReceipt;
   failure?: { reason: string; message?: string };
+  spentUsd?: string;
+  createdAt?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -213,8 +230,12 @@ export class GoatApi {
     return this.call("GET", `/v1/checkouts/${enc(id)}`);
   }
 
-  answerCheckoutAction(id: string, actionId: string, values: Record<string, unknown>): Promise<CheckoutView> {
-    return this.call("POST", `/v1/checkouts/${enc(id)}/actions/${enc(actionId)}`, { body: { values } });
+  answerCheckout(id: string, input: CheckoutMessageInput): Promise<CheckoutView> {
+    return this.call("POST", `/v1/checkouts/${enc(id)}/messages`, { body: input });
+  }
+
+  cancelCheckout(id: string): Promise<CheckoutView> {
+    return this.call("POST", `/v1/checkouts/${enc(id)}/cancel`);
   }
 
   createBuyerProfile(input: BuyerProfileInput): Promise<{ id: string }> {

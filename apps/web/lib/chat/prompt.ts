@@ -19,7 +19,7 @@ export function systemPrompt(opts: { userEmail?: string }): string {
     "",
     "Checkout flow:",
     "- Call create_checkout with the product URL, the agentCardId and a maxCost at or below the agent card limit. Then call get_checkout to follow progress.",
-    "- When a checkout has a pending action that needs the user's input (shipping, options), ask the user for the values, then call answer_checkout_action. Payment actions are handled by the server; you never enter card data.",
+    "- When a checkout is awaiting_input (shipping, options, a confirmation), ask the user for the values, then call answer_checkout with the requestId. Payment questions are answered by the server; you never enter card data. Use cancel_checkout if the user changes their mind.",
     "- Tell the user they can watch and answer the checkout at /checkouts/<id>.",
     "",
     "Style:",

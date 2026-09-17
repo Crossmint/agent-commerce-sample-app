@@ -14,9 +14,12 @@ import {
   revokeAgentCard,
 } from "./handlers/agent-cards.js";
 import {
+  cancelCheckout,
   createBuyerProfile,
   createCheckout,
   getCheckout,
+  listCheckoutMessages,
+  sendCheckoutMessage,
   submitCheckoutAction,
 } from "./handlers/checkouts.js";
 import { getConfig } from "./handlers/config.js";
@@ -66,6 +69,9 @@ export function buildRouter(): Router<Ctx> {
     .post("/v1/agent-cards/:id/credentials", mintCredentials)
     .post("/v1/checkouts", createCheckout)
     .get("/v1/checkouts/:id", getCheckout)
+    .get("/v1/checkouts/:id/messages", listCheckoutMessages)
+    .post("/v1/checkouts/:id/messages", sendCheckoutMessage)
+    .post("/v1/checkouts/:id/cancel", cancelCheckout)
     .post("/v1/checkouts/:id/actions/:actionId", submitCheckoutAction)
     .post("/v1/buyer-profiles", createBuyerProfile);
 }

@@ -43,17 +43,53 @@ export const credentialsSchema = z.object({
   format: z.literal("card").optional(),
 });
 
-export const createCheckoutSchema = z.object({
-  url: z.string().url(),
-  request: z.string().max(2000).optional(),
-  agentCardId: z.string().min(1),
-  maxCost: z.object({
-    amount: z.string().regex(/^\d+(\.\d{1,2})?$/),
-    currency: z.string().length(3),
-  }),
-  buyerProfileId: z.string().min(1).optional(),
-});
+const decimalAmount = z.string().regex(/^\d+(\.\d{1,6})?$/);
 
+/**
+ * Body of POST /v1/checkouts. `startUrl` and `task` mirror Crossmint's
+ * `request`; `url` and `request` are accepted as their older names.
+ */
+export const createCheckoutSchema = z
+  .object({
+    startUrl: z.string().url().optional(),
+    url: z.string().url().optional(),
+    task: z.string().min(1).max(20000).optional(),
+    request: z.string().min(1).max(20000).optional(),
+    agentCardId: z.string().min(1),
+    maxCost: z.object({
+      amount: decimalAmount,
+      currency: z.string().length(3),
+    }),
+    buyerProfileId: z.string().min(1).optional(),
+    browserProfileId: z.string().min(1).optional(),
+    merchantGuidance: z.string().min(1).max(20000).optional(),
+  })
+  .refine((b) => Boolean(b.startUrl ?? b.url), { message: "startUrl is required", path: ["startUrl"] });
+
+/**
+ * Body of POST /v1/checkouts/:id/messages. With `requestId`: answer the open
+ * input request (`submit` with `values`, `decline`, or `alternative` with
+ * `text`). Without: a free-text note to the agent.
+ */
+export const checkoutMessageSchema = z
+  .object({
+    requestId: z.string().min(1).optional(),
+    action: z.enum(["submit", "decline", "alternative"]).optional(),
+    values: z.record(z.string(), z.unknown()).optional(),
+    text: z.string().min(1).max(20000).optional(),
+    messageId: z.string().min(1).max(200).optional(),
+  })
+  .superRefine((b, ctx) => {
+    if (b.requestId) {
+      const action = b.action ?? "submit";
+      if (action === "submit" && !b.values) ctx.addIssue({ code: "custom", path: ["values"], message: "values are required to submit" });
+      if (action === "alternative" && !b.text) ctx.addIssue({ code: "custom", path: ["text"], message: "text is required for an alternative" });
+    } else if (!b.text) {
+      ctx.addIssue({ code: "custom", path: ["text"], message: "text or requestId is required" });
+    }
+  });
+
+/** Body of the older POST /v1/checkouts/:id/actions/:actionId. */
 export const submitActionSchema = z.object({
   values: z.record(z.string(), z.unknown()),
 });

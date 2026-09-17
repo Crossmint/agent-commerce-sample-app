@@ -90,8 +90,8 @@ export function goatClient(jwt: string) {
     getAgentCardRequest: (id: string) => call<AgentCardRequestView>("GET", `/agent-card-requests/${enc(id)}`),
     createCheckout: (input: Record<string, unknown>) => call<CheckoutView>("POST", "/checkouts", input),
     getCheckout: (id: string) => call<CheckoutView>("GET", `/checkouts/${enc(id)}`),
-    submitCheckoutAction: (id: string, actionId: string, values: Record<string, unknown>) =>
-      call<CheckoutView>("POST", `/checkouts/${enc(id)}/actions/${enc(actionId)}`, { values }),
+    answerCheckout: (id: string, input: Record<string, unknown>) => call<CheckoutView>("POST", `/checkouts/${enc(id)}/messages`, input),
+    cancelCheckout: (id: string) => call<CheckoutView>("POST", `/checkouts/${enc(id)}/cancel`, {}),
   };
 }
 

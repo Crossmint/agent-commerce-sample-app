@@ -3,6 +3,7 @@ import type {
   AgentCardRequest,
   ApproveAgentCardRequestInput,
   ApproveAgentCardRequestResult,
+  CheckoutMessageInput,
   CheckoutView,
   CreateAgentCardRequestInput,
   CreateCheckoutInput,
@@ -128,8 +129,8 @@ export function createGoatApi(opts: GoatApiOptions) {
     // Checkouts
     createCheckout: (input: CreateCheckoutInput) => request<CheckoutView>("POST", "/checkouts", input),
     getCheckout: (id: string) => request<CheckoutView>("GET", `/checkouts/${enc(id)}`),
-    submitCheckoutAction: (id: string, actionId: string, values: Record<string, unknown>) =>
-      request<CheckoutView>("POST", `/checkouts/${enc(id)}/actions/${enc(actionId)}`, { values }),
+    answerCheckout: (id: string, input: CheckoutMessageInput) => request<CheckoutView>("POST", `/checkouts/${enc(id)}/messages`, input),
+    cancelCheckout: (id: string) => request<CheckoutView>("POST", `/checkouts/${enc(id)}/cancel`, {}),
     createBuyerProfile: (input: BuyerProfileInput) => request<{ id: string }>("POST", "/buyer-profiles", input),
   };
 }

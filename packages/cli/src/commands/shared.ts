@@ -97,6 +97,7 @@ export function describeAction(checkoutId: string, action: RenderedAction): stri
   lines.push(
     `  goat checkout answer ${checkoutId} ${action.id} --values '${JSON.stringify(valuesTemplate(action.fields))}'`,
   );
+  lines.push(`  ${pc.dim("or")} --decline ${pc.dim("/")} --alternative "<what to do instead>"`);
   return lines;
 }
 
@@ -130,24 +131,20 @@ export function valuesTemplate(fields: RenderedField[]): Record<string, unknown>
 }
 
 export function checkoutSummary(view: CheckoutView): string[] {
-  const receipt = view.receipt as
-    { total?: string | { amount: string; currency: string }; merchantOrderId?: string } | undefined;
-  const total =
-    typeof receipt?.total === "string"
-      ? receipt.total
-      : receipt?.total
-        ? `${receipt.total.amount} ${receipt.total.currency}`
-        : undefined;
+  const receipt = view.receipt;
+  const total = receipt ? `${receipt.total.amount} ${receipt.total.currency}` : undefined;
   return kv([
     ["Checkout", view.id],
     ["Status", view.status],
     ["Agent card", view.agentCardId],
     ["Total", total],
     ["Order", receipt?.merchantOrderId],
+    ["Spent", view.spentUsd ? `${view.spentUsd} USD` : undefined],
+    ["Summary", view.result?.summary],
     [
-      "Failure",
+      view.status === "blocked" ? "Blocked" : "Failure",
       view.failure
-        ? `${view.failure.reason}${view.failure.message ? `: ${view.failure.message}` : ""}`
+        ? `${view.failure.reason}${view.failure.message && view.failure.message !== view.result?.summary ? `: ${view.failure.message}` : ""}`
         : undefined,
     ],
   ]);

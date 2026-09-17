@@ -3,6 +3,7 @@ import { hasUsableRail } from "./rails.js";
 
 export const TERMINAL_CHECKOUT_STATUSES: ReadonlySet<CheckoutStatus> = new Set([
   "succeeded",
+  "blocked",
   "failed",
   "cancelled",
 ]);
@@ -49,7 +50,7 @@ export function pollCheckout(
   const stopOnUserAction = opts.stopOnUserAction ?? true;
   return pollUntil(
     fetchOnce,
-    (c) => isTerminalCheckout(c) || (stopOnUserAction && c.status === "awaiting_user_action"),
+    (c) => isTerminalCheckout(c) || (stopOnUserAction && c.status === "awaiting_input"),
     opts,
   );
 }

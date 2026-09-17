@@ -243,30 +243,50 @@ export type Credential = AgenticTokenCredential | SptCredential | EncryptedCardC
 // ---------------------------------------------------------------------------
 // Agent checkouts
 // ---------------------------------------------------------------------------
+// Mirrors https://docs.crossmint.com/api-reference/agent-checkouts/create-agent-checkout
+// A checkout is a run: create it, poll it (or stream its messages) until a
+// terminal status, and answer each input request by sending a message.
 
 export type CheckoutStatus =
-  | "pending"
+  | "queued"
   | "running"
-  | "awaiting_user_action"
+  | "awaiting_input"
   | "succeeded"
+  | "blocked"
   | "failed"
   | "cancelled"
   | (string & {});
 
+/** Why a run `failed`: the run itself broke. */
 export type CheckoutFailureReason =
-  | "max_cost_exceeded"
-  | "user_cancelled"
-  | "user_action_expired"
-  | "automation_failed"
-  | "automation_timeout"
-  | "llm_spend_exceeded"
+  | "input_expired"
+  | "cost_limit"
+  | "cancelled"
+  | "model_error"
+  | "runtime_error"
+  | "browser_session_lost"
+  | "accounting_unavailable"
+  | "reconciliation_required"
   | (string & {});
 
-export interface CheckoutTarget {
-  kind: "direct_url";
-  url: string;
-  /** Natural-language instruction for the agent, e.g. "buy the medium in black". */
-  request?: string;
+/** Why a run ended `blocked`: the agent stopped on purpose. */
+export type CheckoutBlockedCode =
+  | "policy.max_cost_exceeded"
+  | "product.item_unavailable"
+  | "product.requested_option_unavailable"
+  | "merchant.fulfillment_unavailable"
+  | "merchant.human_verification_required"
+  | "merchant.access_blocked"
+  | "merchant.payment_declined"
+  | "merchant.checkout_error"
+  | "merchant.no_safe_path"
+  | (string & {});
+
+export interface CheckoutRequest {
+  /** Product or cart page to start from. */
+  startUrl: string;
+  /** Natural-language instruction for the agent, e.g. "buy the medium in black". Up to 20000 chars. */
+  task?: string;
 }
 
 export interface CheckoutConstraints {
@@ -274,9 +294,14 @@ export interface CheckoutConstraints {
 }
 
 export interface CreateCheckoutInput {
-  target: CheckoutTarget;
+  request: CheckoutRequest;
   constraints: CheckoutConstraints;
+  /** Saved name, contact and shipping. */
   buyerProfileId?: string;
+  /** Saved merchant logins. */
+  browserProfileId?: string;
+  /** Notes about the store for the agent. Up to 20000 chars. */
+  merchantGuidance?: string;
 }
 
 /** A JSON Schema object. Kept loose on purpose; GOAT walks `.properties`. */
@@ -300,43 +325,155 @@ export interface JsonSchema {
   [key: string]: unknown;
 }
 
+export interface CheckoutInteraction {
+  kind: "form" | (string & {});
+  responseSchema: JsonSchema;
+  uiSchema?: Record<string, unknown>;
+}
+
+/** What the agent is asking, as it appears in `requiredAction.request` and in `input_request` message parts. */
+export interface CheckoutInputRequest {
+  question: string;
+  /** Answer before this or the run fails with `input_expired`. */
+  expiresAt: string;
+  interaction: CheckoutInteraction;
+}
+
+/** The run's open question. Present while `status` is `awaiting_input`. */
+export interface CheckoutRequiredAction {
+  type: "input_response";
+  requestId: string;
+  messageId: string;
+  request: CheckoutInputRequest;
+}
+
+/**
+ * GOAT's flat view of an open input request. `id` is the `requestId` to
+ * answer with. Built from `requiredAction` by `pendingActionOf`.
+ */
 export interface PendingUserAction {
   id: string;
-  /** Crossmint may call this `type` or `kind`; GOAT reads both. */
-  type?: string;
-  kind?: string;
-  title?: string;
-  description?: string;
-  responseSchema: JsonSchema;
+  messageId?: string;
+  question: string;
   expiresAt?: string;
-  [key: string]: unknown;
+  responseSchema: JsonSchema;
+  uiSchema?: Record<string, unknown>;
 }
 
 export interface CheckoutReceipt {
-  total?: string | { amount: string; currency: string };
+  total: { amount: string; currency: string };
   merchantOrderId?: string;
-  evidence?: unknown;
-  [key: string]: unknown;
+}
+
+export type CheckoutPurchase =
+  | { kind: "confirmed_without_receipt" }
+  | { kind: "receipt_captured"; receipt: CheckoutReceipt };
+
+export interface CheckoutResult {
+  outcome: "succeeded" | "blocked" | "cancelled" | "failed" | (string & {});
+  summary: string;
+  /** On `blocked`. */
+  code?: CheckoutBlockedCode;
+  /** On `succeeded`. */
+  purchase?: CheckoutPurchase;
 }
 
 export interface Checkout {
-  id: string;
+  runId: string;
   status: CheckoutStatus;
-  target?: CheckoutTarget;
-  constraints?: CheckoutConstraints;
-  buyerProfileId?: string;
-  pendingUserAction?: PendingUserAction | null;
-  browser?: { embedUrl?: string; [key: string]: unknown };
-  receipt?: CheckoutReceipt;
-  failure?: { reason: CheckoutFailureReason; message?: string };
-  createdAt?: string;
-  updatedAt?: string;
+  revision: number;
+  createdAt: string;
+  input: CreateCheckoutInput;
+  /** View-only live browser. `null` while no session is attached. */
+  browser?: { embedUrl: string; permissions: Array<"read" | (string & {})> } | null;
+  requiredAction?: CheckoutRequiredAction | null;
+  /** On `succeeded`, `blocked` and `cancelled`. */
+  result?: CheckoutResult;
+  /** On `failed`. */
+  reason?: CheckoutFailureReason;
+  knownSpentUsdMicros?: number;
   [key: string]: unknown;
 }
 
-export interface SubmitCheckoutActionInput {
-  action: "submit";
-  values: Record<string, unknown>;
+export interface CheckoutList {
+  data: Checkout[];
+  nextCursor: string | null;
+}
+
+// Messages. The agent writes progress, activity, input requests and the
+// result; the caller writes input responses and free text.
+
+export type InputResponsePart =
+  | { type: "input_response"; requestId: string; action: "submit"; response: { kind: "form"; values: Record<string, unknown> } }
+  | { type: "input_response"; requestId: string; action: "decline" }
+  | { type: "input_response"; requestId: string; action: "alternative"; text: string };
+
+export interface TextPart {
+  type: "text";
+  text: string;
+  delivery?: "accepted" | "consumed";
+}
+
+export interface InputRequestPart extends CheckoutInputRequest {
+  type: "input_request";
+  requestId: string;
+  status: "open" | "closed";
+}
+
+export interface ActivityPart {
+  type: "activity";
+  status: "running" | "completed" | "incomplete" | "uncertain";
+  operations: Array<{ kind: string; count: number }>;
+}
+
+export interface ProgressPart {
+  type: "progress";
+  text: string;
+}
+
+export type ResultPart = CheckoutResult & { type: "result" };
+
+export type CheckoutMessagePart =
+  | InputResponsePart
+  | TextPart
+  | InputRequestPart
+  | ActivityPart
+  | ProgressPart
+  | ResultPart
+  | { type: string; [key: string]: unknown };
+
+export interface CheckoutMessage {
+  id: string;
+  role: "assistant" | "user";
+  createdAt: string;
+  revision: number;
+  parts: CheckoutMessagePart[];
+}
+
+export interface CheckoutMessageList {
+  data: CheckoutMessage[];
+  nextCursor: string | null;
+  /** Resume point for the SSE stream. */
+  streamCursor: string;
+}
+
+/** Parts a caller may send. */
+export type OutboundMessagePart = InputResponsePart | { type: "text"; text: string };
+
+export interface SendCheckoutMessageInput {
+  /** Your own unique id, up to 200 chars. A retry with the same id is applied once. */
+  id: string;
+  parts: OutboundMessagePart[];
+}
+
+export interface SendCheckoutMessageResult {
+  messageId: string;
+  status: "accepted";
+}
+
+export interface CancelCheckoutResult {
+  runId: string;
+  status: "accepted";
 }
 
 export interface BuyerProfileInput {

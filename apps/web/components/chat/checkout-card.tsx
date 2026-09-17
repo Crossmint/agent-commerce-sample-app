@@ -50,10 +50,24 @@ export function CheckoutCard({
                 <dd>{view.rendered.title}</dd>
               </>
             ) : null}
+            {view.receipt ? (
+              <>
+                <dt className="text-muted-foreground">Total</dt>
+                <dd>
+                  {view.receipt.total.amount} {view.receipt.total.currency}
+                  {view.receipt.merchantOrderId ? <span className="text-muted-foreground"> · order {view.receipt.merchantOrderId}</span> : null}
+                </dd>
+              </>
+            ) : null}
             {view.failure ? (
               <>
-                <dt className="text-muted-foreground">Failure</dt>
+                <dt className="text-muted-foreground">{view.status === "blocked" ? "Stopped" : "Failure"}</dt>
                 <dd className="text-destructive">{view.failure.message ?? view.failure.reason}</dd>
+              </>
+            ) : view.result?.summary ? (
+              <>
+                <dt className="text-muted-foreground">Summary</dt>
+                <dd>{view.result.summary}</dd>
               </>
             ) : null}
           </dl>
@@ -69,15 +83,23 @@ export function CheckoutCard({
 }
 
 function StatusLine({ view }: { view: CheckoutView }) {
-  if (view.failure) return <>Failed: {view.failure.message ?? view.failure.reason}</>;
+  if (view.failure) return <>{view.status === "blocked" ? "Stopped" : view.status === "cancelled" ? "Cancelled" : "Failed"}: {view.failure.message ?? view.failure.reason}</>;
   if (view.rendered) return <>Waiting for input: {view.rendered.title}</>;
+  if (view.status === "succeeded") return <>Bought{view.receipt ? ` for ${view.receipt.total.amount} ${view.receipt.total.currency}` : ""}</>;
   return <>{view.status.replace(/_/g, " ")}</>;
 }
 
 function badgeVariant(status: string): "success" | "warning" | "destructive" | "muted" {
-  const s = status.toLowerCase();
-  if (s.includes("complete") || s.includes("success") || s.includes("purchased")) return "success";
-  if (s.includes("fail") || s.includes("cancel") || s.includes("error")) return "destructive";
-  if (s.includes("pending") || s.includes("action") || s.includes("progress")) return "warning";
-  return "muted";
+  switch (status) {
+    case "succeeded":
+      return "success";
+    case "blocked":
+    case "failed":
+    case "cancelled":
+      return "destructive";
+    case "awaiting_input":
+      return "warning";
+    default:
+      return "muted";
+  }
 }
