@@ -13,9 +13,9 @@ export function BuildYourOwn() {
         <BrandSwitcher
           intro={
             <div className="flex flex-col items-start gap-4">
-              <h2 className="font-display text-4xl font-semibold tracking-[-0.03em] text-foreground sm:text-5xl">Your brand, your users.</h2>
+              <h2 className="font-display text-4xl font-semibold tracking-[-0.03em] text-foreground sm:text-5xl">Build your own</h2>
               <p className="max-w-2xl text-lg text-muted-foreground sm:text-xl">
-                Add agent cards and agent checkouts to your agent platform. Copy the parts you need from the GOAT template and make it feel your own with your own components.
+                Add agent cards and agent checkouts to your agent platform. <strong className="font-semibold text-foreground">Your brand, your users.</strong>
               </p>
             </div>
           }

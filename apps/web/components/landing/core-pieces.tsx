@@ -27,8 +27,8 @@ const adapters: ReactNode[] = [
   <Item key="mcp" title="MCP server">
     One endpoint with OAuth for ChatGPT, Claude, and any MCP host.
   </Item>,
-  <Item key="cli" title="CLI + Skills">
-    A <code className="rounded-sm bg-muted px-1 py-0.5 font-mono text-[0.85em]">goat</code> CLI and a skill for Claude Code, OpenClaw, and Hermes.
+  <Item key="cli" title="Your own CLI and skills">
+    Ship a branded CLI and a skill for Claude Code, OpenClaw, and Hermes.
   </Item>,
 ];
 
@@ -40,7 +40,7 @@ export function CorePieces() {
       <div className="flex flex-col gap-10 sm:gap-14">
         <Block index="01" title="Agent Cards" bullets={cards} visual={<AgentCardsDemo className="mx-auto w-full max-w-[var(--phone-w)]" />} />
         <Block index="02" title="Agent Checkouts" bullets={checkouts} visual={<CheckoutRunMock className="mx-auto w-full max-w-[var(--phone-w)]" />} flip />
-        <Block index="03" title="Adapters for any agent" bullets={adapters} visual={<AdaptersPanel className="mx-auto w-full max-w-[520px]" />} />
+        <Block index="03" title="Adapters for any agent framework" bullets={adapters} visual={<AdaptersPanel className="mx-auto w-full max-w-[520px]" />} />
       </div>
     </Section>
   );

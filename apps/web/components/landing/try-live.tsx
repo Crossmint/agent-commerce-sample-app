@@ -65,7 +65,7 @@ export function TryLive() {
                   >
                     <Image src={goat.src} alt="" width={40} height={40} className="relative size-9 shrink-0 object-contain sm:size-10" />
                     <span className="relative min-w-0 flex-1 text-sm leading-tight font-semibold text-foreground sm:text-base">
-                      Or try our <span className="text-primary">example chat</span>
+                      Or try our example chat
                     </span>
                     <ArrowUpRight className="relative size-5 shrink-0 text-primary" />
                   </Link>

@@ -159,19 +159,6 @@ html {
   animation-delay: var(--delay, 0ms);
 }
 
-/* Agent logo tiles lift a little on hover. */
-.landing-tile {
-  transition:
-    transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1),
-    border-color 0.25s ease,
-    box-shadow 0.25s ease;
-}
-.landing-tile:hover {
-  transform: translateY(-3px);
-  border-color: color-mix(in srgb, var(--primary) 55%, var(--border));
-  box-shadow: 0 12px 28px -18px rgba(10, 24, 37, 0.35);
-}
-
 /*
  * Phone frame. iPhone 15/16 proportions that shrink with the container.
  * Screens draw their own header under the status bar (they pad 44px) and
@@ -502,7 +489,6 @@ html {
     transform: none;
   }
   .landing-reveal[data-reveal="shown"],
-  .landing-tile,
   .landing-screen-layer {
     transition: none;
   }
