@@ -28,3 +28,18 @@ export function isSessionDurationError(e: unknown): boolean {
   const msg = e instanceof Error ? e.message : String(e);
   return /invalid_session_duration/.test(msg);
 }
+
+/**
+ * Run a Stytch authenticate call with SESSION_MINUTES. If the project maximum
+ * is lower than that, retry once with a short session instead of failing the
+ * login. Shared by the OTP form and the OAuth callback, so both behave alike.
+ */
+export async function authenticateWithSessionFallback(authenticate: (minutes: number) => Promise<unknown>): Promise<void> {
+  try {
+    await authenticate(SESSION_MINUTES);
+  } catch (e: unknown) {
+    if (!isSessionDurationError(e)) throw e;
+    console.warn("[goat] Session duration above the Stytch project maximum. Retrying with", FALLBACK_SESSION_MINUTES, "minutes.");
+    await authenticate(FALLBACK_SESSION_MINUTES);
+  }
+}

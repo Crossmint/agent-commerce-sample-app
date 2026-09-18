@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { useStytch } from "@stytch/nextjs";
 import { Alert, AlertDescription, AlertTitle, Button, Spinner } from "@goat-wallet/ui";
 import { NEXT_COOKIE } from "./login-form";
-import { FALLBACK_SESSION_MINUTES, SESSION_MINUTES, isSessionDurationError } from "@/lib/stytch-client";
+import { authenticateWithSessionFallback } from "@/lib/stytch-client";
 
 function readNextCookie(): string {
   const match = document.cookie.split("; ").find((c) => c.startsWith(`${NEXT_COOKIE}=`));
@@ -21,6 +21,11 @@ function tokenKind(tokenType: string | undefined): TokenKind | null {
   return tokenType === "magic_links" || tokenType === "oauth" ? tokenType : null;
 }
 
+/**
+ * Finishes a redirect-based login. Google's callback lands here; email sign-in
+ * uses a passcode and never leaves /login, so the magic-link branch is kept
+ * only for links that were already sent.
+ */
 export function AuthenticateClient({ token, tokenType }: { token?: string; tokenType?: string }) {
   const stytch = useStytch();
   const router = useRouter();
@@ -42,14 +47,7 @@ export function AuthenticateClient({ token, tokenType }: { token?: string; token
       if (kind === "oauth") await stytch.oauth.authenticate(token, opts);
       else await stytch.magicLinks.authenticate(token, opts);
     };
-    // If the project's maximum session duration is lower than what we ask for,
-    // retry once with a short session instead of failing the login.
-    authenticate(SESSION_MINUTES)
-      .catch((e: unknown) => {
-        if (!isSessionDurationError(e)) throw e;
-        console.warn("[goat] Session duration above the Stytch project maximum. Retrying with", FALLBACK_SESSION_MINUTES, "minutes.");
-        return authenticate(FALLBACK_SESSION_MINUTES);
-      })
+    authenticateWithSessionFallback(authenticate)
       .then(() => {
         const next = readNextCookie();
         router.replace(next);

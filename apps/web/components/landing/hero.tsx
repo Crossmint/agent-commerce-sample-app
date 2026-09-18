@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Button } from "@goat-wallet/ui";
 import { GoatLockup } from "@/components/brand";
 import { GridCell } from "./grid";
+import { PoweredBy } from "./powered-by";
 import { HeroPhone } from "./hero-phone";
 
 const rise = (ms: number) => ({ "--delay": `${ms}ms` }) as CSSProperties;
@@ -10,7 +11,8 @@ const rise = (ms: number) => ({ "--delay": `${ms}ms` }) as CSSProperties;
 /**
  * The hero: one grid cell on the dotted ground. Halftone green bleeds in
  * from the top right, the blue pixel block sits in the bottom left corner,
- * the headline and the phone share the cell.
+ * the headline and the phone share the cell, and the powered-by strip runs
+ * along its foot.
  */
 export function Hero() {
   return (
@@ -25,10 +27,10 @@ export function Hero() {
         className="pointer-events-none absolute bottom-0 left-0 h-[96px] w-[134px] bg-[url(/brand/agents/texture-pixels-blue.png)] bg-cover opacity-90 sm:h-[144px] sm:w-[200px]"
       />
 
-      <div className="relative mx-auto w-full max-w-6xl px-4 py-10 sm:px-6 sm:py-14">
+      <div className="relative mx-auto w-full max-w-6xl px-4 py-8 sm:px-6">
         <div className="relative">
           <GridCell />
-          <div className="grid items-center gap-14 px-5 py-12 sm:px-10 sm:py-20 lg:grid-cols-[1.3fr_1fr] lg:gap-10 lg:py-24">
+          <div className="grid items-center gap-14 px-5 pt-12 pb-8 sm:px-10 sm:pt-16 sm:pb-10 lg:grid-cols-[1.3fr_1fr] lg:gap-10 lg:pt-20">
             <div className="flex flex-col items-start gap-6">
               <div className="flex flex-col items-start gap-3 sm:gap-4">
                 <GoatLockup size="lg" className="landing-rise" />
@@ -39,7 +41,7 @@ export function Hero() {
                 </h1>
               </div>
               <p className="landing-rise max-w-xl text-lg leading-snug text-muted-foreground sm:text-xl" style={rise(110)}>
-                Give your agents a card and check out at millions of merchants. Your brand, your users.
+                Give your agents a card and check out at millions of merchants using this simple template. Your brand, your users.
               </p>
               <div className="landing-rise flex w-full flex-col gap-3 pt-2 sm:w-auto sm:flex-row" style={rise(220)}>
                 <Button asChild size="lg">
@@ -51,7 +53,19 @@ export function Hero() {
               </div>
             </div>
 
-            <HeroPhone className="landing-rise relative mx-auto w-full max-w-[var(--phone-w)] lg:mr-0" />
+            {/* The phone sets the cell's height, and the cell has to leave the
+                strip below it on the first screen. A short viewport gets a
+                narrower phone; a tall one keeps the full size. This overrides
+                the `--phone-w` token rather than the frame's max-width,
+                because landing.css derives the frame's height from the token
+                — capping the width alone would squash the phone. */}
+            <HeroPhone className="landing-rise relative mx-auto w-full max-w-[var(--phone-w)] [@media(max-height:860px)]:[--phone-w:230px] lg:mr-0" />
+          </div>
+
+          {/* Inside the cell, under a hairline: the strip has to be on the
+              first screen, and after the cell it fell below the fold. */}
+          <div className="relative border-t border-hairline px-5 py-5 sm:px-10">
+            <PoweredBy />
           </div>
         </div>
       </div>

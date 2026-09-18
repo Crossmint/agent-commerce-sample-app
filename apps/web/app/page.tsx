@@ -5,7 +5,6 @@ import { GridRule } from "@/components/landing/grid";
 import { Hero } from "@/components/landing/hero";
 import { LandingFooter } from "@/components/landing/landing-footer";
 import { LandingNav } from "@/components/landing/landing-nav";
-import { PoweredBy } from "@/components/landing/powered-by";
 import { TryLive } from "@/components/landing/try-live";
 import "@/components/landing/landing.css";
 
@@ -21,11 +20,7 @@ export default function LandingPage() {
       <LandingNav />
       <main className="landing flex flex-1 flex-col">
         <Hero />
-        {/* On phones "Powered by" is a grid cell that draws its own top and
-            bottom rules; from sm up it is a plain row and needs these. */}
-        <GridRule className="hidden sm:block" />
-        <PoweredBy />
-        <GridRule className="hidden sm:block" />
+        <GridRule />
         <CorePieces />
         <GridRule />
         <TryLive />

@@ -1,7 +1,6 @@
+import type { CSSProperties } from "react";
 import { cn } from "@/lib/cn";
-import { GridCell, GridNode } from "./grid";
 import { MaskLogo } from "./mask-logo";
-import { Container } from "./section";
 
 /**
  * The rails and infrastructure under GOAT. Full logotypes at one height, in
@@ -14,67 +13,56 @@ const LOGOS: Array<{ name: string; src: string; href: string; w: number; h: numb
   { name: "Visa", src: "/logos/visa.svg", href: "https://usa.visa.com", w: 58, h: 19 },
   { name: "Mastercard", src: "/logos/mastercard.svg", href: "https://www.mastercard.com", w: 42, h: 26 },
   { name: "Basis Theory", src: "/logos/basis-theory.svg", href: "https://basistheory.com", w: 87, h: 30 },
-  { name: "Adyen", src: "/logos/adyen.svg", href: "https://www.adyen.com", w: 80, h: 26 },
   { name: "Vercel", src: "/logos/vercel.svg", href: "https://vercel.com", w: 2048, h: 407 },
 ];
 
 const HEIGHT = 24;
-const COLS = 2;
-const LABEL = "text-xs font-medium tracking-[0.18em] text-muted-foreground uppercase";
 
-export function PoweredBy() {
+/**
+ * How many times the logos repeat in the track. The loop needs the visible
+ * strip to be no wider than `(COPIES - 1)` copies, or it runs out of logos
+ * before it wraps; four covers a strip up to three times the logo run, which
+ * is well past the widest container here.
+ */
+const COPIES = [0, 1, 2, 3];
+
+/**
+ * The label sits above the logo strip, which slides without stopping at every
+ * width. The caller sets how wide it is. The second pass of the logos is
+ * decorative:
+ * it repeats what the first already said, so it is hidden from screen readers
+ * and taken out of the tab order.
+ *
+ * Spacing lives on the items as trailing padding, not as a `gap` on the
+ * track — see `.goat-marquee` in globals.css for why the loop depends on it.
+ */
+export function PoweredBy({ className }: { className?: string }) {
   return (
-    <section aria-label="Powered by" className="relative overflow-hidden">
-      {/* Phones: one cell of the page's own grid. The rules bleed to the
-          viewport edges, the verticals run the height of the section, and a
-          green diamond marks every crossing — the same motif as the hero, so
-          the block reads as part of the page and not as a panel on top of it. */}
-      <Container className="py-2 sm:hidden">
-        <div className="goat-backdrop relative">
-          <GridCell bleed={false} />
-          <p className={cn("relative px-4 py-3.5", LABEL)}>Powered by</p>
-          <ul className="relative grid grid-cols-2 border-t border-hairline">
-            {LOGOS.map((logo, i) => (
-              <li
-                key={logo.name}
-                className={cn("relative flex h-20 items-center justify-center", i % COLS < COLS - 1 && "border-r border-hairline", i >= COLS && "border-t border-hairline")}
-              >
-                <GridNode className="absolute top-0 left-0 z-10 -translate-x-1/2 -translate-y-1/2" />
-                {i % COLS === COLS - 1 ? <GridNode className="absolute top-0 right-0 z-10 translate-x-1/2 -translate-y-1/2" /> : null}
-                <Logo logo={logo} />
+    <section aria-label="Powered by" className={cn("flex w-full flex-col gap-4", className)}>
+      {/* Indented so the label clears the grid rule on the container's edge,
+          which it otherwise sits right against. The strip below keeps the
+          full width; its masked edges soften where it meets the rule. */}
+      <p className="shrink-0 pl-4 text-xs font-medium tracking-[0.18em] whitespace-nowrap text-muted-foreground uppercase sm:pl-6">Powered by</p>
+      <div className="goat-marquee">
+        <ul className="goat-marquee-track" style={{ "--goat-marquee-copies": COPIES.length } as CSSProperties}>
+          {COPIES.map((copy) =>
+            LOGOS.map((logo) => (
+              <li key={`${copy}-${logo.name}`} className="shrink-0 pr-12" aria-hidden={copy > 0 || undefined}>
+                <a
+                  href={logo.href}
+                  target="_blank"
+                  rel="noreferrer"
+                  title={logo.name}
+                  tabIndex={copy > 0 ? -1 : undefined}
+                  className="inline-flex h-6 items-center text-muted-foreground transition-colors hover:text-foreground"
+                >
+                  <MaskLogo src={logo.src} label={copy === 0 ? logo.name : ""} width={Math.round((HEIGHT * logo.w) / logo.h)} height={HEIGHT} />
+                </a>
               </li>
-            ))}
-          </ul>
-          {/* The centre vertical ends on the cell's bottom rule. */}
-          <GridNode className="pointer-events-none absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2" />
-        </div>
-      </Container>
-
-      {/* sm and up: one row, label first. */}
-      <Container className="hidden py-8 sm:flex sm:flex-row sm:items-center sm:gap-10">
-        <p className={cn("shrink-0", LABEL)}>Powered by</p>
-        <ul className="flex flex-wrap items-center gap-x-12 gap-y-5">
-          {LOGOS.map((logo) => (
-            <li key={logo.name} className="flex h-6 items-center">
-              <Logo logo={logo} />
-            </li>
-          ))}
+            )),
+          )}
         </ul>
-      </Container>
+      </div>
     </section>
-  );
-}
-
-function Logo({ logo }: { logo: (typeof LOGOS)[number] }) {
-  return (
-    <a
-      href={logo.href}
-      target="_blank"
-      rel="noreferrer"
-      title={logo.name}
-      className="inline-flex h-6 items-center text-muted-foreground transition-colors hover:text-foreground"
-    >
-      <MaskLogo src={logo.src} label={logo.name} width={Math.round((HEIGHT * logo.w) / logo.h)} height={HEIGHT} />
-    </a>
   );
 }

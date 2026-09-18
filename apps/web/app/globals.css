@@ -25,3 +25,54 @@ html {
 body {
   font-family: var(--font-sans);
 }
+
+/*
+ * The powered-by marquee, used on the landing page and on sign in.
+ *
+ * The track repeats its items `--goat-marquee-copies` times and slides by
+ * exactly one copy, so the next copy arrives where the last began and the
+ * loop has no seam. Two conditions make that hold:
+ *
+ * 1. The spacing rides on the items themselves. A `gap` on the track would
+ *    leave the gap between copies unaccounted for, and the strip would jump
+ *    by that much every cycle.
+ * 2. There are enough copies to keep the window full at the end of a cycle,
+ *    which needs `visible width <= (copies - 1) * one copy`. With two copies
+ *    a strip wider than one copy runs dry and shows a gap before it loops.
+ *
+ * The wrapper masks both edges, so logos fade in and out rather than being
+ * cut off at the border. Hovering or tabbing in pauses the slide, which is
+ * what makes the logos clickable, and reduced motion stops it outright.
+ */
+.goat-marquee {
+  overflow: hidden;
+  mask-image: linear-gradient(to right, transparent, #000 7%, #000 93%, transparent);
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 7%, #000 93%, transparent);
+}
+
+.goat-marquee-track {
+  display: flex;
+  width: max-content;
+  align-items: center;
+  animation: goat-marquee 24s linear infinite;
+}
+
+.goat-marquee:hover .goat-marquee-track,
+.goat-marquee:focus-within .goat-marquee-track {
+  animation-play-state: paused;
+}
+
+@keyframes goat-marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(calc(-100% / var(--goat-marquee-copies, 2)));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .goat-marquee-track {
+    animation: none;
+  }
+}
