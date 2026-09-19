@@ -1,7 +1,6 @@
 "use client";
 
 import * as React from "react";
-import { CrossmintProvider } from "@crossmint/client-sdk-react-ui";
 import type { CrossmintEnvironment } from "@goat-wallet/core";
 import { createGoatApi, type GetJwt, type GoatApi } from "./api/client.js";
 
@@ -38,9 +37,9 @@ export interface GoatProviderProps {
 }
 
 /**
- * Wires the GOAT API client and the Crossmint React SDK to the user's session.
- * Crossmint components (save card, verification) authenticate with the same JWT
- * the GOAT server verifies, so there is one identity everywhere.
+ * Wires the GOAT API client to the user's session and hands the same JWT to
+ * the Crossmint components (save card, verification) through `CrossmintScope`,
+ * so there is one identity everywhere.
  */
 export function GoatProvider({
   apiBaseUrl = "/api/goat",
@@ -90,52 +89,10 @@ export function GoatProvider({
     [api, apiBaseUrl, jwt, refreshJwt, crossmintClientApiKey, crossmintEnvironment, mascotSrc],
   );
 
-  const inner = <GoatContext.Provider value={value}>{children}</GoatContext.Provider>;
-
-  // Without a client key the GOAT API still works. Only the Crossmint browser
-  // components (save card, verification) need it. The Crossmint SDK is
-  // browser-only, so it mounts after hydration and never runs during prerender.
-  const isClient = useIsClient();
-  if (!crossmintClientApiKey || !isClient) return inner;
-
-  return (
-    <CrossmintBoundary fallback={inner}>
-      <CrossmintProvider apiKey={crossmintClientApiKey} jwt={jwt ?? undefined} consoleLogLevel="warn">
-        {inner}
-      </CrossmintProvider>
-    </CrossmintBoundary>
-  );
-}
-
-/**
- * The Crossmint SDK validates the API key on mount and throws on a malformed one.
- * A bad or placeholder key must not take the whole app down: the GOAT API, the
- * approval list, and checkouts do not need it. Fall back to rendering without
- * Crossmint and warn once.
- */
-class CrossmintBoundary extends React.Component<
-  { fallback: React.ReactNode; children: React.ReactNode },
-  { failed: boolean }
-> {
-  override state = { failed: false };
-  static getDerivedStateFromError() {
-    return { failed: true };
-  }
-  override componentDidCatch(error: unknown) {
-    console.warn("[goat] Crossmint provider failed to mount. Save card and verification are disabled.", error);
-  }
-  override render() {
-    return this.state.failed ? this.props.fallback : this.props.children;
-  }
-}
-
-const subscribeNoop = () => () => {};
-function useIsClient(): boolean {
-  return React.useSyncExternalStore(
-    subscribeNoop,
-    () => true,
-    () => false,
-  );
+  // Crossmint's browser SDK mounts inside <CrossmintScope>, around the one
+  // component that needs it. Wrapping the whole app here would change the
+  // tree after hydration and remount every page.
+  return <GoatContext.Provider value={value}>{children}</GoatContext.Provider>;
 }
 
 export function useGoat(): GoatContextValue {

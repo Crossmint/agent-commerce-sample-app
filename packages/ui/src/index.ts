@@ -1,5 +1,6 @@
 // Provider and API
 export { GoatProvider, useGoat, useGoatOptional } from "./provider.js";
+export { CrossmintScope } from "./components/crossmint-scope.js";
 export type { GoatProviderProps, GoatContextValue } from "./provider.js";
 export { createGoatApi, GoatApiError, errorMessage } from "./api/client.js";
 export type { GoatApi, GoatApiOptions, GetJwt } from "./api/client.js";

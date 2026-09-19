@@ -9,6 +9,8 @@ import { paymentMethodAppearanceFromTheme } from "../lib/appearance.js";
 import { paymentMethodLabel, registrationRailLabel } from "../lib/format.js";
 import { cn } from "../lib/utils.js";
 import { useGoat } from "../provider.js";
+import { Skeleton } from "./primitives/skeleton.js";
+import { CrossmintScope } from "./crossmint-scope.js";
 import { Alert, AlertDescription, AlertTitle } from "./primitives/alert.js";
 import { Badge, type BadgeProps } from "./primitives/badge.js";
 import { Button } from "./primitives/button.js";
@@ -163,13 +165,15 @@ export function SaveCard({
         </div>
       ) : null}
       <div className={cn(phase === "registering" && "pointer-events-none opacity-60")}>
-        <CrossmintPaymentMethodManagement
-          jwt={jwt}
-          allowedModes={["new"]}
-          allowedPaymentMethodTypes={["card"]}
-          appearance={appearance ?? themeAppearance}
-          onPaymentMethodSelected={handleSelected}
-        />
+        <CrossmintScope fallback={<Skeleton className="h-64" />}>
+          <CrossmintPaymentMethodManagement
+            jwt={jwt}
+            allowedModes={["new"]}
+            allowedPaymentMethodTypes={["card"]}
+            appearance={appearance ?? themeAppearance}
+            onPaymentMethodSelected={handleSelected}
+          />
+        </CrossmintScope>
       </div>
     </div>
   );

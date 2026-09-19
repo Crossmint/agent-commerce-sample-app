@@ -244,7 +244,7 @@ Credential issuance is logged, not stored: rail, amount, merchant, agent card id
 
 **Components.**
 
-- `<GoatProvider apiBaseUrl getJwt>`: wires the GOAT API and wraps `CrossmintProvider` with the user's session JWT from Stytch.
+- `<GoatProvider apiBaseUrl getJwt>`: wires the GOAT API to the user's session JWT from Stytch. `<CrossmintScope>` mounts Crossmint's browser SDK only around the components that need it (save card, verification), so the page tree never changes shape after hydration.
 - `<SaveCard onSaved>`: wraps `CrossmintPaymentMethodManagement`. Then calls register. Reports which rails came back `enabled`.
 - `<CardPicker>`: saved cards with rail badges. "Add a card" opens `SaveCard`.
 - `<ApproveAgentCard requestId>`: the full approval screen. Shows who asks, how much, for what. `CardPicker` inside. On approve, calls the server, receives the order intent, mounts `<VerifyAgentCard>` if a rail is `pending_verification`. Ends in an "Active" state.

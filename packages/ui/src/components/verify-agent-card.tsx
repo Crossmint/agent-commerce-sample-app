@@ -9,6 +9,7 @@ import { cn } from "../lib/utils.js";
 import { verificationAppearanceFromTheme } from "../lib/appearance.js";
 import { railShortLabel } from "../lib/format.js";
 import { useGoat } from "../provider.js";
+import { CrossmintScope } from "./crossmint-scope.js";
 import { Alert, AlertDescription, AlertTitle } from "./primitives/alert.js";
 import { Button } from "./primitives/button.js";
 import { Spinner } from "./primitives/spinner.js";
@@ -103,17 +104,19 @@ export function VerifyAgentCard({ agentCard, onComplete, onError, appearance, di
         </Button>
       ) : null}
       {canVerify && !error ? (
-        <OrderIntentVerification
-          key={attempt}
-          orderIntent={agentCard as unknown as OrderIntentVerificationProps["orderIntent"]}
-          displayName={displayName}
-          appearance={appearance ?? themeAppearance}
-          onVerificationComplete={onComplete}
-          onVerificationError={(e) => {
-            setError(e ?? new Error("Verification failed"));
-            onError?.(e);
-          }}
-        />
+        <CrossmintScope>
+          <OrderIntentVerification
+            key={attempt}
+            orderIntent={agentCard as unknown as OrderIntentVerificationProps["orderIntent"]}
+            displayName={displayName}
+            appearance={appearance ?? themeAppearance}
+            onVerificationComplete={onComplete}
+            onVerificationError={(e) => {
+              setError(e ?? new Error("Verification failed"));
+              onError?.(e);
+            }}
+          />
+        </CrossmintScope>
       ) : null}
     </div>
   );
