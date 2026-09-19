@@ -1,19 +1,19 @@
 import type { ReactNode } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowRight, ArrowUpRight, Plug, Terminal } from "lucide-react";
+import { ArrowRight, Plug, Terminal } from "lucide-react";
 import { Button } from "@goat-wallet/ui";
 import { cn } from "@/lib/cn";
-import { CONNECTOR_URLS, INSTALL_URL, MCP_URL } from "./links";
+import { INSTALL_URL, MCP_URL } from "./links";
 import { MaskLogo } from "./mask-logo";
 import { Reveal } from "./reveal";
 import { Section, SectionHeading } from "./section";
 import { ChatDemo, CopyChip } from "./try-live-bits";
 
 /**
- * Section `#try`: one card per way in. Grok Bot and ChatGPT as native
- * connectors, any MCP host, terminal agents through the CLI and skill, and
- * our example chat. Every card has the same bones: a tile and a title, the
+ * Section `#try`: one card per way in. Any MCP host (Grok Bot and ChatGPT
+ * included, until they get native connectors), terminal agents through the
+ * CLI and skill, and our example chat. Every card has the same bones: a tile and a title, the
  * agents it fits when there are several, one line when it needs one, and
  * one action at the bottom.
  */
@@ -22,33 +22,19 @@ export function TryLive() {
     <Section id="try">
       <SectionHeading title="Try it live" sub="Pick the agent you already use." />
       <div className="grid gap-4 lg:grid-cols-6">
-        <Card title="Grok Bot" tile={<MaskLogo src="/logos/grok-bot.svg" label="" className="size-6" />} className="lg:col-span-2" delay={0}>
-          <Button asChild variant="outline" className="w-full justify-between sm:w-auto sm:min-w-[11rem]">
-            <a href={CONNECTOR_URLS.grokBot} target="_blank" rel="noreferrer">
-              Get the connector <ArrowUpRight />
-            </a>
-          </Button>
-        </Card>
-
-        <Card title="ChatGPT" tile={<MaskLogo src="/logos/openai.svg" label="" className="size-6" />} className="lg:col-span-2" delay={40}>
-          <Button asChild variant="outline" className="w-full justify-between sm:w-auto sm:min-w-[11rem]">
-            <a href={CONNECTOR_URLS.chatgpt} target="_blank" rel="noreferrer">
-              Get the connector <ArrowUpRight />
-            </a>
-          </Button>
-        </Card>
-
         <Card
           title="MCP server"
           tile={<Plug className="size-5" />}
           marks={[
+            { name: "Grok Bot", logo: "/logos/grok-bot.svg" },
+            { name: "ChatGPT", logo: "/logos/openai.svg" },
             { name: "Claude", logo: "/logos/claude.svg" },
             { name: "Claude Code", logo: "/logos/claude-code.svg" },
             { name: "Cursor", logo: "/logos/cursor.svg" },
           ]}
           lead="Any agent that speaks MCP. Paste the URL; OAuth does the rest."
-          className="lg:col-span-2"
-          delay={80}
+          className="lg:col-span-3"
+          delay={0}
         >
           <CopyChip text={MCP_URL} />
         </Card>
@@ -62,8 +48,8 @@ export function TryLive() {
             { name: "Hermes", logo: "/logos/hermes-agent.png" },
           ]}
           lead="For agents in a terminal. Paste this line into your agent and it sets itself up."
-          className="lg:col-span-2"
-          delay={120}
+          className="lg:col-span-3"
+          delay={60}
         >
           <CopyChip text={`Set up ${INSTALL_URL}`} />
         </Card>
@@ -72,8 +58,8 @@ export function TryLive() {
           title="Our example chat"
           tile={<Image src="/brand/agents/crossmint-agents-mark.svg" alt="" width={24} height={24} className="size-6" />}
           lead="Our own agent chat, with GOAT components inline. This is what your users would see if you build the wallet into your product."
-          className="lg:col-span-4"
-          delay={160}
+          className="lg:col-span-6"
+          delay={120}
           aside={<ChatDemo className="rounded-md border border-border bg-muted p-3 sm:p-4" />}
         >
           <Button asChild className="w-full justify-between sm:w-auto sm:min-w-[11rem]">
