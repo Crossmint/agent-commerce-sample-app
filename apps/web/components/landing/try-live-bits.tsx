@@ -4,14 +4,13 @@ import Image from "next/image";
 import { type CSSProperties, useEffect, useState } from "react";
 import { Check, Copy, Lock } from "lucide-react";
 import { cn } from "@/lib/cn";
-import { MaskLogo } from "./mask-logo";
 import { useStepLoop } from "./use-step-loop";
 
 /*
- * Client pieces of the "Try it live" bento: a copy chip and two small
- * looping demos (agents wiring up to GOAT, a chat with an inline approval).
- * Each demo restarts its CSS animations by keying its content on the loop
- * `cycle`, and pauses out of view through `useStepLoop`.
+ * Client pieces of the "Try it live" bento: a copy chip and the chat demo
+ * with an inline approval. The demo restarts its CSS animations by keying
+ * its content on the loop `cycle`, and pauses out of view through
+ * `useStepLoop`.
  */
 
 const d = (ms: number) => ({ "--delay": `${ms}ms` }) as CSSProperties;
@@ -51,65 +50,7 @@ export function CopyChip({ text, display, className }: { text: string; display?:
 }
 
 // ---------------------------------------------------------------------------
-// Demo 1: connectors. Two agents wire up to GOAT, one after the other. The
-// agent chips are links to where each connector is set up.
-// ---------------------------------------------------------------------------
-
-export interface Connector {
-  name: string;
-  logo: string;
-  href: string;
-}
-
-export function ConnectorDemo({ connectors, className }: { connectors: Connector[]; className?: string }) {
-  const { ref, cycle } = useStepLoop<HTMLDivElement>(1, { interval: 6400 });
-  const at = connectors.map((_, i) => 300 + i * 2000);
-  return (
-    <div ref={ref} className={cn("relative flex h-[132px] min-w-0 items-center gap-3 sm:gap-5", className)}>
-      <div key={cycle} className="contents">
-        <ul className="flex flex-col gap-4">
-          {connectors.map((c, i) => (
-            <li key={c.name}>
-              <a
-                href={c.href}
-                target="_blank"
-                rel="noreferrer"
-                className="flex items-center gap-2 rounded-md border border-border bg-background px-3 py-2 text-sm font-semibold text-foreground transition-colors outline-none hover:border-primary/60 hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring/60"
-              >
-                <MaskLogo src={c.logo} label="" className="size-4" />
-                {c.name}
-                <span aria-hidden className="landing-pop ml-1 inline-flex size-4 items-center justify-center rounded-full bg-primary text-primary-foreground" style={d(at[i]! + 1100)}>
-                  <Check className="size-2.5" strokeWidth={3} />
-                </span>
-              </a>
-            </li>
-          ))}
-        </ul>
-        <svg aria-hidden viewBox="0 0 100 100" preserveAspectRatio="none" className="h-[104px] min-w-0 flex-1" fill="none">
-          {connectors.map((c, i) => {
-            const y = connectors.length === 1 ? 50 : 24 + (52 * i) / (connectors.length - 1);
-            const path = `M0 ${y} C 50 ${y}, 50 50, 100 50`;
-            return (
-              <g key={c.name}>
-                <path d={path} className="landing-wire" vectorEffect="non-scaling-stroke" strokeWidth={1.5} />
-                <path d={path} className="landing-bento-wire" vectorEffect="non-scaling-stroke" strokeWidth={1.5} style={d(at[i]!)} />
-              </g>
-            );
-          })}
-        </svg>
-        <div aria-hidden className="flex flex-col items-center gap-2">
-          <div className="landing-ready flex size-14 items-center justify-center rounded-md border border-border bg-background" style={{ ...d(at[0]! + 1000), "--ring-color": "color-mix(in srgb, var(--primary) 30%, transparent)" } as CSSProperties}>
-            <Image src="/brand/agents/crossmint-agents-mark.svg" alt="" width={30} height={30} className="size-[30px]" />
-          </div>
-          <span className="font-pixel text-[13px] text-brand-wordmark">GOAT</span>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Demo 2: the chat. An inline approval card, pressed, then the receipt.
+// The chat demo. An inline approval card, pressed, then the receipt.
 // ---------------------------------------------------------------------------
 
 export function ChatDemo({ className }: { className?: string }) {
