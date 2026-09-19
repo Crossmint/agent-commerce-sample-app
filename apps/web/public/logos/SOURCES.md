@@ -27,3 +27,4 @@ All six fill with `currentColor` and render as CSS masks (`components/landing/ma
 - `grok-bot.svg`: Grok Bot mark from https://x.ai/bot (the `.grok-bot-mark--fill` SVG in the page), head and eyes merged into one even-odd path so the eyes are holes and the mark takes `currentColor`. Fetched 2026-09-19.
 - `eve.svg`: eve logotype from https://eve.dev (header SVG), `currentColor`. Fetched 2026-09-19.
 - `cursor.svg`: the Cursor mark from the cursor.com header lockup (first path of the logo SVG), `currentColor`. Fetched 2026-09-19.
+- `hermes-agent.png`: Hermes Agent icon from https://cdn.jsdelivr.net/gh/selfhst/icons/png/hermes-agent.png (selfh.st icons). Black on transparent, so it renders as a mask in the text color. Fetched 2026-09-19.
