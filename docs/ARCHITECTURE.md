@@ -319,6 +319,7 @@ apps/web/app/
 ├── login/, authenticate/        Stytch login and redirect callback
 ├── oauth/authorize/             Stytch IdentityProvider consent page, the Connected Apps Authorization URL
 ├── cli-callback/                shows the OAuth code for `goat login --code`
+├── install/route.ts             markdown for agents: "Set up https://<wallet>/install" installs the CLI and the skill
 ├── .well-known/oauth-protected-resource/  RFC 9728 metadata so MCP hosts find Stytch
 ├── (chat)/
 │   └── chat/page.tsx            agent chat with inline approvals

@@ -24,3 +24,6 @@ All six fill with `currentColor` and render as CSS masks (`components/landing/ma
 - visa.svg, mastercard.svg, basis-theory.svg, crossmint-gray.svg: logotypes from lobster.cash (Crossmint's own site); the original gray #959AA4 fills changed to `currentColor`. The `white` fills inside `<mask>` elements are luminance masks and stay white.
 - adyen.svg: inline header SVG from adyen.com, fill set to `currentColor`.
 - vercel.svg: Wikimedia Commons "Vercel logo 2025" (triangle + wordmark), fill set to `currentColor`.
+- `grok-bot.svg`: Grok Bot mark from https://x.ai/bot (the `.grok-bot-mark--fill` SVG in the page), head and eyes merged into one even-odd path so the eyes are holes and the mark takes `currentColor`. Fetched 2026-09-19.
+- `eve.svg`: eve logotype from https://eve.dev (header SVG), `currentColor`. Fetched 2026-09-19.
+- `cursor.svg`: the Cursor mark from the cursor.com header lockup (first path of the logo SVG), `currentColor`. Fetched 2026-09-19.

@@ -4,9 +4,25 @@
     {
       "name": "web",
       "runtimeExecutable": "pnpm",
-      "runtimeArgs": ["--filter", "@goat-wallet/web", "dev"],
+      "runtimeArgs": [
+        "--filter",
+        "@goat-wallet/web",
+        "dev"
+      ],
       "port": 3000,
       "autoPort": true
+    },
+    {
+      "name": "web-3005",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": [
+        "--filter",
+        "@goat-wallet/web",
+        "dev",
+        "-p",
+        "3005"
+      ],
+      "port": 3005
     }
   ]
 }

@@ -6,6 +6,8 @@ const nextConfig: NextConfig = {
   transpilePackages: [],
   // Postgres and the Stytch node SDK stay external on the server.
   serverExternalPackages: ["postgres", "stytch"],
+  // /install reads the skill file at request time.
+  outputFileTracingIncludes: { "/install": ["./public/skill.md"] },
 };
 
 export default nextConfig;

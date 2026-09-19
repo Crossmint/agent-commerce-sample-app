@@ -45,7 +45,7 @@ export function PoweredBy({ className }: { className?: string }) {
       <p className="shrink-0 pl-4 text-xs font-medium tracking-[0.18em] whitespace-nowrap text-muted-foreground uppercase sm:pl-6">Powered by</p>
       <div className="goat-marquee">
         <ul className="goat-marquee-track" style={{ "--goat-marquee-copies": COPIES.length } as CSSProperties}>
-          {COPIES.map((copy) =>
+          {COPIES.flatMap((copy) =>
             LOGOS.map((logo) => (
               <li key={`${copy}-${logo.name}`} className="shrink-0 pr-12" aria-hidden={copy > 0 || undefined}>
                 <a
