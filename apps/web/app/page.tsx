@@ -13,10 +13,16 @@ export const metadata: Metadata = {
   description: "An open source template to create your own evolved version of Stripe's Link. Powered by Crossmint.",
 };
 
-/** Public marketing page. The wallet lives at /wallet. */
+/**
+ * Public marketing page. The wallet lives at /wallet.
+ *
+ * One root element on purpose. Arriving here from another page, the router
+ * scrolls the new page into view; with several roots it picked the footer and
+ * the page opened at the very bottom.
+ */
 export default function LandingPage() {
   return (
-    <>
+    <div className="flex flex-1 flex-col">
       <LandingNav />
       <main className="landing flex flex-1 flex-col">
         <Hero />
@@ -29,6 +35,6 @@ export default function LandingPage() {
       </main>
       <GridRule />
       <LandingFooter />
-    </>
+    </div>
   );
 }

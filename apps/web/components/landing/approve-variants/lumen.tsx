@@ -33,7 +33,7 @@ const form: CardFormTheme = {
   fieldRadius: 12,
 };
 
-function LumenApprove({ agentName = "Lumen", state }: ApproveLayoutProps) {
+function LumenApprove({ state }: ApproveLayoutProps) {
   return (
     <div className="flex h-full flex-col px-4 pt-3 pb-4 antialiased" style={{ background: BG, color: INK }}>
       <Image src={MARK} alt="" width={26} height={26} className="size-[26px]" />
@@ -43,16 +43,16 @@ function LumenApprove({ agentName = "Lumen", state }: ApproveLayoutProps) {
           <CheckBurst fill={BLUE} size={60} />
           <div className="landing-fade flex flex-col gap-2" style={delay(APPROVE_T.copy)}>
             <p className="text-[21px] leading-[1.15] font-semibold tracking-tight">Approved.</p>
-            <p className="text-[13px] leading-snug">{agentName} can spend up to $8.00.</p>
+            <p className="text-[13px] leading-snug">Your agent can spend up to $8.00.</p>
             <p className="text-[11.5px]" style={{ color: MUTED }}>
-              Visa •••• 4242 · one purchase. Your receipt lands in the chat.
+              You can close this tab.
             </p>
           </div>
         </div>
       ) : (
         <>
           <div className="flex min-h-0 flex-1 flex-col pt-4">
-            <p className="text-[17px] leading-[1.2] font-semibold tracking-tight">{agentName} wants to use your card</p>
+            <p className="text-[17px] leading-[1.2] font-semibold tracking-tight">Your agent is requesting to use your card</p>
             <p className="mt-3 text-[34px] leading-none font-bold tracking-tight tabular-nums">$8.00</p>
             <p className="mt-1.5 text-[12px]" style={{ color: MUTED }}>
               Grande latte at Starbucks
@@ -80,7 +80,7 @@ function LumenApprove({ agentName = "Lumen", state }: ApproveLayoutProps) {
 
             <p className="mt-3 flex items-start gap-1.5 text-[10.5px] leading-snug" style={{ color: MUTED }}>
               <LockIcon width={12} height={12} className="mt-px shrink-0" />
-              The card number stays in the vault. {agentName} never sees it.
+              Your card is never shared with the agent.
             </p>
           </div>
 

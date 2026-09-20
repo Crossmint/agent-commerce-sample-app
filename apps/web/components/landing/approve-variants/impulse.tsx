@@ -43,16 +43,16 @@ function ImpulseApprove({ agentName = "Impulse", logo, state }: ApproveLayoutPro
           <CheckBurst fill={ORANGE} size={60} />
           <div className="landing-fade flex flex-col gap-2" style={delay(APPROVE_T.copy)}>
             <p className="text-[21px] leading-[1.15] font-semibold tracking-tight">Approved.</p>
-            <p className="text-[13px] leading-snug">{agentName} can spend up to $8.00 on Visa ••••4242.</p>
+            <p className="text-[13px] leading-snug">Your agent can spend up to $8.00.</p>
             <p className="text-[11.5px]" style={{ color: MUTED }}>
-              Head back to Messages. {agentName} will send the receipt.
+              You can close this tab.
             </p>
           </div>
         </div>
       ) : (
         <>
           <div className="flex min-h-0 flex-1 flex-col gap-3.5 pt-5">
-            <p className="text-[18px] leading-[1.2] font-semibold tracking-tight">{agentName} is requesting to use your card</p>
+            <p className="text-[18px] leading-[1.2] font-semibold tracking-tight">Your agent is requesting to use your card</p>
 
             <div className="flex flex-col gap-1 text-[12px] leading-snug">
               <p>
@@ -82,7 +82,7 @@ function ImpulseApprove({ agentName = "Impulse", logo, state }: ApproveLayoutPro
 
             <p className="flex items-start gap-1.5 text-[11px] leading-snug" style={{ color: MUTED }}>
               <LockIcon width={13} height={13} className="mt-px shrink-0" />
-              Your card number is never shared with the agent or the store.
+              Your card is never shared with the agent.
             </p>
           </div>
 

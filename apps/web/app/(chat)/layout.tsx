@@ -26,7 +26,7 @@ export default async function ChatLayout({ children }: { children: ReactNode }) 
 
   if (!enabled) {
     return (
-      <>
+      <div className="flex flex-1 flex-col">
         {nav}
         <main className="mx-auto flex w-full max-w-xl flex-1 flex-col justify-center px-4 py-10">
           <EmptyState
@@ -34,7 +34,7 @@ export default async function ChatLayout({ children }: { children: ReactNode }) 
             description="Set ANTHROPIC_API_KEY or OPENAI_API_KEY in your env to turn on the agent chat. See .env.example."
           />
         </main>
-      </>
+      </div>
     );
   }
 
@@ -49,10 +49,12 @@ export default async function ChatLayout({ children }: { children: ReactNode }) 
     }
   }
 
+  // One root element, as in the wallet layout: the router scrolls the new
+  // page into view and must not land on the last of several roots.
   return (
-    <>
+    <div className="flex flex-1 flex-col">
       {nav}
       <ChatShell sidebar={chats ? <HistorySidebar chats={chats} /> : undefined}>{children}</ChatShell>
-    </>
+    </div>
   );
 }

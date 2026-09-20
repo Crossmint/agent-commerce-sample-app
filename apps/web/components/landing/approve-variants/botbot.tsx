@@ -43,7 +43,7 @@ export function BotBotWordmark({ size = 18, className }: { size?: number; classN
   );
 }
 
-function BotBotApprove({ agentName = "BotBot", state }: ApproveLayoutProps) {
+function BotBotApprove({ state }: ApproveLayoutProps) {
   return (
     <div className="flex h-full flex-col px-4 pt-3 pb-3 antialiased" style={{ background: BG, color: INK }}>
       <BotBotWordmark size={18} />
@@ -53,9 +53,9 @@ function BotBotApprove({ agentName = "BotBot", state }: ApproveLayoutProps) {
           <CheckBurst fill={INK} size={56} />
           <div className="landing-fade flex flex-col gap-2" style={delay(APPROVE_T.copy)}>
             <p className="text-[21px] leading-[1.15] font-medium tracking-tight">Approved.</p>
-            <p className="text-[13px] leading-snug">{agentName} can spend up to $8.00.</p>
+            <p className="text-[13px] leading-snug">Your agent can spend up to $8.00.</p>
             <p className="text-[11.5px]" style={{ color: MUTED }}>
-              Visa ···· 4242 · expires in 24h
+              You can close this tab.
             </p>
           </div>
         </div>
@@ -64,11 +64,10 @@ function BotBotApprove({ agentName = "BotBot", state }: ApproveLayoutProps) {
           <div className="flex min-h-0 flex-1 flex-col justify-center">
             <div className="flex flex-col gap-2.5 rounded-[14px] border p-3.5" style={{ background: SURFACE, borderColor: LINE }}>
               <p className="text-[11px]" style={{ color: MUTED }}>
-                Card access request
+                Your agent is requesting to use your card
               </p>
               <p className="text-[26px] leading-none font-medium tracking-tight tabular-nums">$8.00</p>
               <dl className="flex flex-col gap-0.5 text-[11.5px]">
-                <Row k="Bot" v={agentName} />
                 <Row k="Purpose" v="Grande latte" />
                 <Row k="Expires" v="24h" />
               </dl>
@@ -89,7 +88,7 @@ function BotBotApprove({ agentName = "BotBot", state }: ApproveLayoutProps) {
             </div>
             <p className="mt-2.5 flex items-start gap-1.5 text-[10.5px] leading-snug" style={{ color: MUTED }}>
               <LockIcon width={12} height={12} className="mt-px shrink-0" />
-              The card number is never shared with {agentName} or the store.
+              Your card is never shared with the agent.
             </p>
           </div>
 

@@ -41,19 +41,27 @@ export function GridRule({ className }: { className?: string }) {
  * `bleed` runs the verticals far past the block, for a cell tall enough that
  * the section edge cuts them off (the hero). Without it they stop on the
  * block's own rules, which is what a short cell wants.
+ *
+ * `top={false}` opens the cell: no rule across the top and no diamonds on it,
+ * for a cell that starts under the nav, whose own border already draws that
+ * line.
  */
-export function GridCell({ bleed = true }: { bleed?: boolean } = {}) {
+export function GridCell({ bleed = true, top = true }: { bleed?: boolean; top?: boolean } = {}) {
   const line = "pointer-events-none absolute bg-hairline";
   const node = "pointer-events-none absolute";
   const vertical = bleed ? "-inset-y-[60rem]" : "inset-y-0";
   return (
     <div aria-hidden className="contents">
-      <span className={cn(line, "top-0 left-1/2 h-px w-screen -translate-x-1/2")} />
+      {top ? <span className={cn(line, "top-0 left-1/2 h-px w-screen -translate-x-1/2")} /> : null}
       <span className={cn(line, "bottom-0 left-1/2 h-px w-screen -translate-x-1/2")} />
       <span className={cn(line, vertical, "left-0 w-px")} />
       <span className={cn(line, vertical, "right-0 w-px")} />
-      <GridNode className={cn(node, "top-0 left-0 -translate-x-1/2 -translate-y-1/2")} />
-      <GridNode className={cn(node, "top-0 right-0 translate-x-1/2 -translate-y-1/2")} />
+      {top ? (
+        <>
+          <GridNode className={cn(node, "top-0 left-0 -translate-x-1/2 -translate-y-1/2")} />
+          <GridNode className={cn(node, "top-0 right-0 translate-x-1/2 -translate-y-1/2")} />
+        </>
+      ) : null}
       <GridNode className={cn(node, "bottom-0 left-0 -translate-x-1/2 translate-y-1/2")} />
       <GridNode className={cn(node, "bottom-0 right-0 translate-x-1/2 translate-y-1/2")} />
     </div>

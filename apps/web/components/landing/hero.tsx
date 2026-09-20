@@ -9,10 +9,14 @@ import { HeroPhone } from "./hero-phone";
 const rise = (ms: number) => ({ "--delay": `${ms}ms` }) as CSSProperties;
 
 /**
- * The hero: one grid cell on the dotted ground. Halftone green bleeds in
+ * The hero: one grid cell on the dotted ground, opening flush under the nav
+ * — no band above it. Halftone green bleeds in
  * from the top right, the blue pixel block sits in the bottom left corner,
- * the headline and the phone share the cell, and the powered-by strip runs
- * along its foot.
+ * and the headline and the phone share the cell. The powered-by strip has
+ * the band under the cell to itself — the row between the cell's bottom rule
+ * and the rule that opens the next section, which was otherwise empty. Its
+ * padding matches the cell's, so the label starts on the same line as the
+ * lockup and the headline.
  */
 export function Hero() {
   return (
@@ -27,9 +31,10 @@ export function Hero() {
         className="pointer-events-none absolute bottom-0 left-0 h-[96px] w-[134px] bg-[url(/brand/agents/texture-pixels-blue.png)] bg-cover opacity-90 sm:h-[144px] sm:w-[200px]"
       />
 
-      <div className="relative mx-auto w-full max-w-6xl px-4 py-8 sm:px-6">
+      <div className="relative mx-auto w-full max-w-6xl px-4 sm:px-6">
         <div className="relative">
-          <GridCell />
+          {/* Open at the top: the nav's own border is the line there. */}
+          <GridCell top={false} />
           <div className="grid items-center gap-14 px-5 pt-12 pb-8 sm:px-10 sm:pt-16 sm:pb-10 lg:grid-cols-[1.3fr_1fr] lg:gap-10 lg:pt-20">
             <div className="flex flex-col items-start gap-6">
               <div className="flex flex-col items-start gap-3 sm:gap-4">
@@ -61,12 +66,13 @@ export function Hero() {
                 — capping the width alone would squash the phone. */}
             <HeroPhone className="landing-rise relative mx-auto w-full max-w-[var(--phone-w)] [@media(max-height:860px)]:[--phone-w:230px] lg:mr-0" />
           </div>
+        </div>
 
-          {/* Inside the cell, under a hairline: the strip has to be on the
-              first screen, and after the cell it fell below the fold. */}
-          <div className="relative border-t border-hairline px-5 py-5 sm:px-10">
-            <PoweredBy />
-          </div>
+        {/* The band below the cell. The cell's own bottom rule closes the
+            hero above it and the section's rule closes it below, so the strip
+            needs no line of its own. */}
+        <div className="relative px-5 py-6 sm:px-10">
+          <PoweredBy inset={false} />
         </div>
       </div>
     </section>

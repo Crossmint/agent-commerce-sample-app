@@ -34,7 +34,7 @@ const form: CardFormTheme = {
   fieldRadius: 8,
 };
 
-function GoatApprove({ agentName = "Your agent", state }: ApproveLayoutProps) {
+function GoatApprove({ state }: ApproveLayoutProps) {
   return (
     <div className="flex h-full flex-col p-3 antialiased" style={{ background: C.bg, color: C.text }}>
       <div className="flex items-center gap-2 px-1 pt-0.5 text-[12px] font-semibold tracking-tight">
@@ -48,10 +48,7 @@ function GoatApprove({ agentName = "Your agent", state }: ApproveLayoutProps) {
             <CheckBurst fill={C.primary} color={C.onPrimary} size={52} />
             <div className="landing-fade flex flex-col gap-1.5" style={delay(APPROVE_T.copy)}>
               <p className="text-[19px] leading-tight font-semibold tracking-tight">Approved.</p>
-              <p className="text-[13px] leading-snug">{agentName} can spend up to $8.00.</p>
-              <p className="text-[11px]" style={{ color: C.muted }}>
-                Visa •••• 4242 · one purchase · expires in 24h
-              </p>
+              <p className="text-[13px] leading-snug">Your agent can spend up to $8.00.</p>
             </div>
             <p className="landing-fade text-[11px]" style={{ ...delay(APPROVE_T.copy + 200), color: C.muted }}>
               You can close this tab.
@@ -59,12 +56,11 @@ function GoatApprove({ agentName = "Your agent", state }: ApproveLayoutProps) {
           </div>
         ) : (
           <div className="flex flex-col gap-3.5 rounded-lg border p-3.5" style={{ background: C.card, borderColor: C.border }}>
-            <p className="text-[16px] leading-tight font-semibold tracking-tight">{agentName} is requesting to use your card</p>
-            <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-[12px]">
-              <dt style={{ color: C.muted }}>Purpose</dt>
-              <dd className="font-medium">Grande latte at Starbucks</dd>
-              <dt style={{ color: C.muted }}>Limit</dt>
-              <dd className="font-medium">$8.00</dd>
+            <p className="text-[16px] leading-tight font-semibold tracking-tight">Your agent is requesting to use your card</p>
+            {/* The rows are ruled apart, as on the real screen. */}
+            <dl className="flex flex-col divide-y rounded-lg border text-[12px]" style={{ borderColor: C.border, background: C.card }}>
+              <Row label="Purpose" value="Grande latte at Starbucks" />
+              <Row label="Limit" value="$8.00" strong />
             </dl>
 
             <div className="flex flex-col gap-1.5">
@@ -82,7 +78,7 @@ function GoatApprove({ agentName = "Your agent", state }: ApproveLayoutProps) {
 
             <p className="flex items-start gap-1.5 text-[11px] leading-snug" style={{ color: C.muted }}>
               <LockIcon width={13} height={13} className="mt-px shrink-0" />
-              Your card number is never shared with the agent or the store.
+              Your card is never shared with the agent.
             </p>
 
             <div className="flex flex-col items-center gap-1.5">
@@ -103,6 +99,16 @@ function GoatApprove({ agentName = "Your agent", state }: ApproveLayoutProps) {
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+/** One ruled row of the request. */
+function Row({ label, value, strong = false }: { label: string; value: string; strong?: boolean }) {
+  return (
+    <div className="flex items-baseline justify-between gap-3 px-2.5 py-1.5" style={{ borderColor: C.border }}>
+      <dt style={{ color: C.muted }}>{label}</dt>
+      <dd className={strong ? "text-right text-[13px] font-semibold tabular-nums" : "text-right font-medium"}>{value}</dd>
     </div>
   );
 }

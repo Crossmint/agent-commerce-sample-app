@@ -36,13 +36,22 @@ const COPIES = [0, 1, 2, 3];
  * Spacing lives on the items as trailing padding, not as a `gap` on the
  * track — see `.goat-marquee` in globals.css for why the loop depends on it.
  */
-export function PoweredBy({ className }: { className?: string }) {
+export function PoweredBy({ inset = true, className }: { inset?: boolean; className?: string }) {
   return (
     <section aria-label="Powered by" className={cn("flex w-full flex-col gap-4", className)}>
-      {/* Indented so the label clears the grid rule on the container's edge,
-          which it otherwise sits right against. The strip below keeps the
-          full width; its masked edges soften where it meets the rule. */}
-      <p className="shrink-0 pl-4 text-xs font-medium tracking-[0.18em] whitespace-nowrap text-muted-foreground uppercase sm:pl-6">Powered by</p>
+      {/* The indent keeps the label off a grid rule on the container's own
+          edge. In a band with padding of its own it would sit further in than
+          everything above it, so that caller turns it off. The strip below
+          keeps the full width; its masked edges soften where it meets the
+          rule. */}
+      <p
+        className={cn(
+          "shrink-0 text-xs font-medium tracking-[0.18em] whitespace-nowrap text-muted-foreground uppercase",
+          inset && "pl-4 sm:pl-6",
+        )}
+      >
+        Powered by
+      </p>
       <div className="goat-marquee">
         <ul className="goat-marquee-track" style={{ "--goat-marquee-copies": COPIES.length } as CSSProperties}>
           {COPIES.flatMap((copy) =>
