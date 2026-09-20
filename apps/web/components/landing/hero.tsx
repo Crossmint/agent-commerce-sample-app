@@ -1,7 +1,7 @@
 import type { CSSProperties } from "react";
-import Link from "next/link";
 import { Button } from "@goat-wallet/ui";
 import { GoatLockup } from "@/components/brand";
+import { AnchorLink } from "./anchor-link";
 import { GridCell } from "./grid";
 import { PoweredBy } from "./powered-by";
 import { HeroPhone } from "./hero-phone";
@@ -33,12 +33,16 @@ export function Hero() {
 
       <div className="relative mx-auto w-full max-w-6xl px-4 sm:px-6">
         <div className="relative">
-          {/* Open at the top: the nav's own border is the line there. */}
-          <GridCell top={false} />
-          <div className="grid items-center gap-14 px-5 pt-12 pb-8 sm:px-10 sm:pt-16 sm:pb-10 lg:grid-cols-[1.3fr_1fr] lg:gap-10 lg:pt-20">
+          {/* Open at the top: the nav's own border is the line there. On a
+              phone the verticals go too, so the phone below can have the
+              width they and their padding were taking. */}
+          <GridCell top={false} sides="sm" />
+          <div className="grid items-center gap-14 pt-12 pb-8 sm:px-10 sm:pt-16 sm:pb-10 lg:grid-cols-[1.3fr_1fr] lg:gap-10 lg:pt-20">
             <div className="flex flex-col items-start gap-6">
               <div className="flex flex-col items-start gap-3 sm:gap-4">
-                <GoatLockup size="lg" className="landing-rise" />
+                {/* The nav already carries the lockup, and on a phone the
+                    two sit a thumb apart. */}
+                <GoatLockup size="lg" className="landing-rise hidden sm:inline-flex" />
                 {/* From `sm` up both lines are held unbroken, so the size is
                     capped by the column: 56px fits the narrow lg column, 64px
                     the full one. A phone is narrower than either line, so
@@ -52,28 +56,29 @@ export function Hero() {
               </p>
               <div className="landing-rise flex w-full flex-col gap-3 pt-2 sm:w-auto sm:flex-row" style={rise(220)}>
                 <Button asChild size="lg">
-                  <Link href="#try">Try it live</Link>
+                  <AnchorLink href="#try">Try it live</AnchorLink>
                 </Button>
                 <Button asChild size="lg" variant="outline">
-                  <Link href="#build">Build your own</Link>
+                  <AnchorLink href="#build">Build your own</AnchorLink>
                 </Button>
               </div>
             </div>
 
             {/* The phone sets the cell's height, and the cell has to leave the
-                strip below it on the first screen. A short viewport gets a
-                narrower phone; a tall one keeps the full size. This overrides
+                strip below it on the first screen. A short desktop gets a
+                narrower phone; a tall one keeps the full size. A phone is
+                short too, but it scrolls, so the rule stays off it. This overrides
                 the `--phone-w` token rather than the frame's max-width,
                 because landing.css derives the frame's height from the token
                 — capping the width alone would squash the phone. */}
-            <HeroPhone className="landing-rise relative mx-auto w-full max-w-[var(--phone-w)] [@media(max-height:860px)]:[--phone-w:230px] lg:mr-0" />
+            <HeroPhone className="landing-rise relative mx-auto w-full max-w-[var(--phone-w)] [@media(max-height:860px)_and_(min-width:640px)]:[--phone-w:230px] lg:mr-0" />
           </div>
         </div>
 
         {/* The band below the cell. The cell's own bottom rule closes the
             hero above it and the section's rule closes it below, so the strip
             needs no line of its own. */}
-        <div className="relative px-5 py-6 sm:px-10">
+        <div className="relative py-6 sm:px-10">
           <PoweredBy inset={false} />
         </div>
       </div>

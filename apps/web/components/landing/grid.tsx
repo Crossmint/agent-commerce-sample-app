@@ -45,25 +45,35 @@ export function GridRule({ className }: { className?: string }) {
  * `top={false}` opens the cell: no rule across the top and no diamonds on it,
  * for a cell that starts under the nav, whose own border already draws that
  * line.
+ *
+ * `sides="sm"` keeps the verticals and their diamonds off a phone, where the
+ * two rules and the padding they ask for cost more width than the grid is
+ * worth. The horizontals stay: they are what marks the band.
  */
-export function GridCell({ bleed = true, top = true }: { bleed?: boolean; top?: boolean } = {}) {
+export function GridCell({
+  bleed = true,
+  top = true,
+  sides = "always",
+}: { bleed?: boolean; top?: boolean; sides?: "always" | "sm" } = {}) {
   const line = "pointer-events-none absolute bg-hairline";
   const node = "pointer-events-none absolute";
   const vertical = bleed ? "-inset-y-[60rem]" : "inset-y-0";
+  // The verticals and the diamonds that sit on them come and go together.
+  const onSides = sides === "sm" ? "hidden sm:block" : "";
   return (
     <div aria-hidden className="contents">
       {top ? <span className={cn(line, "top-0 left-1/2 h-px w-screen -translate-x-1/2")} /> : null}
       <span className={cn(line, "bottom-0 left-1/2 h-px w-screen -translate-x-1/2")} />
-      <span className={cn(line, vertical, "left-0 w-px")} />
-      <span className={cn(line, vertical, "right-0 w-px")} />
+      <span className={cn(line, vertical, "left-0 w-px", onSides)} />
+      <span className={cn(line, vertical, "right-0 w-px", onSides)} />
       {top ? (
         <>
-          <GridNode className={cn(node, "top-0 left-0 -translate-x-1/2 -translate-y-1/2")} />
-          <GridNode className={cn(node, "top-0 right-0 translate-x-1/2 -translate-y-1/2")} />
+          <GridNode className={cn(node, onSides, "top-0 left-0 -translate-x-1/2 -translate-y-1/2")} />
+          <GridNode className={cn(node, onSides, "top-0 right-0 translate-x-1/2 -translate-y-1/2")} />
         </>
       ) : null}
-      <GridNode className={cn(node, "bottom-0 left-0 -translate-x-1/2 translate-y-1/2")} />
-      <GridNode className={cn(node, "bottom-0 right-0 translate-x-1/2 translate-y-1/2")} />
+      <GridNode className={cn(node, onSides, "bottom-0 left-0 -translate-x-1/2 translate-y-1/2")} />
+      <GridNode className={cn(node, onSides, "bottom-0 right-0 translate-x-1/2 translate-y-1/2")} />
     </div>
   );
 }

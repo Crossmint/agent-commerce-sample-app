@@ -71,7 +71,7 @@ function Block({ index, title, bullets, visual, flip = false }: { index: string;
           ))}
         </ul>
       </Reveal>
-      <Reveal delay={120} className={cn("flex min-w-0 items-center justify-center rounded-lg bg-muted px-6 py-10 sm:px-10 sm:py-14", flip && "lg:order-1")}>
+      <Reveal delay={120} className={cn("flex min-w-0 items-center justify-center rounded-lg bg-muted px-3 py-10 sm:px-10 sm:py-14", flip && "lg:order-1")}>
         <div className="w-full">{visual}</div>
       </Reveal>
     </article>

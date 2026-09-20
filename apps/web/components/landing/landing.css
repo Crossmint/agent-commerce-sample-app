@@ -5,7 +5,9 @@
 
 html {
   scroll-behavior: smooth;
-  scroll-padding-top: 5rem;
+  /* No `scroll-padding-top` here: every section already sets `scroll-mt-20`,
+     and the two add up — a jump would stop 10rem above the section under a
+     4rem nav. */
 }
 
 @keyframes landing-rise {
@@ -196,9 +198,14 @@ html {
 .landing {
   --phone-w: 280px;
 }
-@media (max-width: 319px) {
+/* On a phone the frame takes the width the page can spare: the hero drops
+   its side rules there, and the screens inside are cramped at 280. The
+   subtraction is the page gutter plus the padding of the narrowest column
+   that holds a phone, so every phone on the page still comes out the same
+   width. */
+@media (max-width: 639px) {
   .landing {
-    --phone-w: calc(100vw - 32px);
+    --phone-w: min(320px, calc(100vw - 56px));
   }
 }
 .landing-phone {
@@ -206,19 +213,15 @@ html {
      126x37pt dynamic island 11pt from the top, 54pt status bar. Everything
      scales from the screen width, which is the frame width minus the bezel. */
   --phone-bezel: 10px;
-  --phone-screen-w: calc(var(--phone-w, 280px) - 2 * var(--phone-bezel));
-  --phone-screen-r: calc(var(--phone-screen-w) * 55 / 393);
-  --phone-island-w: calc(var(--phone-screen-w) * 126 / 393);
-  --phone-island-h: calc(var(--phone-screen-w) * 37 / 393);
-  --phone-island-top: calc(var(--phone-screen-w) * 11 / 393);
-  --phone-status-h: calc(var(--phone-screen-w) * 54 / 393);
+  /* The frame's own corner, which cannot read its container size. */
+  --phone-screen-r: calc((var(--phone-w, 280px) - 2 * var(--phone-bezel)) * 55 / 393);
   width: 100%;
   max-width: var(--phone-w, 280px);
-  /* The screen's text must not set the frame's minimum width. Narrow columns
-     shrink the frame; the aspect ratio keeps the phone proportions. */
-  contain: inline-size;
-  /* Screen 393:852 exactly, plus the bezel on top and bottom. */
-  height: calc(var(--phone-screen-w) * 852 / 393 + 2 * var(--phone-bezel));
+  /* The screen's text must not set the frame's minimum width, and the screen
+     measures itself against the width the frame actually got — a column
+     narrower than the token used to leave the frame too tall, which squashed
+     everything inside it. The height then follows the screen. */
+  container-type: inline-size;
   padding: var(--phone-bezel);
   border-radius: calc(var(--phone-screen-r) + var(--phone-bezel));
   background: linear-gradient(160deg, #2c2c2c 0%, #0c0c0c 38%, #161616 100%);
@@ -228,10 +231,19 @@ html {
     0 32px 64px -32px rgba(10, 24, 37, 0.4);
 }
 .landing-phone-screen {
+  /* iPhone 15/16 geometry in points: 393x852 screen, 55pt screen corners,
+     126x37pt dynamic island 11pt from the top, 54pt status bar. Everything
+     scales from the screen's own width. */
+  --phone-screen-w: calc(100cqw - 2 * var(--phone-bezel));
+  --phone-screen-r: calc(var(--phone-screen-w) * 55 / 393);
+  --phone-island-w: calc(var(--phone-screen-w) * 126 / 393);
+  --phone-island-h: calc(var(--phone-screen-w) * 37 / 393);
+  --phone-island-top: calc(var(--phone-screen-w) * 11 / 393);
+  --phone-status-h: calc(var(--phone-screen-w) * 54 / 393);
   position: relative;
   display: flex;
   flex-direction: column;
-  height: 100%;
+  aspect-ratio: 393 / 852;
   width: 100%;
   overflow: hidden;
   border-radius: var(--phone-screen-r);
