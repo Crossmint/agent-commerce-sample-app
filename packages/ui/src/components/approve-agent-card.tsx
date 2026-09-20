@@ -3,7 +3,7 @@
 import * as React from "react";
 import type { AgentCard, PaymentMethod } from "@goat-wallet/core";
 import { pendingVerificationRails } from "@goat-wallet/core";
-import { Clock, Lock, TriangleAlert } from "lucide-react";
+import { Check, Clock, Lock, TriangleAlert, X } from "lucide-react";
 import { errorMessage } from "../api/client.js";
 import type { AgentCardRequest } from "../api/types.js";
 import { isRequestPastDeadline, useAgentCardRequest } from "../hooks/use-agent-card-request.js";
@@ -17,7 +17,6 @@ import { Label } from "./primitives/label.js";
 import { Skeleton } from "./primitives/skeleton.js";
 import { Spinner } from "./primitives/spinner.js";
 import { CardPicker } from "./card-picker.js";
-import { Mascot } from "./mascot.js";
 import { VerifyAgentCard, type VerificationAppearance } from "./verify-agent-card.js";
 
 export type ApproveOutcomeStatus = "active" | "denied" | "expired" | "failed";
@@ -32,11 +31,20 @@ export interface ApproveAgentCardProps {
   requestId: string;
   /** Called once the request reaches a final state. */
   onDone?: (outcome: ApproveOutcome) => void;
-  /** Mascot for the success state. Default "/brand/agents/crossmint-agents-mark.svg". */
-  mascotSrc?: string;
   /** Country for card registration. Default "US". */
   countryCode?: string;
+  /**
+   * The name the card network shows in its confirmation window. It is the
+   * platform the card is being saved with, not the agent asking. Default "GOAT".
+   */
+  platformName?: string;
   verificationAppearance?: VerificationAppearance;
+  /**
+   * "card" stands the screen on its own white panel, which is what a host
+   * page usually wants. "plain" drops the panel so the page's own frame — a
+   * grid cell, a phone shell — can hold it. Default "card".
+   */
+  variant?: "card" | "plain";
   className?: string;
 }
 
@@ -50,18 +58,20 @@ type Phase =
 /**
  * The approval screen. Structure is fixed:
  * 1. Headline: "<Agent> is requesting to use your card".
- * 2. Purpose, Limit. Merchant and Expires only when set.
- * 3. "Choose card" with saved cards. "Add a new card" at the bottom.
+ * 2. What is being asked for: Purpose, Limit, and Merchant and Expires when set.
+ * 3. The card: a dropdown of saved cards, "Add a new card" at the foot of it.
+ *    With nothing saved the card form stands in for the dropdown.
  * 4. One reassurance line with a lock.
- * 5. Full-width Allow. Quiet Deny link under it.
- * Verification replaces the button area. Success replaces the whole card.
+ * 5. Full-width Allow. Quiet Deny under it.
+ * Verification replaces the button area. Every ending replaces the screen.
  */
 export function ApproveAgentCard({
   requestId,
   onDone,
-  mascotSrc,
   countryCode = "US",
+  platformName = "GOAT",
   verificationAppearance,
+  variant = "card",
   className,
 }: ApproveAgentCardProps) {
   const { api } = useGoat();
@@ -74,6 +84,12 @@ export function ApproveAgentCard({
   const [phase, setPhase] = React.useState<Phase>({ kind: "choose" });
   const [actionError, setActionError] = React.useState<unknown>(undefined);
   const [agentCard, setAgentCard] = React.useState<AgentCard | undefined>(undefined);
+  /**
+   * The user walked back from verification to the picker. It tells the two
+   * "approved" screens apart: coming back to a card mid-verification, which
+   * resumes, and asking for a different one, which answers again.
+   */
+  const [changingCard, setChangingCard] = React.useState(false);
 
   // Pick the default card once cards load.
   React.useEffect(() => {
@@ -134,6 +150,7 @@ export function ApproveAgentCard({
   async function allow() {
     if (!req || !selected) return;
     setActionError(undefined);
+    setChangingCard(false);
     setPhase({ kind: "approving" });
     try {
       let email: string | undefined;
@@ -143,6 +160,9 @@ export function ApproveAgentCard({
         email = undefined;
       }
       const result = await api.approveAgentCardRequest(req.id, { paymentMethodId: selected, email, countryCode });
+      // This screen is already showing the new card, so the resume effect has
+      // nothing left to do for it.
+      resumedFor.current = result.agentCard.orderIntentId;
       setAgentCard(result.agentCard);
       request.setData(result.request);
       if (result.needsVerification) {
@@ -160,6 +180,13 @@ export function ApproveAgentCard({
       setPhase({ kind: "choose" });
       void request.refetch();
     }
+  }
+
+  /** Back to the picker from verification. The next Allow answers again. */
+  function useAnotherCard() {
+    setActionError(undefined);
+    setChangingCard(true);
+    setPhase({ kind: "choose" });
   }
 
   async function verified(card: AgentCard) {
@@ -191,33 +218,39 @@ export function ApproveAgentCard({
 
   // ----- Render -----
 
+  const shell = { variant, className };
+  // On its own page the headline carries the screen; inside a host panel — a
+  // chat bubble, a card in a list — it has to sit among other type.
+  const scale: HeaderScale = variant === "plain" ? "page" : "panel";
+
   if (request.loading && !req) {
     return (
-      <Shell className={className}>
-        <Skeleton className="h-9 w-3/4" />
-        <div className="space-y-3">
-          <Skeleton className="h-5 w-1/2" />
-          <Skeleton className="h-5 w-1/3" />
+      <Shell {...shell}>
+        <div className="flex flex-col gap-3">
+          <Skeleton className="h-10 w-full" />
+          <Skeleton className="h-10 w-2/3" />
         </div>
+        <Skeleton className="h-28 w-full" />
         <Skeleton className="h-11 w-full" />
-        <Skeleton className="h-11 w-full rounded-md" />
+        <Skeleton className="h-13 w-full" />
       </Shell>
     );
   }
 
+  // Same shape as the not-found page: a line saying what happened, then the
+  // one thing worth doing about it. A red panel would be louder than the
+  // news, which is usually an old link.
   if (!req) {
     return (
-      <Shell className={className}>
-        <Alert variant="destructive">
-          <TriangleAlert />
-          <AlertTitle>Could not load this request</AlertTitle>
-          <AlertDescription>
-            <p>{errorMessage(request.error)}</p>
-            <Button type="button" size="sm" variant="outline" onClick={() => void request.refetch()}>
-              Try again
-            </Button>
-          </AlertDescription>
-        </Alert>
+      <Shell {...shell}>
+        <Header
+          scale={scale}
+          title="We could not open this request."
+          sub="The link may be old, or the request may be gone. Nothing was charged."
+        />
+        <Button type="button" size="lg" className="w-full" onClick={() => void request.refetch()}>
+          Try again
+        </Button>
       </Shell>
     );
   }
@@ -232,14 +265,15 @@ export function ApproveAgentCard({
   const stillPending = agentCard ? pendingVerificationRails(agentCard).length > 0 : false;
   if (req.status === "active" && stillPending && agentCard) {
     return (
-      <Shell className={cn("goat-backdrop", className)}>
-        <h1 className="text-2xl font-semibold tracking-tight">One more step</h1>
-        <p className="text-sm text-muted-foreground">
-          Confirm with your card network so {req.requester} can get a card number.
-        </p>
+      <Shell {...shell}>
+        <Header
+          scale={scale}
+          title="One more step"
+          sub="Confirm with your card network so your agent can get a card number."
+        />
         <VerifyAgentCard
           agentCard={agentCard}
-          displayName={req.requester}
+          displayName={platformName}
           appearance={verificationAppearance}
           onComplete={() => void verified(agentCard)}
         />
@@ -249,85 +283,86 @@ export function ApproveAgentCard({
 
   if (req.status === "active") {
     return (
-      <Shell className={cn("goat-backdrop items-center text-center", className)}>
-        <Mascot src={mascotSrc} size={112} />
-        <h1 className="text-2xl font-semibold tracking-tight">
-          Active. {req.requester} can spend up to {limit} until {until}.
-        </h1>
-        <p className="text-sm text-muted-foreground">You can revoke this any time from your wallet.</p>
+      <Shell {...shell}>
+        <Disc tone="primary">
+          <Check className="size-7" strokeWidth={3} />
+        </Disc>
+        <Header
+          scale={scale}
+          title="Approved."
+          sub={`Your agent can spend up to ${limit}${until ? ` until ${until}` : ""}.`}
+        />
+        <p className="text-sm text-muted-foreground">You can close this tab. Revoke it any time from your wallet.</p>
       </Shell>
     );
   }
 
   if (req.status === "denied") {
     return (
-      <Shell className={cn("items-center text-center", className)}>
-        <Mascot src={mascotSrc} size={96} className="opacity-80 grayscale" />
-        <h1 className="text-2xl font-semibold tracking-tight">Denied.</h1>
-        <p className="text-muted-foreground">{req.requester} cannot use your card.</p>
+      <Shell {...shell}>
+        <Disc tone="muted">
+          <X className="size-7" strokeWidth={3} />
+        </Disc>
+        <Header scale={scale} title="Denied." sub="Your agent cannot use your card." />
+        <p className="text-sm text-muted-foreground">You can close this tab.</p>
       </Shell>
     );
   }
 
   if (req.status === "expired" || isRequestPastDeadline(req)) {
     return (
-      <Shell className={cn("items-center text-center", className)}>
+      <Shell {...shell}>
         <Clock className="size-10 text-muted-foreground" />
-        <h1 className="text-2xl font-semibold tracking-tight">This request expired.</h1>
-        <p className="text-muted-foreground">Ask {req.requester} to send a new one.</p>
+        <Header scale={scale} title="This request expired." sub={`Ask ${req.requester} to send a new one.`} />
       </Shell>
     );
   }
 
   if (req.status === "failed") {
     return (
-      <Shell className={cn("items-center text-center", className)}>
+      <Shell {...shell}>
         <TriangleAlert className="size-10 text-destructive" />
-        <h1 className="text-2xl font-semibold tracking-tight">Something went wrong.</h1>
-        <p className="text-muted-foreground">{req.failureReason ?? "The card could not be set up."}</p>
+        <Header scale={scale} title="Something went wrong." sub={req.failureReason ?? "The card could not be set up."} />
       </Shell>
     );
   }
 
   // pending or approved
   const busy = phase.kind === "approving" || phase.kind === "denying" || phase.kind === "confirming";
+  const hasCards = Boolean(paymentMethods.data?.length);
+  // A card is already made and the user came back for a different one. The
+  // server takes the second answer and revokes the first card.
+  const canChooseCard = req.status === "pending" || changingCard;
+  // Landing on an approved request with nothing to show yet: the resume
+  // effect is fetching the card, so say so rather than offering the picker.
+  const resuming = req.status === "approved" && phase.kind === "choose" && !changingCard;
 
   return (
-    <Shell className={className}>
-      <h1 className="text-2xl font-semibold leading-tight tracking-tight sm:text-3xl">
-        {req.requester} is requesting to use your card
-      </h1>
+    <Shell {...shell}>
+      <Header scale={scale} title="Your agent is requesting to use your card" sub="Approve it once, for this budget only." />
 
-      <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 text-sm">
-        <dt className="text-muted-foreground">Purpose</dt>
-        <dd className="font-medium">{req.description}</dd>
-        <dt className="text-muted-foreground">Limit</dt>
-        <dd className="font-medium">{limit}</dd>
+      <dl className="flex flex-col divide-y divide-border rounded-md border border-border bg-card">
+        <Row label="Purpose">{req.description}</Row>
+        <Row label="Limit" strong>
+          {limit}
+        </Row>
         {req.merchant ? (
-          <>
-            <dt className="text-muted-foreground">Merchant</dt>
-            <dd className="font-medium">
-              {req.merchant.url ? (
-                <a href={req.merchant.url} target="_blank" rel="noreferrer" className="underline-offset-4 hover:underline">
-                  {req.merchant.name}
-                </a>
-              ) : (
-                req.merchant.name
-              )}
-            </dd>
-          </>
+          <Row label="Merchant">
+            {req.merchant.url ? (
+              <a href={req.merchant.url} target="_blank" rel="noreferrer" className="underline-offset-4 hover:underline">
+                {req.merchant.name}
+              </a>
+            ) : (
+              req.merchant.name
+            )}
+          </Row>
         ) : null}
-        {req.expiresAt ? (
-          <>
-            <dt className="text-muted-foreground">Expires</dt>
-            <dd className="font-medium">{formatDateTime(req.expiresAt)}</dd>
-          </>
-        ) : null}
+        {req.expiresAt ? <Row label="Expires">{formatDateTime(req.expiresAt)}</Row> : null}
       </dl>
 
-      {req.status === "pending" ? (
+      {canChooseCard ? (
         <div className="flex flex-col gap-2">
-          <Label htmlFor="approve-card">Choose card</Label>
+          <Label htmlFor="approve-card">{hasCards ? "Choose card" : "Add a card"}</Label>
           <CardPicker
             id="approve-card"
             paymentMethods={paymentMethods.data}
@@ -344,8 +379,8 @@ export function ApproveAgentCard({
       ) : null}
 
       <p className="flex items-start gap-2 text-sm text-muted-foreground">
-        <Lock className="mt-0.5 size-4 shrink-0" />
-        Your card number is never shared with the agent or the store.
+        <Lock aria-hidden className="mt-0.5 size-4 shrink-0" />
+        Your card is never shared with the agent.
       </p>
 
       {actionError ? (
@@ -359,17 +394,19 @@ export function ApproveAgentCard({
       {phase.kind === "verifying" ? (
         <VerifyAgentCard
           agentCard={phase.agentCard}
-          displayName={req.requester}
+          displayName={platformName}
           appearance={verificationAppearance}
+          onUseAnotherCard={useAnotherCard}
+          onRetryApproval={() => void allow()}
           onComplete={() => void verified(phase.agentCard)}
         />
-      ) : phase.kind === "confirming" || (req.status === "approved" && phase.kind === "choose") ? (
-        <div className="flex items-center gap-3 rounded-md border border-border bg-muted/40 p-4 text-sm">
+      ) : phase.kind === "confirming" || resuming ? (
+        <div className="flex items-center gap-3 rounded-md border border-border bg-card p-4 text-sm">
           <Spinner className="text-primary" />
           <span>Almost there. Waiting for the card network to confirm.</span>
         </div>
       ) : (
-        <div className="flex flex-col items-center gap-3">
+        <div className="flex flex-col items-center gap-2">
           <Button type="button" size="lg" className="w-full" disabled={busy || !selected} onClick={() => void allow()}>
             {phase.kind === "approving" ? <Spinner /> : null}
             Allow
@@ -384,15 +421,74 @@ export function ApproveAgentCard({
   );
 }
 
-function Shell({ className, children }: { className?: string; children: React.ReactNode }) {
+/**
+ * The column the screen lives in. `card` gives it its own panel; `plain`
+ * leaves it to the page, which is what the GOAT pages do — their grid cell is
+ * the frame.
+ */
+function Shell({ variant = "card", className, children }: { variant?: "card" | "plain"; className?: string; children: React.ReactNode }) {
   return (
     <div
       className={cn(
-        "mx-auto flex w-full max-w-md flex-col gap-6 rounded-md border border-border bg-card p-6 text-card-foreground shadow-sm sm:p-8",
+        "mx-auto flex w-full flex-col gap-6",
+        variant === "card" && "max-w-md rounded-md border border-border bg-card p-6 text-card-foreground shadow-sm sm:p-8",
         className,
       )}
     >
       {children}
+    </div>
+  );
+}
+
+/**
+ * The mark an ending carries: green for the budget that is live, quiet grey
+ * for the one the user turned down. A denial is a choice, not a fault, so it
+ * is not painted in the error colour.
+ */
+function Disc({ tone, children }: { tone: "primary" | "muted"; children: React.ReactNode }) {
+  return (
+    <span
+      aria-hidden
+      className={cn(
+        "inline-flex size-14 shrink-0 items-center justify-center self-start rounded-full",
+        tone === "primary" ? "bg-primary text-primary-foreground" : "bg-foreground/10 text-muted-foreground",
+      )}
+    >
+      {children}
+    </span>
+  );
+}
+
+type HeaderScale = "page" | "panel";
+
+/**
+ * The headline and the line under it, set like the sign-in step: display
+ * face, tight tracking, left-aligned. `--font-heading` swaps the face for a
+ * host that has one.
+ */
+function Header({ title, sub, scale = "panel" }: { title: string; sub?: string; scale?: HeaderScale }) {
+  return (
+    <div className="flex flex-col gap-2">
+      <h1
+        className={cn(
+          "max-w-2xl leading-[1.1] font-semibold tracking-[-0.03em] text-balance text-foreground",
+          scale === "page" ? "text-3xl sm:text-4xl" : "text-2xl sm:text-3xl",
+        )}
+        style={{ fontFamily: "var(--font-heading, inherit)" }}
+      >
+        {title}
+      </h1>
+      {sub ? <p className={cn("max-w-prose text-muted-foreground", scale === "panel" && "text-sm")}>{sub}</p> : null}
+    </div>
+  );
+}
+
+/** One line of the request: what it is on the left, what it says on the right. */
+function Row({ label, strong = false, children }: { label: string; strong?: boolean; children: React.ReactNode }) {
+  return (
+    <div className="flex items-baseline justify-between gap-6 px-4 py-3">
+      <dt className="shrink-0 text-sm text-muted-foreground">{label}</dt>
+      <dd className={cn("min-w-0 text-right text-sm font-medium", strong && "text-base font-semibold tabular-nums")}>{children}</dd>
     </div>
   );
 }

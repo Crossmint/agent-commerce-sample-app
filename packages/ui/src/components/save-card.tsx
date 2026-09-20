@@ -74,6 +74,9 @@ export function SaveCard({
       if (selected.type !== "card") return;
       setPhase("registering");
       setError(undefined);
+      // `display` carries the network artwork. It is not in the SDK's type,
+      // so it is read off the object and passed on only when it is there.
+      const display = (selected as { display?: PaymentMethod["display"] }).display;
       const paymentMethod: PaymentMethod = {
         paymentMethodId: selected.paymentMethodId,
         type: "card",
@@ -83,6 +86,7 @@ export function SaveCard({
           last4: selected.card.last4,
           expiration: selected.card.expiration,
         },
+        ...(display ? { display } : {}),
       };
       try {
         // The server fills in the email from the token or a Stytch lookup when none is given.

@@ -7,7 +7,7 @@ import { formatDateTime } from "../lib/format.js";
 import { Button } from "./primitives/button.js";
 import { Input } from "./primitives/input.js";
 import { Label } from "./primitives/label.js";
-import { Select } from "./primitives/select.js";
+import { NativeSelect } from "./primitives/native-select.js";
 import { Spinner } from "./primitives/spinner.js";
 
 export interface PendingActionFormProps {
@@ -159,7 +159,7 @@ function Field({
       return (
         <div className="flex flex-col gap-2">
           {label}
-          <Select
+          <NativeSelect
             id={id}
             required={field.required}
             disabled={disabled}
@@ -178,7 +178,7 @@ function Field({
                 {o.label}
               </option>
             ))}
-          </Select>
+          </NativeSelect>
           {help}
         </div>
       );

@@ -95,10 +95,11 @@ interface AgentCardRequest {
 `POST /v1/agent-card-requests/:id/approve` (browser) body `{ "paymentMethodId": string, "email"?: string, "countryCode"?: string }`.
 Server: registers the card for order intents (idempotent), creates the order intent with the user JWT, stores `agentCardId`, sets `status: "approved"`, or `"active"` right away if a rail is already active.
 → `{ "request": AgentCardRequest, "agentCard": AgentCard, "needsVerification": boolean }`. `AgentCard` is the Crossmint `OrderIntent` shape.
+Answers a `pending` request, and a second time while it is `approved`: the card exists but no agent can spend from it until verification lands, so the user may still swap cards or retry. The earlier order intent is revoked first, best effort. Once the request is `active`, `denied`, `expired` or `failed`, approve returns `409`.
 
 `POST /v1/agent-card-requests/:id/verified` (browser) → re-reads the order intent. If a rail is active, `status: "active"`. → `{ "request": AgentCardRequest, "agentCard": AgentCard }`.
 
-`POST /v1/agent-card-requests/:id/deny` → `AgentCardRequest` with `status: "denied"`.
+`POST /v1/agent-card-requests/:id/deny` → `AgentCardRequest` with `status: "denied"`. Allowed while `pending` or `approved`; an order intent made on the way is revoked with it.
 
 ## Agent cards (order intents)
 

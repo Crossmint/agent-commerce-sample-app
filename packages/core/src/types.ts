@@ -55,6 +55,14 @@ export interface PaymentMethod {
   createdAt?: string;
   updatedAt?: string;
   card?: CardDetails;
+  /** How Crossmint draws the method: the network's artwork and its own label. */
+  display?: PaymentMethodDisplay;
+}
+
+export interface PaymentMethodDisplay {
+  /** Card network artwork, e.g. `https://www.crossmint.com/assets/cards/visa.svg`. */
+  imageUrl?: string;
+  label?: string;
 }
 
 export interface PaymentMethodList {

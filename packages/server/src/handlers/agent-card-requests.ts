@@ -50,15 +50,24 @@ export async function getRequest(req: Request, ctx: Ctx, params: Params): Promis
   return json(request);
 }
 
-/** POST /v1/agent-card-requests/:id/approve */
+/**
+ * POST /v1/agent-card-requests/:id/approve
+ *
+ * Also answers a second time while the request is `approved`: the card is
+ * made but not usable yet, so verification may have failed and the user may
+ * be trying another card. The card from the first answer is revoked, because
+ * nothing may be left behind that an agent could still spend from.
+ */
 export async function approveRequest(req: Request, ctx: Ctx, params: Params): Promise<Response> {
   const user = await requireUser(req, ctx);
   const body = await parseBody(req, approveSchema);
   const request = await loadOwnedRequest(ctx, user, params.id!);
-  assertPending(request);
+  assertAnswerable(request);
 
   const email = await resolveEmail(user, ctx, body.email);
   const jwt = { jwt: user.jwt };
+
+  await revokePreviousCard(ctx, jwt, request);
 
   // Idempotent. Turns on the network rails the card supports.
   await ctx.crossmint.paymentMethods.registerForOrderIntents(jwt, body.paymentMethodId, {
@@ -106,11 +115,18 @@ export async function verifiedRequest(req: Request, ctx: Ctx, params: Params): P
   return json({ request: updated, agentCard: withAgentRails(agentCard) });
 }
 
-/** POST /v1/agent-card-requests/:id/deny */
+/**
+ * POST /v1/agent-card-requests/:id/deny
+ *
+ * Denying an `approved` request is a change of mind partway through, so the
+ * card made on the way is revoked with it.
+ */
 export async function denyRequest(req: Request, ctx: Ctx, params: Params): Promise<Response> {
   const user = await requireUser(req, ctx);
   const request = await loadOwnedRequest(ctx, user, params.id!);
-  assertPending(request);
+  assertAnswerable(request);
+  await revokePreviousCard(ctx, { jwt: user.jwt }, request);
+  // The revoked card id stays on the record: it says what was undone.
   const updated = await ctx.store.update(request.id, { status: "denied" });
   return json(updated);
 }
@@ -132,10 +148,29 @@ async function loadOwnedRequest(
   return request;
 }
 
-function assertPending(request: AgentCardRequest): void {
-  if (request.status === "pending") return;
+/**
+ * The request can still be answered: nobody has answered it yet, or the
+ * answer did not carry — `approved` means a card exists but no agent can
+ * spend from it until verification lands.
+ */
+function assertAnswerable(request: AgentCardRequest): void {
+  if (request.status === "pending" || request.status === "approved") return;
   if (request.status === "expired") {
     throw new HttpError(409, "expired", "The user did not answer this request in time");
   }
   throw new HttpError(409, "invalid_request", `This request is already ${request.status}`);
+}
+
+/**
+ * Drop the agent card left by an earlier answer. Best effort: a card that
+ * Crossmint will not revoke must not block the new one, and an unverified
+ * card can spend nothing in the meantime. It is logged, never raised.
+ */
+async function revokePreviousCard(ctx: Ctx, jwt: { jwt: string }, request: AgentCardRequest): Promise<void> {
+  if (!request.agentCardId) return;
+  try {
+    await ctx.crossmint.orderIntents.revoke(jwt, request.agentCardId);
+  } catch (e) {
+    console.warn("[goat] could not revoke the previous agent card", request.agentCardId, e instanceof Error ? e.message : e);
+  }
 }

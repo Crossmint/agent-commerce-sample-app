@@ -210,6 +210,90 @@ describe("agent card requests", () => {
     expect(verified.agentCard.orderIntentId).toBe("oi_1");
   });
 
+  it("approve again with another card revokes the first one, while verification is still open", async () => {
+    const pending = activeOrderIntent({
+      rails: [{ rail: "agentic-token", provider: "vic", status: "pending_verification" }],
+    });
+    const { handlers, calls } = makeServer([
+      {
+        method: "PUT",
+        path: "/order-intent-registration",
+        reply: { body: { paymentMethodId: "pm_1", rails: [] } },
+      },
+      { method: "POST", path: "/unstable/order-intents", reply: { status: 201, body: pending }, once: true },
+      { method: "DELETE", path: "/unstable/order-intents/oi_1", reply: { status: 204 } },
+      {
+        method: "POST",
+        path: "/unstable/order-intents",
+        reply: { status: 201, body: activeOrderIntent({ orderIntentId: "oi_2", paymentMethodId: "pm_2" }) },
+      },
+    ]);
+    const created = await (
+      await call(handlers, "POST", "/v1/agent-card-requests", { body: requestBody })
+    ).json();
+    const first = await (
+      await call(handlers, "POST", `/v1/agent-card-requests/${created.id}/approve`, {
+        body: { paymentMethodId: "pm_1" },
+      })
+    ).json();
+    expect(first.request.status).toBe("approved");
+
+    // The bank would not confirm, so the user picks another card.
+    const second = await call(handlers, "POST", `/v1/agent-card-requests/${created.id}/approve`, {
+      body: { paymentMethodId: "pm_2" },
+    });
+    expect(second.status).toBe(200);
+    const body = await second.json();
+    expect(body.request).toMatchObject({ status: "active", agentCardId: "oi_2", paymentMethodId: "pm_2" });
+    expect(calls.some((c) => c.method === "DELETE" && c.path.endsWith("/unstable/order-intents/oi_1"))).toBe(true);
+  });
+
+  it("approve again is refused once the card is active", async () => {
+    const { handlers } = makeServer([
+      {
+        method: "PUT",
+        path: "/order-intent-registration",
+        reply: { body: { paymentMethodId: "pm_1", rails: [] } },
+      },
+      { method: "POST", path: "/unstable/order-intents", reply: { status: 201, body: activeOrderIntent() } },
+    ]);
+    const created = await (
+      await call(handlers, "POST", "/v1/agent-card-requests", { body: requestBody })
+    ).json();
+    await call(handlers, "POST", `/v1/agent-card-requests/${created.id}/approve`, {
+      body: { paymentMethodId: "pm_1" },
+    });
+    const again = await call(handlers, "POST", `/v1/agent-card-requests/${created.id}/approve`, {
+      body: { paymentMethodId: "pm_2" },
+    });
+    expect(again.status).toBe(409);
+    expect((await again.json()).error.code).toBe("invalid_request");
+  });
+
+  it("deny during verification revokes the card that was made", async () => {
+    const pending = activeOrderIntent({
+      rails: [{ rail: "agentic-token", provider: "vic", status: "pending_verification" }],
+    });
+    const { handlers, calls } = makeServer([
+      {
+        method: "PUT",
+        path: "/order-intent-registration",
+        reply: { body: { paymentMethodId: "pm_1", rails: [] } },
+      },
+      { method: "POST", path: "/unstable/order-intents", reply: { status: 201, body: pending } },
+      { method: "DELETE", path: "/unstable/order-intents/oi_1", reply: { status: 204 } },
+    ]);
+    const created = await (
+      await call(handlers, "POST", "/v1/agent-card-requests", { body: requestBody })
+    ).json();
+    await call(handlers, "POST", `/v1/agent-card-requests/${created.id}/approve`, {
+      body: { paymentMethodId: "pm_1" },
+    });
+    const denied = await (await call(handlers, "POST", `/v1/agent-card-requests/${created.id}/deny`)).json();
+    expect(denied.status).toBe("denied");
+    expect(calls.some((c) => c.method === "DELETE" && c.path.endsWith("/unstable/order-intents/oi_1"))).toBe(true);
+  });
+
   it("deny marks the request denied", async () => {
     const { handlers } = makeServer();
     const created = await (

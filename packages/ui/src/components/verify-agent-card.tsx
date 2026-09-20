@@ -24,6 +24,17 @@ export interface VerifyAgentCardProps {
   appearance?: VerificationAppearance;
   /** Name shown in the bank's verification prompt. */
   displayName?: string;
+  /**
+   * Offers a way back to the card picker. Give it when another card is still
+   * a choice — a bank that will not confirm is a reason to try one.
+   */
+  onUseAnotherCard?: () => void;
+  /**
+   * Asks for the card again from the top, with the same payment method. It is
+   * the retry for a card that came back with no verification step at all,
+   * where there is nothing on this screen left to repeat.
+   */
+  onRetryApproval?: () => void;
   className?: string;
 }
 
@@ -32,7 +43,16 @@ export interface VerifyAgentCardProps {
  * a modal over the page and may create a passkey. This component shows what is
  * happening in the space where the Allow button was.
  */
-export function VerifyAgentCard({ agentCard, onComplete, onError, appearance, displayName, className }: VerifyAgentCardProps) {
+export function VerifyAgentCard({
+  agentCard,
+  onComplete,
+  onError,
+  appearance,
+  displayName,
+  onUseAnotherCard,
+  onRetryApproval,
+  className,
+}: VerifyAgentCardProps) {
   const { crossmint } = useGoat();
   const [attempt, setAttempt] = React.useState(0);
   const [error, setError] = React.useState<unknown>(undefined);
@@ -53,23 +73,44 @@ export function VerifyAgentCard({ agentCard, onComplete, onError, appearance, di
     }
   }, [agentCard.verificationConfig]);
 
+  // Both dead ends below are reasons to try another card, so they carry the
+  // way back when the screen offers one.
+  const anotherCard = onUseAnotherCard ? (
+    <Button type="button" variant="outline" className="w-full" onClick={onUseAnotherCard}>
+      Use a different card
+    </Button>
+  ) : null;
+
   if (!crossmint.clientApiKey) {
     return (
-      <Alert variant="destructive" className={className}>
-        <TriangleAlert />
-        <AlertTitle>Verification is not set up</AlertTitle>
-        <AlertDescription>The Crossmint client API key is missing.</AlertDescription>
-      </Alert>
+      <div className={cn("flex flex-col gap-3", className)}>
+        <Alert variant="destructive">
+          <TriangleAlert />
+          <AlertTitle>Verification is not set up</AlertTitle>
+          <AlertDescription>The Crossmint client API key is missing.</AlertDescription>
+        </Alert>
+        {anotherCard}
+      </div>
     );
   }
 
   if (!agentCard.verificationConfig) {
     return (
-      <Alert variant="destructive" className={className}>
-        <TriangleAlert />
-        <AlertTitle>Cannot verify this card</AlertTitle>
-        <AlertDescription>The card network did not return a verification step.</AlertDescription>
-      </Alert>
+      <div className={cn("flex flex-col gap-3", className)}>
+        <Alert variant="destructive">
+          <TriangleAlert />
+          <AlertTitle>Cannot verify this card</AlertTitle>
+          <AlertDescription>The card network did not return a verification step.</AlertDescription>
+        </Alert>
+        {/* Nothing on this screen can be repeated, so the retry goes back to
+            the top and asks for the card again on the same payment method. */}
+        {onRetryApproval ? (
+          <Button type="button" className="w-full" onClick={onRetryApproval}>
+            <ShieldCheck /> Try again
+          </Button>
+        ) : null}
+        {anotherCard}
+      </div>
     );
   }
 
@@ -101,6 +142,11 @@ export function VerifyAgentCard({ agentCard, onComplete, onError, appearance, di
           }}
         >
           <ShieldCheck /> Try again
+        </Button>
+      ) : null}
+      {error ? anotherCard : onUseAnotherCard ? (
+        <Button type="button" variant="link" size="sm" onClick={onUseAnotherCard}>
+          Use a different card
         </Button>
       ) : null}
       {canVerify && !error ? (

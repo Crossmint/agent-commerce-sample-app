@@ -26,12 +26,13 @@
     "clean": "rm -rf dist .turbo"
   },
   "dependencies": {
-    "@goat-wallet/core": "workspace:*",
     "@crossmint/client-sdk-react-ui": "^4.6.0",
+    "@goat-wallet/core": "workspace:*",
     "@radix-ui/react-slot": "^1.2.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "lucide-react": "^1.46.0",
+    "radix-ui": "^1.6.7",
     "tailwind-merge": "^3.3.0"
   },
   "peerDependencies": {

@@ -3,3 +3,4 @@ export * from "./use-agent-card-request.js";
 export * from "./use-payment-methods.js";
 export * from "./use-agent-cards.js";
 export * from "./use-checkout.js";
+export * from "./use-media-query.js";

@@ -14,6 +14,8 @@ export { SaveCard } from "./components/save-card.js";
 export type { SaveCardProps, SaveCardResult, PaymentMethodAppearance } from "./components/save-card.js";
 export { CardPicker, ADD_NEW_CARD } from "./components/card-picker.js";
 export type { CardPickerProps } from "./components/card-picker.js";
+export { AddCardDialog } from "./components/add-card-dialog.js";
+export type { AddCardDialogProps } from "./components/add-card-dialog.js";
 export { ApproveAgentCard } from "./components/approve-agent-card.js";
 export type { ApproveAgentCardProps, ApproveOutcome, ApproveOutcomeStatus } from "./components/approve-agent-card.js";
 export { ApproveAgentCardPreview } from "./components/approve-agent-card-preview.js";

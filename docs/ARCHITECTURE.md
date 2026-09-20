@@ -246,9 +246,9 @@ Credential issuance is logged, not stored: rail, amount, merchant, agent card id
 
 - `<GoatProvider apiBaseUrl getJwt>`: wires the GOAT API to the user's session JWT from Stytch. `<CrossmintScope>` mounts Crossmint's browser SDK only around the components that need it (save card, verification), so the page tree never changes shape after hydration.
 - `<SaveCard onSaved>`: wraps `CrossmintPaymentMethodManagement`. Then calls register. Reports which rails came back `enabled`.
-- `<CardPicker>`: saved cards with rail badges. "Add a card" opens `SaveCard`.
-- `<ApproveAgentCard requestId>`: the full approval screen. Shows who asks, how much, for what. `CardPicker` inside. On approve, calls the server, receives the order intent, mounts `<VerifyAgentCard>` if a rail is `pending_verification`. Ends in an "Active" state.
-- `<VerifyAgentCard orderIntent>`: wraps `OrderIntentVerification`. Accepts the `appearance` prop.
+- `<CardPicker>`: a dropdown of saved cards, each with the network artwork Crossmint sends on `display.imageUrl`, brand and last four, the default marked. "Add a new card" sits under a rule at the foot of the list and opens `SaveCard` on its own surface — a bottom sheet under `sm`, a modal above it (`<AddCardDialog>`). With no cards saved there is nothing to pick from, so the form takes the dropdown's place.
+- `<ApproveAgentCard requestId>`: the full approval screen, one column at every width. Shows what is asked, how much, for what. `CardPicker` inside. On approve, calls the server, receives the order intent, mounts `<VerifyAgentCard>` if a rail is `pending_verification`. Ends on a check and a line saying the tab can be closed. `variant="plain"` drops its panel for a page that frames it itself, which is what `/approve` does with a grid cell; the default `"card"` keeps the panel for hosts that drop it into a page, such as the chat. `platformName` (default "GOAT") is the name the card network shows in its confirmation window — the platform, never the agent.
+- `<VerifyAgentCard orderIntent>`: wraps `OrderIntentVerification`. Accepts the `appearance` prop. A verification that fails, or a card that came back with no verification step at all, offers "Try again" and "Use a different card" — the second answer replaces the card, which the server allows while the request is `approved`.
 - `<AgentCardList>`: list, balance, revoke.
 - `<CheckoutView checkoutId>`: polls, renders `embedUrl` in a view-only iframe, renders the open `pendingUserAction` from its JSON Schema via `<PendingActionForm>` (with skip and cancel), and ends with the receipt or the blocked/failed summary.
 - `<ConnectedAgents>`: the user's Stytch sessions, with labels and a revoke button.
@@ -307,17 +307,20 @@ A `SKILL.md` that teaches a coding agent when and how to use the CLI. It covers:
 
 Next.js App Router. The reference deployment and the "copy me" target. It is one website, the way a real platform is one website: an agent chat, plus the pages where a user manages cards and approvals.
 
-Two route groups keep the halves separable:
+Two route groups keep the halves separable, and a third holds the one page that has no wallet chrome around it:
 
 ```
 apps/web/app/
 ├── (wallet)/
 │   ├── page.tsx                 saved cards, agent cards, connected agents
 │   ├── cards/new/page.tsx       save a card
-│   ├── approve/[requestId]/     approve an agent card request (the link agents send)
 │   └── checkouts/[id]/          watch a checkout, answer actions
+├── (approve)/approve/[requestId]/  approve an agent card request (the link agents send). Its own
+│                                group: one decision, no nav, session checked in the layout
 ├── login/, authenticate/        Stytch login and redirect callback
-├── oauth/authorize/             Stytch IdentityProvider consent page, the Connected Apps Authorization URL
+├── not-found.tsx                any URL that is not there
+├── oauth/authorize/             the Connected Apps Authorization URL: GOAT's own consent screen on
+│                                Stytch's headless `idp` calls
 ├── cli-callback/                shows the OAuth code for `goat login --code`
 ├── install/route.ts             markdown for agents: "Set up https://<wallet>/install" installs the CLI and the skill
 ├── .well-known/oauth-protected-resource/  RFC 9728 metadata so MCP hosts find Stytch
@@ -475,7 +478,7 @@ For the platform, the CLI is `npm i -g goat`. The MCP URL is `https://wallet.exa
 
 ## 7. Design
 
-**Brand.** GOAT is part of Crossmint Agents and uses its visual system. The site is light: a warm off-white ground (`#f2f3ef`), navy text (`#0a1825`), white cards with hairline borders (`rgba(10,24,37,0.12)`), mint panels (`#e9f0d6`) behind product visuals, and Crossmint green (`#11ba4b`) as the one accent. The signature motif is a loose grid of 1px hairlines with a small green diamond at each intersection; content sits in the cells. Textures are subtle: a dotted grid on the ground, a halftone green dot field bleeding into the hero, and one small blue pixel block. Headlines use Plus Jakarta Sans, medium to bold, tight tracking. The lockup is "GOAT" in the pixel font VCR OSD Mono in `#32d55d` (see `apps/web/app/fonts/SOURCES.md`; outlines at `apps/web/public/brand/goat-wordmark.svg`), then "by" and the Crossmint logotype in small (`apps/web/components/brand.tsx`). The hero repeats the pixel wordmark as a large eyebrow over the headline and a "Built by Crossmint" line under the copy. Corners are 8px, no pills, shadows soft or none. Assets live in `apps/web/public/brand/agents/`.
+**Brand.** Sign in, authorize an agent, approve a budget and the not-found page share one shell, `components/focus-screen.tsx`: the dotted ground, the halftone, the lockup, and one cell of the hairline grid at the same width on every one of them. GOAT is part of Crossmint Agents and uses its visual system. The site is light: a warm off-white ground (`#f2f3ef`), navy text (`#0a1825`), white cards with hairline borders (`rgba(10,24,37,0.12)`), mint panels (`#e9f0d6`) behind product visuals, and Crossmint green (`#11ba4b`) as the one accent. The signature motif is a loose grid of 1px hairlines with a small green diamond at each intersection; content sits in the cells. Textures are subtle: a dotted grid on the ground, a halftone green dot field bleeding into the hero, and one small blue pixel block. Headlines use Plus Jakarta Sans, medium to bold, tight tracking. The lockup is "GOAT" in the pixel font VCR OSD Mono in `#32d55d` (see `apps/web/app/fonts/SOURCES.md`; outlines at `apps/web/public/brand/goat-wordmark.svg`), then "by" and the Crossmint logotype in small (`apps/web/components/brand.tsx`). The hero repeats the pixel wordmark as a large eyebrow over the headline and a "Built by Crossmint" line under the copy. Corners are 8px, no pills, shadows soft or none. Assets live in `apps/web/public/brand/agents/`.
 
 The goat mascot is retired. "GOAT" survives as the product name in text and in the pixel wordmark. The Crossmint Agents mark stands in wherever an avatar or icon is needed: favicons, the chat agent avatar, empty and success states. `docs/logo*.png` stay as the historical files for the README.
 
