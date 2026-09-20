@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { parsePastedCode } from "../src/login.js";
 import { runCli } from "../src/program.js";
 import { EXIT } from "../src/output.js";
-import { fakeFetch, json, testContext } from "./helpers.js";
+import { fakeFetch, json, stripAnsi, testContext } from "./helpers.js";
 
 const publicConfig = {
   name: "GOAT",
@@ -50,7 +50,10 @@ describe("goat login --code", () => {
     };
     const err = t.overrides.err!;
     t.overrides.err = (line = "") => {
-      const m = /https:\/\/test\.stytch\.com\S+/.exec(line);
+      // The CLI prints the URL in cyan. Strip the colour first, as the
+      // harness does for stderr: the reset code is not whitespace, so `\S+`
+      // would carry it into the query string. CI runs with colour on.
+      const m = /https:\/\/test\.stytch\.com\S+/.exec(stripAnsi(line));
       if (m) printedUrl = m[0];
       err(line);
     };
