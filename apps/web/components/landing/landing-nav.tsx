@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Button } from "@goat-wallet/ui";
 import { GoatLockup } from "@/components/brand";
+import { AnchorLink } from "./anchor-link";
 import { GITHUB_URL, X_URL } from "./links";
 import { GitHubMark, XMark } from "./social-marks";
 
@@ -37,10 +38,10 @@ export function LandingNav() {
             <XMark className="size-4" />
           </a>
           <Button asChild size="sm" className="justify-center sm:min-w-[8.5rem]">
-            <Link href="#try">Try it live</Link>
+            <AnchorLink href="#try">Try it live</AnchorLink>
           </Button>
           <Button asChild size="sm" variant="outline" className="hidden justify-center sm:inline-flex sm:min-w-[8.5rem]">
-            <Link href="#build">Build your own</Link>
+            <AnchorLink href="#build">Build your own</AnchorLink>
           </Button>
         </nav>
       </div>
