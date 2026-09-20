@@ -39,10 +39,12 @@ export function Hero() {
             <div className="flex flex-col items-start gap-6">
               <div className="flex flex-col items-start gap-3 sm:gap-4">
                 <GoatLockup size="lg" className="landing-rise" />
-                {/* Both lines are held unbroken, so the size is capped by the
-                    column: 56px fits the narrow lg column, 64px the full one. */}
+                {/* From `sm` up both lines are held unbroken, so the size is
+                    capped by the column: 56px fits the narrow lg column, 64px
+                    the full one. A phone is narrower than either line, so
+                    there the words wrap instead of running off the screen. */}
                 <h1 className="landing-rise font-display text-[2.75rem]/[1.02] font-semibold tracking-[-0.035em] text-foreground sm:text-[3.5rem]/[1.02] min-[1152px]:text-[4rem]/[1]" style={rise(60)}>
-                  <span className="whitespace-nowrap">An open alternative</span> <span className="whitespace-nowrap">to Stripe Link</span>
+                  <span className="sm:whitespace-nowrap">An open alternative</span> <span className="sm:whitespace-nowrap">to Stripe Link</span>
                 </h1>
               </div>
               <p className="landing-rise max-w-xl text-lg leading-snug text-muted-foreground sm:text-xl" style={rise(110)}>
