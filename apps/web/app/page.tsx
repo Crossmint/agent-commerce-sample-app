@@ -9,7 +9,7 @@ import { TryLive } from "@/components/landing/try-live";
 import "@/components/landing/landing.css";
 
 export const metadata: Metadata = {
-  title: { absolute: "GOAT Wallet" },
+  title: { absolute: "GOAT by Crossmint" },
   description: "An open source template to create your own evolved version of Stripe's Link. Powered by Crossmint.",
 };
 
