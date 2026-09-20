@@ -24,6 +24,15 @@ export const SESSION_MINUTES: number = (() => {
 /** Fallback when the project maximum is lower than SESSION_MINUTES. */
 export const FALLBACK_SESSION_MINUTES = 60;
 
+/** Stytch throws its API errors with the readable text on `error_message`. */
+export function stytchMessage(e: unknown, fallback: string): string {
+  if (e && typeof e === "object" && "error_message" in e) {
+    const m = (e as { error_message?: unknown }).error_message;
+    if (typeof m === "string" && m) return m;
+  }
+  return e instanceof Error && e.message ? e.message : fallback;
+}
+
 export function isSessionDurationError(e: unknown): boolean {
   const msg = e instanceof Error ? e.message : String(e);
   return /invalid_session_duration/.test(msg);

@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
-import { GoatLockup } from "@/components/brand";
 import { CliCallback } from "@/components/cli-callback";
+import { FocusScreen } from "@/components/focus-screen";
 
 export const metadata: Metadata = { title: "Finish CLI login" };
 
@@ -22,9 +22,8 @@ export default async function CliCallbackPage({
   const state = one(params.state);
   const error = one(params.error_description) ?? one(params.error);
   return (
-    <main className="goat-backdrop flex flex-1 flex-col items-center justify-center gap-8 px-4 py-16">
-      <GoatLockup size="md" />
+    <FocusScreen>
       <CliCallback code={code} state={state} error={error} />
-    </main>
+    </FocusScreen>
   );
 }

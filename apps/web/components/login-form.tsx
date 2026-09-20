@@ -6,7 +6,7 @@ import { useStytch, useStytchSession } from "@stytch/nextjs";
 import { Alert, AlertDescription, AlertTitle, Button, Input, Label, Spinner } from "@goat-wallet/ui";
 import { cn } from "@/lib/cn";
 import { GoogleMark } from "@/components/landing/social-marks";
-import { authenticateWithSessionFallback } from "@/lib/stytch-client";
+import { authenticateWithSessionFallback, stytchMessage } from "@/lib/stytch-client";
 
 export const NEXT_COOKIE = "goat_next";
 
@@ -26,15 +26,6 @@ function useOrigin(): string | null {
     () => window.location.origin,
     () => null,
   );
-}
-
-/** Stytch throws its API errors with the readable text on `error_message`. */
-function stytchMessage(e: unknown, fallback: string): string {
-  if (e && typeof e === "object" && "error_message" in e) {
-    const m = (e as { error_message?: unknown }).error_message;
-    if (typeof m === "string" && m) return m;
-  }
-  return e instanceof Error && e.message ? e.message : fallback;
 }
 
 type Status = "idle" | "sending" | "verifying" | "leaving";

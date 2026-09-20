@@ -1,19 +1,14 @@
 "use client";
 
-import { useState } from "react";
-import Link from "next/link";
-import { ApproveAgentCard, Button, type ApproveOutcome } from "@goat-wallet/ui";
+import { ApproveAgentCard } from "@goat-wallet/ui";
 
+/**
+ * The approval screen on the focus ground: the page draws the dotted
+ * backdrop and the grid cell, so the component itself runs "plain" — a panel
+ * inside the cell would be a second frame around the same content. Every
+ * ending says what happened and leaves the tab to be closed, so there is no
+ * button back into the wallet.
+ */
 export function ApproveScreen({ requestId }: { requestId: string }) {
-  const [outcome, setOutcome] = useState<ApproveOutcome | null>(null);
-  return (
-    <div className="flex w-full max-w-md flex-col items-center gap-6">
-      <ApproveAgentCard requestId={requestId} onDone={setOutcome} mascotSrc="/brand/agents/crossmint-agents-mark.svg" />
-      {outcome ? (
-        <Button asChild variant="outline">
-          <Link href="/wallet">Back to wallet</Link>
-        </Button>
-      ) : null}
-    </div>
-  );
+  return <ApproveAgentCard requestId={requestId} variant="plain" />;
 }
