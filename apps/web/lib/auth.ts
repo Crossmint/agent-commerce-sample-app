@@ -1,5 +1,4 @@
 import { cookies } from "next/headers";
-import { redirect } from "next/navigation";
 import type { UserAuth } from "@agent-commerce/auth";
 import { createStytchUserAuth, inferStytchEnvironment } from "@agent-commerce/auth/stytch";
 import { Client as StytchClient, envs } from "stytch";
@@ -74,7 +73,13 @@ export async function getSession(): Promise<ServerSession | null> {
 
   if (jwt) {
     const user = await verifier.verify(jwt);
-    if (user) return { userId: user.userId, email: user.email, sessionId: sessionIdFrom(user.claims), sessionJwt: jwt };
+    if (user)
+      return {
+        userId: user.userId,
+        email: user.email,
+        sessionId: sessionIdFrom(user.claims),
+        sessionJwt: jwt,
+      };
   }
 
   if (sessionToken && verifier.refresh) {
@@ -82,20 +87,18 @@ export async function getSession(): Promise<ServerSession | null> {
       const fresh = await verifier.refresh(sessionToken);
       const user = await verifier.verify(fresh.jwt);
       if (user) {
-        return { userId: user.userId, email: user.email, sessionId: sessionIdFrom(user.claims), sessionJwt: fresh.jwt };
+        return {
+          userId: user.userId,
+          email: user.email,
+          sessionId: sessionIdFrom(user.claims),
+          sessionJwt: fresh.jwt,
+        };
       }
     } catch {
       // fall through
     }
   }
   return null;
-}
-
-/** Like getSession, but sends the visitor to /login when there is none. */
-export async function requireSession(next?: string): Promise<ServerSession> {
-  const session = await getSession();
-  if (!session) redirect(next && next !== "/" ? `/login?next=${encodeURIComponent(next)}` : "/login");
-  return session;
 }
 
 /** Revoke one of the user's sessions. Used by the connected agents list. */

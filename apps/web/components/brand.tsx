@@ -100,21 +100,6 @@ export function AgentsLockup({ size = 22, className }: { size?: number; classNam
   );
 }
 
-/** The product name, set in plain type. */
-export function AppName({ size = "sm", className }: { size?: "sm" | "lg"; className?: string }) {
-  return (
-    <span
-      className={cn(
-        "font-medium tracking-[-0.01em] text-foreground",
-        size === "sm" ? "text-sm" : "text-base",
-        className,
-      )}
-    >
-      Agent Commerce Sample App
-    </span>
-  );
-}
-
 /**
  * Acme Agent's mark: a white A on an indigo tile. `shape` is the tile's
  * corner: "tile" keeps the app-icon rounding, "round" makes a disc, for the
@@ -158,25 +143,3 @@ export function AgentAvatar({ size = 32, className }: { size?: number; className
     </span>
   );
 }
-
-/** The Crossmint logo, for the top of a screen. */
-export function AgentCommerceLockup({
-  size = "sm",
-  className,
-}: {
-  size?: "sm" | "md" | "lg";
-  className?: string;
-}) {
-  const h = size === "lg" ? 28 : size === "md" ? 22 : 18;
-  return (
-    <span
-      className={cn("inline-flex items-center gap-2.5", className)}
-      aria-label="Agent Commerce Sample App by Crossmint"
-    >
-      <CrossmintLogo height={h} />
-    </span>
-  );
-}
-
-/** @deprecated Use `AgentAvatar`. */
-export const AgentCommerceAvatar = AgentAvatar;

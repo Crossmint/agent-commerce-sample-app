@@ -23,7 +23,6 @@
 @theme inline {
   --font-sans: var(--font-sans-stack);
   --font-mono: var(--font-geist-mono), ui-monospace, monospace;
-  --font-heading: var(--font-sans-stack);
   --font-display: var(--font-display-stack);
 }
 

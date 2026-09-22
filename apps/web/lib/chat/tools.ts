@@ -33,7 +33,10 @@ import { AgentCommerceToolError, type AgentCommerceClient } from "./api-client";
 type ChatTools = Record<ToolNameFor<"chat">, unknown>;
 
 const amountSchema = z.object({
-  value: z.string().regex(/^\d+(\.\d{1,2})?$/, 'Decimal string like "50.00"').describe('Decimal string, e.g. "50.00".'),
+  value: z
+    .string()
+    .regex(/^\d+(\.\d{1,2})?$/, 'Decimal string like "50.00"')
+    .describe('Decimal string, e.g. "50.00".'),
   currency: z.string().length(3).describe(PARAM_DOCS.currency),
 });
 
@@ -79,7 +82,9 @@ function summarizeAgentCard(card: {
     total: card.amount.total,
     available: card.amount.available,
     spent: card.amount.spent,
-    activeRails: card.rails.filter((r) => r.status === "active").map((r) => r.provider ? `${r.rail}:${r.provider}` : r.rail),
+    activeRails: card.rails
+      .filter((r) => r.status === "active")
+      .map((r) => (r.provider ? `${r.rail}:${r.provider}` : r.rail)),
     merchant: card.merchant ? { name: card.merchant.name, url: card.merchant.url } : undefined,
   };
 }
@@ -113,8 +118,11 @@ export function createChatTools(api: AgentCommerceClient) {
 
     get_agent_card: tool({
       description: describeTool("get_agent_card"),
-      inputSchema: z.object({ agentCardId: z.string().min(1).describe(paramDoc("get_agent_card", "agentCardId")) }),
-      execute: ({ agentCardId }) => guard(async () => summarizeAgentCard(await api.getAgentCard(agentCardId))),
+      inputSchema: z.object({
+        agentCardId: z.string().min(1).describe(paramDoc("get_agent_card", "agentCardId")),
+      }),
+      execute: ({ agentCardId }) =>
+        guard(async () => summarizeAgentCard(await api.getAgentCard(agentCardId))),
     }),
 
     request_agent_card: tool({
@@ -124,9 +132,18 @@ export function createChatTools(api: AgentCommerceClient) {
       ),
       inputSchema: z.object({
         amount: amountSchema.describe(paramDoc("request_agent_card", "amount")),
-        description: z.string().min(1).max(200).describe(paramDoc("request_agent_card", "description")),
+        description: z
+          .string()
+          .min(1)
+          .max(200)
+          .describe(paramDoc("request_agent_card", "description")),
         merchant: merchantSchema.optional().describe(paramDoc("request_agent_card", "merchant")),
-        expiresInHours: z.number().positive().max(24 * 30).optional().describe(paramDoc("request_agent_card", "expiresInHours")),
+        expiresInHours: z
+          .number()
+          .positive()
+          .max(24 * 30)
+          .optional()
+          .describe(paramDoc("request_agent_card", "expiresInHours")),
       }),
       execute: (input) =>
         guard(async () => {
@@ -148,12 +165,17 @@ export function createChatTools(api: AgentCommerceClient) {
     // Client-side tool: no `execute`. The chat UI supplies the output after the user answers.
     await_agent_card_approval: tool({
       description: describeTool("await_agent_card_approval"),
-      inputSchema: z.object({ requestId: z.string().min(1).describe(paramDoc("await_agent_card_approval", "requestId")) }),
+      inputSchema: z.object({
+        requestId: z.string().min(1).describe(paramDoc("await_agent_card_approval", "requestId")),
+      }),
       outputSchema: approvalOutcomeSchema,
     }),
 
     reveal_agent_card: tool({
-      description: describeTool("reveal_agent_card", "Returns only a masked summary: the full number never enters the chat."),
+      description: describeTool(
+        "reveal_agent_card",
+        "Returns only a masked summary: the full number never enters the chat.",
+      ),
       inputSchema: z.object({
         agentCardId: z.string().min(1).describe(paramDoc("reveal_agent_card", "agentCardId")),
         amount: amountSchema.optional().describe(paramDoc("reveal_agent_card", "amount")),
@@ -168,7 +190,11 @@ export function createChatTools(api: AgentCommerceClient) {
             provider: result.provider,
             enforced: result.enforced,
             card: result.card
-              ? { last4: result.card.number.slice(-4), expirationMonth: result.card.expirationMonth, expirationYear: result.card.expirationYear }
+              ? {
+                  last4: result.card.number.slice(-4),
+                  expirationMonth: result.card.expirationMonth,
+                  expirationYear: result.card.expirationYear,
+                }
               : undefined,
             expiresAt: result.expiresAt,
             warning: result.enforced
@@ -181,7 +207,9 @@ export function createChatTools(api: AgentCommerceClient) {
 
     revoke_agent_card: tool({
       description: describeTool("revoke_agent_card"),
-      inputSchema: z.object({ agentCardId: z.string().min(1).describe(paramDoc("revoke_agent_card", "agentCardId")) }),
+      inputSchema: z.object({
+        agentCardId: z.string().min(1).describe(paramDoc("revoke_agent_card", "agentCardId")),
+      }),
       execute: ({ agentCardId }) =>
         guard(async () => {
           await api.revokeAgentCard(agentCardId);
@@ -197,18 +225,27 @@ export function createChatTools(api: AgentCommerceClient) {
         agentCardId: z.string().min(1).describe(paramDoc("create_checkout", "agentCardId")),
         maxCost: z
           .object({
-            amount: z.string().regex(/^\d+(\.\d{1,2})?$/).describe('Decimal string, e.g. "50.00".'),
+            amount: z
+              .string()
+              .regex(/^\d+(\.\d{1,2})?$/)
+              .describe('Decimal string, e.g. "50.00".'),
             currency: z.string().length(3).describe(PARAM_DOCS.currency),
           })
           .describe(paramDoc("create_checkout", "maxCost")),
-        buyerProfileId: z.string().min(1).optional().describe(paramDoc("create_checkout", "buyerProfileId")),
+        buyerProfileId: z
+          .string()
+          .min(1)
+          .optional()
+          .describe(paramDoc("create_checkout", "buyerProfileId")),
       }),
       execute: (input) => guard(() => api.createCheckout(input)),
     }),
 
     get_checkout: tool({
       description: describeTool("get_checkout"),
-      inputSchema: z.object({ checkoutId: z.string().min(1).describe(paramDoc("get_checkout", "checkoutId")) }),
+      inputSchema: z.object({
+        checkoutId: z.string().min(1).describe(paramDoc("get_checkout", "checkoutId")),
+      }),
       execute: ({ checkoutId }) => guard(() => api.getCheckout(checkoutId)),
     }),
 
@@ -217,8 +254,14 @@ export function createChatTools(api: AgentCommerceClient) {
       inputSchema: z.object({
         checkoutId: z.string().min(1).describe(paramDoc("answer_checkout", "checkoutId")),
         requestId: z.string().min(1).optional().describe(paramDoc("answer_checkout", "requestId")),
-        action: z.enum(["submit", "decline", "alternative"]).optional().describe(paramDoc("answer_checkout", "action")),
-        values: z.record(z.string(), z.unknown()).optional().describe(paramDoc("answer_checkout", "values")),
+        action: z
+          .enum(["submit", "decline", "alternative"])
+          .optional()
+          .describe(paramDoc("answer_checkout", "action")),
+        values: z
+          .record(z.string(), z.unknown())
+          .optional()
+          .describe(paramDoc("answer_checkout", "values")),
         text: z.string().max(20000).optional().describe(paramDoc("answer_checkout", "text")),
       }),
       execute: ({ checkoutId, ...input }) => guard(() => api.answerCheckout(checkoutId, input)),
@@ -226,11 +269,12 @@ export function createChatTools(api: AgentCommerceClient) {
 
     cancel_checkout: tool({
       description: describeTool("cancel_checkout"),
-      inputSchema: z.object({ checkoutId: z.string().min(1).describe(paramDoc("cancel_checkout", "checkoutId")) }),
+      inputSchema: z.object({
+        checkoutId: z.string().min(1).describe(paramDoc("cancel_checkout", "checkoutId")),
+      }),
       execute: ({ checkoutId }) => guard(() => api.cancelCheckout(checkoutId)),
     }),
   } satisfies ChatTools;
 }
 
 export type ChatToolSet = ReturnType<typeof createChatTools>;
-export type ChatToolName = keyof ChatToolSet;

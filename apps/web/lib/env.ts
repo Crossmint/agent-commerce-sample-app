@@ -36,9 +36,3 @@ export const serverEnv = {
     return `${this.webBaseUrl()}/api/agent-commerce`;
   },
 };
-
-/** Public values. Only NEXT_PUBLIC_* names are inlined into the client bundle. */
-export const publicEnv = {
-  crossmintClientApiKey: process.env.NEXT_PUBLIC_CROSSMINT_CLIENT_API_KEY,
-  stytchPublicToken: process.env.NEXT_PUBLIC_STYTCH_PUBLIC_TOKEN,
-};
