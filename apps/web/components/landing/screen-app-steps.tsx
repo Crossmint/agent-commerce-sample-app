@@ -23,10 +23,17 @@ import {
 
 /* ---------- Step 2: the approval ---------- */
 
-const APPROVE_SHEET = { up: 1250, ready: 1750, press: 2450, approved: 3000 } as const;
+/**
+ * The beats of an approval, ms from mount. Shared, so the brand layouts in
+ * `brand-app.tsx` can play the same story on their own shapes and every one
+ * of them fits the same loop.
+ */
+export const APP_APPROVE_T = { up: 1250, ready: 1750, press: 2450, approved: 3000 } as const;
 
 /** When the approval has shown its outcome for a moment. */
-export const APP_APPROVE_END = APPROVE_SHEET.approved + 1800;
+export const APP_APPROVE_END = APP_APPROVE_T.approved + 1800;
+
+const APPROVE_SHEET = APP_APPROVE_T;
 
 const APPROVE_SCRIPT: AppRunScript = {
   thread: [

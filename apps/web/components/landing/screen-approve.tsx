@@ -3,61 +3,18 @@
 import type { ReactNode } from "react";
 import { ChevronsUpDown, Lock } from "lucide-react";
 import { CardBadge, CheckBurst, delay, FauxButton } from "./bits";
-import { AgentChatScreen, requestThread } from "./screen-chat";
 import { STORY } from "./story";
 
 /*
- * The approval sheet over the chat, the screen your platform hosts. Same
- * bones as the real `ApproveAgentCard`: headline, Purpose and Limit, the
- * card picker, one reassurance line, Allow. Timings are ms from mount.
- * Tokens only, so a `data-brand` wrapper re-themes the whole sheet, which is
- * what `make-it-yours` uses it for.
+ * The two bodies an approval sheet shows, in the order the real
+ * `ApproveAgentCard` has them: the request (headline, Purpose, Limit,
+ * Merchant and Expires, the card picker, one reassurance line, Allow and
+ * Deny), then the outcome in its place. Timings are ms from mount. Tokens
+ * only, so a `data-brand` wrapper re-themes both.
  *
- * One run: the chat plays (ask, reply, request card), the card's button
- * presses itself, the sheet slides up, Allow presses, Approved shows.
+ * The sheet that holds them belongs to whichever app is drawing it:
+ * `screen-agent-app.tsx` for the agent app, `brand-app.tsx` for the brands.
  */
-
-export const APPROVE_T = {
-  chat: { ask: 200, reply: 900, request: 1500 },
-  /** The request card's button presses itself. */
-  cardPress: 2300,
-  sheet: 2600,
-  ready: 3200,
-  press: 4200,
-  approvedAt: 4800,
-} as const;
-/** When the run has shown Approved for a moment, ms from mount. */
-export const APPROVE_END = APPROVE_T.approvedAt + 1900;
-
-export function ApproveScreen() {
-  return (
-    <div className="relative h-full">
-      <AgentChatScreen
-        messages={requestThread({ times: APPROVE_T.chat, pressAt: APPROVE_T.cardPress })}
-      />
-      <div
-        aria-hidden
-        className="landing-scrim absolute inset-0 z-30 bg-black/10"
-        style={delay(APPROVE_T.sheet)}
-      />
-      <div
-        className="landing-sheet absolute inset-x-0 bottom-0 z-40 flex flex-col rounded-t-[calc(var(--radius)+18px)] bg-background px-5 pt-3 pb-7 text-foreground"
-        style={delay(APPROVE_T.sheet)}
-      >
-        <span aria-hidden className="mx-auto mb-3 h-1 w-9 rounded-full bg-muted-strong" />
-        <div className="relative">
-          {/* The form gives way to the outcome in place, so the sheet keeps its height. */}
-          <div className="landing-vanish flex flex-col gap-3" style={delay(APPROVE_T.approvedAt)}>
-            <RequestForm ready={APPROVE_T.ready} press={APPROVE_T.press} />
-          </div>
-          <div className="absolute inset-x-0 top-0 flex flex-col gap-3">
-            <Approved at={APPROVE_T.approvedAt + 100} />
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 /** The sheet body before approval: the request, the figures, the card, Allow. */
 export function RequestForm({ ready, press }: { ready: number; press: number }) {

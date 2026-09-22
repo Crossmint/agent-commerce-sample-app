@@ -1,10 +1,10 @@
 "use client";
 
-import { delay, FauxButton } from "./bits";
+import { Lock } from "lucide-react";
+import { delay, FauxButton, RunMark, RunStep } from "./bits";
 import { ReceiptCard } from "./receipt-card";
 import { Approved, RequestForm } from "./screen-approve";
 import type { AppEntry } from "./screen-agent-app";
-import { ProgressCard } from "./screen-chat";
 import { STORY } from "./story";
 
 /*
@@ -35,7 +35,9 @@ export const lookedAtCardsEntry = (): AppEntry => ({
 export const replyEntry = (): AppEntry => ({
   kind: "agent",
   key: "reply",
-  text: <>I can do that. I need a {STORY.amount} budget on your card for this — approve it below.</>,
+  text: (
+    <>I can do that. I need a {STORY.amount} budget on your card for this — approve it below.</>
+  ),
 });
 
 export const requestEntry = (opts: { settleAt?: number; reviewPress?: number }): AppEntry => ({
@@ -112,7 +114,10 @@ export function ApprovalThreadCard({
         ) : null}
       </div>
       <div className="relative">
-        <div className={settles ? "landing-vanish" : undefined} style={settles ? delay(settleAt) : undefined}>
+        <div
+          className={settles ? "landing-vanish" : undefined}
+          style={settles ? delay(settleAt) : undefined}
+        >
           <FauxButton press={reviewPress} className="h-9 w-full rounded-full text-[12px]">
             Review
           </FauxButton>
@@ -151,6 +156,32 @@ export function ApprovalSheetBody({
       <div className="absolute inset-x-0 top-0 flex flex-col gap-3">
         <Approved at={approved + 100} />
       </div>
+    </div>
+  );
+}
+
+/* ---------- The checkout card ---------- */
+
+/** The checkout running: the store, then five steps that check off one by one. */
+export function ProgressCard({ from, steps }: { from: number; steps: number[] }) {
+  const last = steps[steps.length - 1] ?? from;
+  return (
+    <div className="flex w-full flex-col gap-1.5 rounded-2xl bg-card px-3 py-2.5 text-[11.5px] text-card-foreground ring-1 ring-foreground/10">
+      <div className="flex items-center justify-between text-[10px] font-semibold tracking-wide text-muted-foreground uppercase">
+        <span className="inline-flex items-center gap-1">
+          <Lock className="size-2.5" strokeWidth={2.5} />
+          {STORY.domain}
+        </span>
+        <RunMark from={from} at={last} size="size-3" />
+      </div>
+      {STORY.checkoutSteps.map((label, i) => (
+        <RunStep
+          key={label}
+          label={label}
+          from={i === 0 ? from : (steps[i - 1] ?? from)}
+          at={steps[i] ?? last}
+        />
+      ))}
     </div>
   );
 }
