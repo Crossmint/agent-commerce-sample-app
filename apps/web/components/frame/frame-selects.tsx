@@ -54,6 +54,7 @@ export function FrameControls({
   onView,
   onApp,
   onBrand,
+  hideViews,
   className,
 }: {
   view: View;
@@ -62,11 +63,18 @@ export function FrameControls({
   onView: (view: View) => void;
   onApp: (app: MessagingApp) => void;
   onBrand: (brand: BrandTheme) => void;
+  /**
+   * Platforms to leave out, for a phone that should not offer the desktop
+   * frame. A hidden platform still lists while it is the current one, so the
+   * menu always has a row that answers the button. The menu contents portal
+   * to the body, so this cannot be done by hiding rows with CSS.
+   */
+  hideViews?: readonly View[];
   className?: string;
 }) {
   return (
     <div className={cn(CARD, className)}>
-      <PlatformMenu view={view} app={app} onView={onView} onApp={onApp} />
+      <PlatformMenu view={view} app={app} onView={onView} onApp={onApp} hideViews={hideViews} />
       <TemplateMenu brand={brand} onBrand={onBrand} />
     </div>
   );
@@ -77,15 +85,18 @@ function PlatformMenu({
   app,
   onView,
   onApp,
+  hideViews,
 }: {
   view: View;
   app: MessagingApp;
   onView: (view: View) => void;
   onApp: (app: MessagingApp) => void;
+  hideViews?: readonly View[];
 }) {
   const messaging = view === "messaging";
   const { label, icon: Icon } = VIEW_META[view];
   const current = messaging ? MESSAGING_APP_META[app] : null;
+  const shown = VIEWS.filter((v) => v === view || !hideViews?.includes(v));
   return (
     <DropdownMenu>
       <DropdownMenuTrigger aria-label="Platform" className={BUTTON}>
@@ -99,7 +110,7 @@ function PlatformMenu({
         <ChevronDown aria-hidden className="size-4 shrink-0 text-muted-foreground" />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="min-w-52">
-        {VIEWS.map((v) => {
+        {shown.map((v) => {
           const meta = VIEW_META[v];
           const ItemIcon = meta.icon;
           if (v === "messaging") {

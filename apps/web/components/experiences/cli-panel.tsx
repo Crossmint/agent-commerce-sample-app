@@ -29,11 +29,11 @@ export function CliPanel(props: ExperienceProps) {
         <h2 className="text-lg font-medium tracking-[-0.02em] text-foreground">What a run looks like</h2>
         <pre className="overflow-x-auto rounded-2xl bg-foreground p-4 font-mono text-xs leading-relaxed text-background">
           <code>
-            <Line prompt>agent-commerce agent-card request --amount 35 --description &quot;Running shoes&quot; --wait</Line>
+            <Line prompt>agent-commerce agent-card request --amount 10 --description &quot;Coffee&quot; --wait</Line>
             <Line dim>Approve at {origin ?? "https://agent-commerce.example"}/approve/req_7f2…</Line>
             <Line>active · agent card oi_4c9a…</Line>
-            <Line prompt>agent-commerce checkout create --url https://nike.com/… --agent-card oi_4c9a… --max-cost 35 --wait</Line>
-            <Line>succeeded · order NK-88213</Line>
+            <Line prompt>agent-commerce checkout create --url https://starbucks.com/… --agent-card oi_4c9a… --max-cost 10 --wait</Line>
+            <Line>succeeded · order SB-88213</Line>
           </code>
         </pre>
       </section>

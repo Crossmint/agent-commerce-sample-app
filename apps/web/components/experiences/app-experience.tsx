@@ -1,10 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useStytch, useStytchSession, useStytchUser } from "@stytch/nextjs";
 import { nanoid } from "nanoid";
 import type { ConnectedAgentSession } from "@agent-commerce/ui";
+import { CrossmintLogo } from "@/components/brand";
 import type { BrandTheme } from "@/components/brand-themes";
 import { useAgentChat } from "@/components/chat/use-agent-chat";
 import { FrameControls } from "@/components/frame/frame-selects";
@@ -55,6 +57,9 @@ interface ThreadState {
  * over the phone.
  */
 const RESERVE_TOP = 24 + 52 + 8 + 26 + 16;
+
+/** A phone does not offer the desktop frame: there is no desktop to show it on. */
+const PHONE_HIDES_VIEWS = ["desktop"] as const;
 
 /**
  * The client half of the app page: the switchers, the frame they name, and
@@ -277,6 +282,24 @@ export function AppExperience({
         </p>
       </div>
 
+      {/*
+        Phone: the logo card is desktop-only, so the way back to the landing
+        page is a banner of its own. In the flow, so the frame below it
+        shrinks to fit rather than sitting under it.
+      */}
+      <div className="flex w-full shrink-0 items-center justify-between gap-3 border-b border-border bg-background px-4 py-2.5 md:hidden">
+        <Link
+          href="/"
+          aria-label="Agent Commerce Sample App home page"
+          className="flex min-w-0 items-center outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          <CrossmintLogo height={18} />
+        </Link>
+        <span className="shrink-0 text-[11px] font-medium text-muted-foreground">
+          All purchases are real
+        </span>
+      </div>
+
       {/* Keyed so a change of conversation starts a fresh `useChat`. While the
           messages load, the key differs too, so they land as initial messages. */}
       <ChatHost
@@ -289,7 +312,7 @@ export function AppExperience({
 
       {/* Phone: the same controls in a bar at the foot, in the flow so the frame above shrinks to fit. */}
       <div className="flex w-full shrink-0 items-center justify-center px-3 pt-2 pb-[max(env(safe-area-inset-bottom),0.75rem)] md:hidden">
-        <FrameControls {...controls} />
+        <FrameControls {...controls} hideViews={PHONE_HIDES_VIEWS} />
       </div>
     </>
   );
@@ -310,13 +333,15 @@ function ChatHost({
   const chat = useAgentChat({ id, initialMessages, persist });
   const props: ExperienceProps = { ...shared, chat };
   const phone = shared.view === "mobile" || shared.view === "messaging";
+  // These two fill a phone screen edge to edge, so they take no page gutter.
+  const fullBleed = shared.view === "mcp" || shared.view === "cli";
 
   return (
     <div
       key={shared.view}
       className={cn(
         "flex min-h-0 w-full flex-1 flex-col items-center justify-center",
-        !phone && "px-4 md:px-0",
+        !phone && !fullBleed && "px-4 md:px-0",
       )}
     >
       {shared.view === "mobile" ? (
