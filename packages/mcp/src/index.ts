@@ -6,6 +6,8 @@ export {
   createAgentCommerceMcpHandler,
   createProtectedResourceMetadataHandler,
   protectedResourceMetadata,
+  createAuthorizationServerMetadataHandler,
+  authorizationServerMetadata,
   protectedResourceMetadataUrl,
   authorizationServerFromEndpoint,
   readBearerToken,
@@ -17,4 +19,6 @@ export type {
   AgentCommerceMcpHandlerOptions,
   ProtectedResourceMetadata,
   ProtectedResourceMetadataOptions,
+  AuthorizationServerMetadata,
+  AuthorizationServerMetadataOptions,
 } from "./server.js";

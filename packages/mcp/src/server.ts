@@ -23,7 +23,11 @@ export interface AgentCommerceMcpServerOptions {
  */
 export function createAgentCommerceMcpServer(opts: AgentCommerceMcpServerOptions): McpServer {
   const server = new McpServer(
-    { name: AGENT_COMMERCE_MCP_SERVER_NAME, version: AGENT_COMMERCE_MCP_SERVER_VERSION, title: "Agent Commerce wallet" },
+    {
+      name: AGENT_COMMERCE_MCP_SERVER_NAME,
+      version: AGENT_COMMERCE_MCP_SERVER_VERSION,
+      title: "Agent Commerce wallet",
+    },
     {
       instructions:
         "Agent Commerce lets you spend from the user's saved cards within limits the user approves. " +
@@ -32,7 +36,11 @@ export function createAgentCommerceMcpServer(opts: AgentCommerceMcpServerOptions
         "Never show revealed card numbers to the user.",
     },
   );
-  const api = new AgentCommerceApi({ baseUrl: opts.apiBaseUrl, bearerToken: opts.bearerToken, fetch: opts.fetch });
+  const api = new AgentCommerceApi({
+    baseUrl: opts.apiBaseUrl,
+    bearerToken: opts.bearerToken,
+    fetch: opts.fetch,
+  });
   registerAgentCommerceTools(server, { api, requester: opts.requester });
   return server;
 }
@@ -61,7 +69,9 @@ export interface ProtectedResourceMetadata {
 }
 
 /** JSON body for `/.well-known/oauth-protected-resource`. */
-export function protectedResourceMetadata(opts: ProtectedResourceMetadataOptions): ProtectedResourceMetadata {
+export function protectedResourceMetadata(
+  opts: ProtectedResourceMetadataOptions,
+): ProtectedResourceMetadata {
   const metadata: ProtectedResourceMetadata = {
     resource: normalizeUrl(opts.resourceUrl),
     authorization_servers: opts.authorizationServers.map(normalizeUrl),
@@ -90,13 +100,117 @@ export function createProtectedResourceMetadataHandler(
 ): (req: Request) => Response {
   const body = JSON.stringify(protectedResourceMetadata(opts));
   return (req) => {
-    if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: corsHeaders() });
+    if (req.method === "OPTIONS")
+      return new Response(null, { status: 204, headers: corsHeaders() });
     if (req.method !== "GET") {
-      return new Response(null, { status: 405, headers: { Allow: "GET, OPTIONS", ...corsHeaders() } });
+      return new Response(null, {
+        status: 405,
+        headers: { Allow: "GET, OPTIONS", ...corsHeaders() },
+      });
     }
     return new Response(body, {
       status: 200,
-      headers: { "Content-Type": "application/json", "Cache-Control": "public, max-age=3600", ...corsHeaders() },
+      headers: {
+        "Content-Type": "application/json",
+        "Cache-Control": "public, max-age=3600",
+        ...corsHeaders(),
+      },
+    });
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Authorization server metadata (RFC 8414)
+// ---------------------------------------------------------------------------
+
+export interface AuthorizationServerMetadataOptions {
+  /** This server's own origin. It is the `issuer`, so it must match where the document is served. */
+  issuer: string;
+  /** The hosted consent page. */
+  authorizationEndpoint: string;
+  /** Where codes are exchanged. */
+  tokenEndpoint: string;
+  /** Dynamic client registration, RFC 7591. Leaving it out is what stops a client auto-registering. */
+  registrationEndpoint?: string;
+  /** The identity provider's signing keys. */
+  jwksUri?: string;
+  revocationEndpoint?: string;
+  userinfoEndpoint?: string;
+  scopes?: string[];
+  grantTypes?: string[];
+}
+
+export interface AuthorizationServerMetadata {
+  issuer: string;
+  authorization_endpoint: string;
+  token_endpoint: string;
+  registration_endpoint?: string;
+  jwks_uri?: string;
+  revocation_endpoint?: string;
+  userinfo_endpoint?: string;
+  scopes_supported?: string[];
+  response_types_supported: string[];
+  grant_types_supported: string[];
+  code_challenge_methods_supported: string[];
+  token_endpoint_auth_methods_supported: string[];
+}
+
+/**
+ * JSON body for `/.well-known/oauth-authorization-server`.
+ *
+ * Why this exists rather than pointing clients straight at the identity
+ * provider: Stytch serves only `/.well-known/openid-configuration`, and that
+ * document omits `registration_endpoint` even though the endpoint is live. A
+ * client that discovers by the book therefore finds no way to register itself
+ * and gives up. Stytch's `issuer` is also scheme-relative
+ * (`stytch.com/project-...`), which strict clients reject.
+ *
+ * So the app stands in front as the authorization server: it advertises its
+ * own https issuer, its own consent page, and endpoints it proxies, with
+ * registration among them.
+ */
+export function authorizationServerMetadata(
+  opts: AuthorizationServerMetadataOptions,
+): AuthorizationServerMetadata {
+  const metadata: AuthorizationServerMetadata = {
+    issuer: normalizeUrl(opts.issuer),
+    authorization_endpoint: opts.authorizationEndpoint,
+    token_endpoint: opts.tokenEndpoint,
+    response_types_supported: ["code"],
+    grant_types_supported: opts.grantTypes ?? ["authorization_code", "refresh_token"],
+    // PKCE is the only thing a public client can prove itself with.
+    code_challenge_methods_supported: ["S256"],
+    token_endpoint_auth_methods_supported: ["client_secret_basic", "client_secret_post", "none"],
+  };
+  if (opts.registrationEndpoint) metadata.registration_endpoint = opts.registrationEndpoint;
+  if (opts.jwksUri) metadata.jwks_uri = opts.jwksUri;
+  if (opts.revocationEndpoint) metadata.revocation_endpoint = opts.revocationEndpoint;
+  if (opts.userinfoEndpoint) metadata.userinfo_endpoint = opts.userinfoEndpoint;
+  if (opts.scopes?.length) metadata.scopes_supported = opts.scopes;
+  return metadata;
+}
+
+/** A `(req: Request) => Response` handler for the metadata route. GET and OPTIONS, CORS open. */
+export function createAuthorizationServerMetadataHandler(
+  opts: AuthorizationServerMetadataOptions,
+): (req: Request) => Response {
+  const body = JSON.stringify(authorizationServerMetadata(opts));
+  return (req) => {
+    if (req.method === "OPTIONS")
+      return new Response(null, { status: 204, headers: corsHeaders() });
+    if (req.method !== "GET") {
+      return new Response(null, {
+        status: 405,
+        headers: { Allow: "GET, OPTIONS", ...corsHeaders() },
+      });
+    }
+    return new Response(body, {
+      status: 200,
+      headers: {
+        "Content-Type": "application/json",
+        "Cache-Control": "public, max-age=3600",
+        ...corsHeaders(),
+      },
     });
   };
 }
@@ -138,7 +252,9 @@ export interface AgentCommerceMcpHandlerOptions {
  * the request's bearer token. No sessions, JSON responses (no SSE), so it runs
  * in serverless route handlers.
  */
-export function createAgentCommerceMcpHandler(opts: AgentCommerceMcpHandlerOptions): (req: Request) => Promise<Response> {
+export function createAgentCommerceMcpHandler(
+  opts: AgentCommerceMcpHandlerOptions,
+): (req: Request) => Promise<Response> {
   const metadataUrl = opts.resourceMetadataUrl ?? protectedResourceMetadataUrl(opts.resourceUrl);
 
   return async (req) => {
@@ -172,13 +288,21 @@ export function readBearerToken(req: Request): string | undefined {
   return match?.[1]?.trim() || undefined;
 }
 
-function unauthorized(metadataUrl: string, scopes: string[] | undefined, description: string): Response {
+function unauthorized(
+  metadataUrl: string,
+  scopes: string[] | undefined,
+  description: string,
+): Response {
   let challenge = `Bearer error="invalid_token", error_description="${description}"`;
   if (scopes?.length) challenge += `, scope="${scopes.join(" ")}"`;
   challenge += `, resource_metadata="${metadataUrl}"`;
   return new Response(JSON.stringify({ error: "invalid_token", error_description: description }), {
     status: 401,
-    headers: { "Content-Type": "application/json", "WWW-Authenticate": challenge, ...corsHeaders() },
+    headers: {
+      "Content-Type": "application/json",
+      "WWW-Authenticate": challenge,
+      ...corsHeaders(),
+    },
   });
 }
 
@@ -206,7 +330,9 @@ function decodeJwtClaims(token: string): Record<string, unknown> | undefined {
   try {
     const json = atob(part.replace(/-/g, "+").replace(/_/g, "/"));
     const parsed: unknown = JSON.parse(json);
-    return typeof parsed === "object" && parsed !== null ? (parsed as Record<string, unknown>) : undefined;
+    return typeof parsed === "object" && parsed !== null
+      ? (parsed as Record<string, unknown>)
+      : undefined;
   } catch {
     return undefined;
   }
@@ -216,7 +342,8 @@ function corsHeaders(): Record<string, string> {
   return {
     "Access-Control-Allow-Origin": "*",
     "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
-    "Access-Control-Allow-Headers": "Authorization, Content-Type, Accept, mcp-session-id, mcp-protocol-version, Last-Event-ID",
+    "Access-Control-Allow-Headers":
+      "Authorization, Content-Type, Accept, mcp-session-id, mcp-protocol-version, Last-Event-ID",
     "Access-Control-Expose-Headers": "WWW-Authenticate, mcp-session-id, mcp-protocol-version",
   };
 }
@@ -226,5 +353,8 @@ function normalizeUrl(url: string): string {
   // RFC 8707 resource identifiers have no fragment. Keep the path as given, minus a trailing slash.
   u.hash = "";
   if (u.pathname.length > 1) u.pathname = u.pathname.replace(/\/+$/, "");
-  return u.href;
+  // `href` puts the slash back on a bare origin, and an issuer has to match
+  // the string the client discovered it by, character for character
+  // (RFC 8414 §3.3). A stray slash there is enough to fail validation.
+  return u.pathname === "/" ? u.origin : u.href;
 }

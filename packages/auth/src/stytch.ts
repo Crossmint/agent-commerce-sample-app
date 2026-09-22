@@ -76,6 +76,12 @@ export function stytchEndpoints(opts: StytchEndpointOptions) {
     /** Where OAuth clients send the user. Your hosted consent page. */
     authorize: opts.authorizationUrl,
     token: `${domain}/oauth2/token`,
+    /**
+     * Dynamic client registration, RFC 7591. Live, but Stytch's own discovery
+     * document does not advertise it, so a client that only reads discovery
+     * cannot find it. Ours does.
+     */
+    register: `${domain}/oauth2/register`,
     revoke: `${domain}/oauth2/revoke`,
     userinfo: `${domain}/oauth2/userinfo`,
     issuer: `stytch.com/${opts.projectId}`,
@@ -94,11 +100,18 @@ export function createStytchUserAuth(opts: StytchUserAuthOptions): UserAuth {
 
   async function verify(jwt: string): Promise<AuthenticatedUser | null> {
     // Try the session JWKS first, then the Connected Apps JWKS when a project domain is set.
-    for (const [kind, jwks] of [["session", sessionJwks], ["access", idpJwks]] as const) {
+    for (const [kind, jwks] of [
+      ["session", sessionJwks],
+      ["access", idpJwks],
+    ] as const) {
       try {
         const { payload } = await jwtVerify(jwt, jwks, { clockTolerance });
         const aud = Array.isArray(payload.aud) ? payload.aud : payload.aud ? [payload.aud] : [];
-        if (aud.length && !aud.includes(opts.projectId) && !aud.some((a) => a.includes(opts.projectId))) {
+        if (
+          aud.length &&
+          !aud.includes(opts.projectId) &&
+          !aud.some((a) => a.includes(opts.projectId))
+        ) {
           // Connected Apps tokens carry the client id as audience; accept as long as issuer matches.
           const iss = payload.iss ?? "";
           const domainHost = ep.projectDomain?.replace(/^https?:\/\//, "");
@@ -128,7 +141,10 @@ export function createStytchUserAuth(opts: StytchUserAuthOptions): UserAuth {
     if (!res.ok) throw new Error(`Stytch refresh failed: ${res.status} ${await res.text()}`);
     const data = (await res.json()) as { session_jwt: string; session: { expires_at: string } };
     const exp = decodeJwt(data.session_jwt).exp;
-    return { jwt: data.session_jwt, expiresAt: exp ? new Date(exp * 1000) : new Date(data.session.expires_at) };
+    return {
+      jwt: data.session_jwt,
+      expiresAt: exp ? new Date(exp * 1000) : new Date(data.session.expires_at),
+    };
   }
 
   async function exchangeAccessToken(accessToken: string): Promise<ExchangedSession> {
@@ -143,7 +159,8 @@ export function createStytchUserAuth(opts: StytchUserAuthOptions): UserAuth {
       // The project maximum is lower than requested. Take what the project allows.
       res = await call(60);
     }
-    if (!res.ok) throw new Error(`Stytch access token exchange failed: ${res.status} ${await res.text()}`);
+    if (!res.ok)
+      throw new Error(`Stytch access token exchange failed: ${res.status} ${await res.text()}`);
     const data = (await res.json()) as {
       session_token: string;
       session_jwt: string;
@@ -186,8 +203,7 @@ function stytchPost(api: string, projectId: string, secret: string, path: string
 
 function extractStytchEmail(payload: Record<string, unknown>): string | undefined {
   const session = payload["https://stytch.com/session"] as
-    | { authentication_factors?: Array<{ email_factor?: { email_address?: string } }> }
-    | undefined;
+    { authentication_factors?: Array<{ email_factor?: { email_address?: string } }> } | undefined;
   const factor = session?.authentication_factors?.find((f) => f.email_factor?.email_address);
   return factor?.email_factor?.email_address;
 }
