@@ -26,14 +26,18 @@ export interface ConnectedAgentsProps {
   loading?: boolean;
   onRevoke?: (sessionId: string) => void | Promise<void>;
   className?: string;
-  mascotSrc?: string;
 }
 
 /**
  * The user's sessions. Each connected CLI or MCP host is one session on the
  * platform's auth provider. Revoking a session logs that agent out.
  */
-export function ConnectedAgents({ sessions, loading = false, onRevoke, className, mascotSrc }: ConnectedAgentsProps) {
+export function ConnectedAgents({
+  sessions,
+  loading = false,
+  onRevoke,
+  className,
+}: ConnectedAgentsProps) {
   const [busy, setBusy] = React.useState<string | null>(null);
 
   if (loading && !sessions) {
@@ -49,8 +53,6 @@ export function ConnectedAgents({ sessions, loading = false, onRevoke, className
     return (
       <EmptyState
         className={className}
-        mascotSrc={mascotSrc}
-        mascotSize={56}
         title="No agents connected"
         description="Run agent-commerce login in a terminal, or connect an MCP client."
       />
@@ -62,7 +64,10 @@ export function ConnectedAgents({ sessions, loading = false, onRevoke, className
   return (
     <ul className={cn("flex flex-col rounded-2xl border border-border px-5", className)}>
       {sessions.map((s) => (
-        <li key={s.id} className="flex items-center gap-4 border-b border-border/60 py-4 last:border-0">
+        <li
+          key={s.id}
+          className="flex items-center gap-4 border-b border-border/60 py-4 last:border-0"
+        >
           <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-muted text-foreground">
             {s.agent ? <Bot className="size-5" /> : <Laptop className="size-5" />}
           </div>
@@ -72,7 +77,9 @@ export function ConnectedAgents({ sessions, loading = false, onRevoke, className
               {s.current ? <Badge variant="muted">This session</Badge> : null}
             </div>
             {s.lastActive ? (
-              <p className="text-xs text-muted-foreground">Last active {formatDateTime(s.lastActive)}</p>
+              <p className="text-xs text-muted-foreground">
+                Last active {formatDateTime(s.lastActive)}
+              </p>
             ) : null}
           </div>
           {onRevoke ? (

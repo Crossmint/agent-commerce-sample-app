@@ -1,7 +1,12 @@
 "use client";
 
 import * as React from "react";
-import { hasCardRail, pendingVerificationRails, type AgentCard, type OrderIntentRail } from "@agent-commerce/core";
+import {
+  hasCardRail,
+  pendingVerificationRails,
+  type AgentCard,
+  type OrderIntentRail,
+} from "@agent-commerce/core";
 import { VerifyAgentCard } from "./verify-agent-card.js";
 import { cn } from "../lib/utils.js";
 import { formatAmount, formatDate, railLongLabel, railShortLabel } from "../lib/format.js";
@@ -20,11 +25,13 @@ export interface AgentCardListProps {
   /** Hide cancelled and expired cards. Default false. */
   activeOnly?: boolean;
   className?: string;
-  mascotSrc?: string;
   emptyAction?: React.ReactNode;
 }
 
-export function agentCardStatusBadge(card: AgentCard): { label: string; variant: BadgeProps["variant"] } {
+export function agentCardStatusBadge(card: AgentCard): {
+  label: string;
+  variant: BadgeProps["variant"];
+} {
   const expired = new Date(card.expiresAt).getTime() < Date.now();
   if (card.status === "cancelled") return { label: "Revoked", variant: "muted" };
   if (card.status === "expired" || expired) return { label: "Expired", variant: "muted" };
@@ -53,11 +60,17 @@ export function agentCardGroup(card: AgentCard): AgentCardGroup {
 
 export function RailBadge({ rail }: { rail: OrderIntentRail }) {
   const variant: BadgeProps["variant"] =
-    rail.status === "active" ? "outline" : rail.status === "pending_verification" ? "warning" : "destructive";
+    rail.status === "active"
+      ? "outline"
+      : rail.status === "pending_verification"
+        ? "warning"
+        : "destructive";
   return (
     <Badge variant={variant} title={railLongLabel(rail)}>
       {railShortLabel(rail)}
-      {rail.status !== "active" ? <span className="opacity-70">· {rail.status.replace(/_/g, " ")}</span> : null}
+      {rail.status !== "active" ? (
+        <span className="opacity-70">· {rail.status.replace(/_/g, " ")}</span>
+      ) : null}
     </Badge>
   );
 }
@@ -69,7 +82,6 @@ export function AgentCardList({
   onVerified,
   activeOnly = false,
   className,
-  mascotSrc,
   emptyAction,
 }: AgentCardListProps) {
   const [busy, setBusy] = React.useState<string | null>(null);
@@ -90,7 +102,6 @@ export function AgentCardList({
     return (
       <EmptyState
         className={className}
-        mascotSrc={mascotSrc}
         title="No agent cards yet"
         description="When an agent asks to spend, you approve it here."
         action={emptyAction}
@@ -103,61 +114,62 @@ export function AgentCardList({
       {cards.map((card) => {
         const status = agentCardStatusBadge(card);
         const revocable = card.status === "active" && onRevoke;
-        const needsVerification = card.status === "active" && pendingVerificationRails(card).length > 0;
+        const needsVerification =
+          card.status === "active" && pendingVerificationRails(card).length > 0;
         const isVerifying = verifying === card.orderIntentId;
         return (
           <li
             key={card.orderIntentId}
             className="flex flex-col gap-3 rounded-2xl bg-card p-5 ring-1 ring-foreground/10"
           >
-           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-            <div className="min-w-0 flex-1 space-y-2">
-              <div className="flex flex-wrap items-center gap-2">
-                <p className="truncate text-sm font-medium">{card.description}</p>
-                <Badge variant={status.variant}>{status.label}</Badge>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div className="min-w-0 flex-1 space-y-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="truncate text-sm font-medium">{card.description}</p>
+                  <Badge variant={status.variant}>{status.label}</Badge>
+                </div>
+                {/* Money is the one thing set in the display face. */}
+                <p className="font-display text-2xl font-semibold tracking-tight tabular-nums">
+                  {formatAmount(card.amount.available, card.amount.currency)}
+                  <span className="ml-1 font-sans text-sm font-normal text-muted-foreground">
+                    of {formatAmount(card.amount.total, card.amount.currency)} available
+                  </span>
+                </p>
+                <div className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
+                  {card.rails.map((r) => (
+                    <RailBadge key={`${r.rail}-${"provider" in r ? r.provider : ""}`} rail={r} />
+                  ))}
+                  {card.merchant ? <span>· {card.merchant.name}</span> : null}
+                  <span>· until {formatDate(card.expiresAt)}</span>
+                </div>
               </div>
-              {/* Money is the one thing set in the display face. */}
-              <p className="font-display text-2xl font-semibold tracking-tight tabular-nums">
-                {formatAmount(card.amount.available, card.amount.currency)}
-                <span className="ml-1 font-sans text-sm font-normal text-muted-foreground">
-                  of {formatAmount(card.amount.total, card.amount.currency)} available
-                </span>
-              </p>
-              <div className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
-                {card.rails.map((r) => (
-                  <RailBadge key={`${r.rail}-${"provider" in r ? r.provider : ""}`} rail={r} />
-                ))}
-                {card.merchant ? <span>· {card.merchant.name}</span> : null}
-                <span>· until {formatDate(card.expiresAt)}</span>
+              <div className="flex shrink-0 gap-2">
+                {needsVerification && !isVerifying ? (
+                  <Button type="button" size="sm" onClick={() => setVerifying(card.orderIntentId)}>
+                    Verify
+                  </Button>
+                ) : null}
+                {revocable ? (
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    disabled={busy === card.orderIntentId}
+                    onClick={async () => {
+                      setBusy(card.orderIntentId);
+                      try {
+                        await onRevoke(card.orderIntentId);
+                      } finally {
+                        setBusy(null);
+                      }
+                    }}
+                  >
+                    {busy === card.orderIntentId ? <Spinner /> : null}
+                    Revoke
+                  </Button>
+                ) : null}
               </div>
             </div>
-            <div className="flex shrink-0 gap-2">
-              {needsVerification && !isVerifying ? (
-                <Button type="button" size="sm" onClick={() => setVerifying(card.orderIntentId)}>
-                  Verify
-                </Button>
-              ) : null}
-              {revocable ? (
-                <Button
-                  type="button"
-                  variant="secondary"
-                  size="sm"
-                  disabled={busy === card.orderIntentId}
-                  onClick={async () => {
-                    setBusy(card.orderIntentId);
-                    try {
-                      await onRevoke(card.orderIntentId);
-                    } finally {
-                      setBusy(null);
-                    }
-                  }}
-                >
-                  {busy === card.orderIntentId ? <Spinner /> : null}
-                  Revoke
-                </Button>
-              ) : null}
-            </div>
-           </div>
             {isVerifying ? (
               <div className="rounded-2xl bg-muted p-4">
                 <p className="mb-3 text-sm text-muted-foreground">

@@ -54,7 +54,6 @@ export interface AgentCardTableProps {
    */
   compact?: boolean;
   className?: string;
-  mascotSrc?: string;
   emptyAction?: React.ReactNode;
 }
 
@@ -109,7 +108,6 @@ export function AgentCardTable({
   activeOnly = false,
   compact = false,
   className,
-  mascotSrc,
   emptyAction,
 }: AgentCardTableProps) {
   const [busy, setBusy] = React.useState<string | null>(null);
@@ -162,7 +160,6 @@ export function AgentCardTable({
     return (
       <EmptyState
         className={className}
-        mascotSrc={mascotSrc}
         title="No agent cards yet"
         description="When an agent asks to spend, you approve it here."
         action={emptyAction}

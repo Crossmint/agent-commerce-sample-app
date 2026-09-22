@@ -30,28 +30,22 @@ export interface EmptyStateProps extends React.ComponentProps<"div"> {
   title: string;
   description?: string;
   action?: React.ReactNode;
-  mascotSrc?: string;
-  mascotSize?: number;
 }
 
-export function EmptyState({
-  title,
-  description,
-  action,
-  mascotSrc,
-  mascotSize = 72,
-  className,
-  ...props
-}: EmptyStateProps) {
+/**
+ * Nothing here yet, said in words. No mark: the Crossmint logo belongs in the
+ * page chrome, and repeating it inside every empty table said nothing about
+ * the table.
+ */
+export function EmptyState({ title, description, action, className, ...props }: EmptyStateProps) {
   return (
     <div
       className={cn(
-        "flex flex-col items-center gap-3 rounded-2xl bg-muted/50 px-6 py-10 text-center",
+        "flex flex-col items-center gap-3 rounded-2xl bg-muted/50 px-6 py-8 text-center",
         className,
       )}
       {...props}
     >
-      <Mascot src={mascotSrc} size={mascotSize} />
       <div className="flex flex-col gap-1">
         <p className="text-base font-medium">{title}</p>
         {description ? <p className="text-sm text-muted-foreground">{description}</p> : null}
