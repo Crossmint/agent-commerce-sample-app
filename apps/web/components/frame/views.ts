@@ -31,10 +31,11 @@ export function parseView(v: string | null | undefined, fallback: View = "mobile
 export const MESSAGING_APPS = ["imessage", "whatsapp", "instagram"] as const;
 export type MessagingApp = (typeof MESSAGING_APPS)[number];
 
-export const MESSAGING_APP_META: Record<MessagingApp, { label: string }> = {
-  imessage: { label: "iMessage" },
-  whatsapp: { label: "WhatsApp" },
-  instagram: { label: "Instagram" },
+/** `logo` is served from /logos and carries the app's own brand color. */
+export const MESSAGING_APP_META: Record<MessagingApp, { label: string; logo: string }> = {
+  imessage: { label: "iMessage", logo: "/logos/imessage.svg" },
+  whatsapp: { label: "WhatsApp", logo: "/logos/whatsapp.svg" },
+  instagram: { label: "Instagram", logo: "/logos/instagram.svg" },
 };
 
 export function isMessagingApp(v: string | null | undefined): v is MessagingApp {

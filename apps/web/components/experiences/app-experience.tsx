@@ -7,9 +7,9 @@ import { nanoid } from "nanoid";
 import type { ConnectedAgentSession } from "@agent-commerce/ui";
 import type { BrandTheme } from "@/components/brand-themes";
 import { useAgentChat } from "@/components/chat/use-agent-chat";
-import { BrandPicker } from "@/components/frame/brand-picker";
-import { ViewSwitcher, type View } from "@/components/frame/view-switcher";
-import { MESSAGING_APP_META, MESSAGING_APPS, type MessagingApp } from "@/components/frame/views";
+import { FrameControls } from "@/components/frame/frame-selects";
+import { SiteHeader } from "@/components/frame/site-header";
+import { type MessagingApp, type View } from "@/components/frame/views";
 import type { ChatMessage, ChatSummary } from "@/lib/chat/types";
 import { cn } from "@/lib/cn";
 import { CliPanel } from "./cli-panel";
@@ -48,11 +48,13 @@ interface ThreadState {
   loaded: boolean;
 }
 
-/** Where the bars fixed at the top of the page start, and the gap kept under them. */
-const TOP_BAR_OFFSET = 24;
-const TOP_BAR_GAP = 16;
-/** What a phone keeps clear before the bars have been measured. */
-const DEFAULT_RESERVE_TOP = 72;
+/**
+ * What a desktop keeps clear above the phone: the header block at the top
+ * left (24px down, the 52px card row, an 8px gap, the 26px notice under it)
+ * and a gap below it. A fixed figure now that the controls no longer stack
+ * over the phone.
+ */
+const RESERVE_TOP = 24 + 52 + 8 + 26 + 16;
 
 /**
  * The client half of the app page: the switchers, the frame they name, and
@@ -69,7 +71,21 @@ const DEFAULT_RESERVE_TOP = 72;
  * flips the interface without a reload; the email and the chat list come from
  * the server and arrive on the `router.refresh()` that follows.
  */
-export function AppExperience({ email, chats, sessions, sessionsNote, chatEnabled, attachmentsEnabled, persist, initialView, initialApp, initialBrand, initialChatId, newChatId, revokeSession }: AppExperienceProps) {
+export function AppExperience({
+  email,
+  chats,
+  sessions,
+  sessionsNote,
+  chatEnabled,
+  attachmentsEnabled,
+  persist,
+  initialView,
+  initialApp,
+  initialBrand,
+  initialChatId,
+  newChatId,
+  revokeSession,
+}: AppExperienceProps) {
   const router = useRouter();
   const stytch = useStytch();
   const { session, isInitialized } = useStytchSession();
@@ -78,7 +94,11 @@ export function AppExperience({ email, chats, sessions, sessionsNote, chatEnable
   const signedIn = isInitialized ? Boolean(session) : Boolean(email);
   const shownEmail = signedIn ? (email ?? user?.emails?.[0]?.email) : undefined;
 
-  const [choice, setChoice] = useState<Choice>({ view: initialView, app: initialApp, brand: initialBrand });
+  const [choice, setChoice] = useState<Choice>({
+    view: initialView,
+    app: initialApp,
+    brand: initialBrand,
+  });
   const [thread, setThread] = useState<ThreadState>({
     id: initialChatId ?? newChatId,
     messages: [],
@@ -93,7 +113,11 @@ export function AppExperience({ email, chats, sessions, sessionsNote, chatEnable
     const id = thread.id;
     let cancelled = false;
     fetch(`/api/chat/history/${encodeURIComponent(id)}`)
-      .then(async (res) => (res.ok ? { ok: true, messages: ((await res.json()) as { messages: ChatMessage[] }).messages } : { ok: false, messages: [] }))
+      .then(async (res) =>
+        res.ok
+          ? { ok: true, messages: ((await res.json()) as { messages: ChatMessage[] }).messages }
+          : { ok: false, messages: [] },
+      )
       .catch(() => ({ ok: false, messages: [] as ChatMessage[] }))
       .then(({ ok, messages }) => {
         if (cancelled) return;
@@ -109,7 +133,15 @@ export function AppExperience({ email, chats, sessions, sessionsNote, chatEnable
   const [seenSignedIn, setSeenSignedIn] = useState(signedIn);
   if (seenSignedIn !== signedIn) {
     setSeenSignedIn(signedIn);
-    if (signedIn && persist && initialChatId && thread.id === initialChatId && !thread.loaded && !thread.loading && thread.messages.length === 0) {
+    if (
+      signedIn &&
+      persist &&
+      initialChatId &&
+      thread.id === initialChatId &&
+      !thread.loaded &&
+      !thread.loading &&
+      thread.messages.length === 0
+    ) {
       setThread({ ...thread, loading: true });
     }
   }
@@ -147,9 +179,24 @@ export function AppExperience({ email, chats, sessions, sessionsNote, chatEnable
     },
     [syncUrl],
   );
-  const changeView = useCallback((view: View) => view !== choice.view && changeChoice({ view }), [changeChoice, choice.view]);
-  const changeApp = useCallback((app: MessagingApp) => app !== choice.app && changeChoice({ app }), [changeChoice, choice.app]);
-  const changeBrand = useCallback((brand: BrandTheme) => brand !== choice.brand && changeChoice({ brand }), [changeChoice, choice.brand]);
+  const changeView = useCallback(
+    (view: View) => view !== choice.view && changeChoice({ view }),
+    [changeChoice, choice.view],
+  );
+  const changeBrand = useCallback(
+    (brand: BrandTheme) => brand !== choice.brand && changeChoice({ brand }),
+    [changeChoice, choice.brand],
+  );
+  /**
+   * Picking a chat app moves to the messaging platform and names the app in
+   * one change. Two calls would race in the URL: `syncUrl` reads the current
+   * search each time, so the second would write back the search from before
+   * the first and drop the app.
+   */
+  const changeMessagingApp = useCallback(
+    (app: MessagingApp) => changeChoice({ view: "messaging", app }),
+    [changeChoice],
+  );
 
   const openChat = useCallback(
     (id: string) => {
@@ -187,13 +234,15 @@ export function AppExperience({ email, chats, sessions, sessionsNote, chatEnable
     }
   }, [router, stytch, syncUrl]);
 
-  // The top bars can wrap onto two rows on a narrow desktop, or grow a row
-  // for the messaging apps, so the phone measures them rather than guessing.
-  const [topBar, setTopBar] = useState<HTMLDivElement | null>(null);
-  const topBarHeight = useElementHeight(topBar);
-  const reserveTop = topBarHeight ? TOP_BAR_OFFSET + topBarHeight + TOP_BAR_GAP : DEFAULT_RESERVE_TOP;
-
-  const messaging = choice.view === "messaging";
+  const reserveTop = RESERVE_TOP;
+  const controls = {
+    view: choice.view,
+    app: choice.app,
+    brand: choice.brand,
+    onView: changeView,
+    onApp: changeMessagingApp,
+    onBrand: changeBrand,
+  };
 
   const shared = {
     ...choice,
@@ -216,39 +265,60 @@ export function AppExperience({ email, chats, sessions, sessionsNote, chatEnable
 
   return (
     <>
-      {/* Desktop: the switchers fixed top centre, the app tabs under them when the messaging frame is up. */}
-      <div ref={setTopBar} className="fixed inset-x-0 z-20 hidden flex-col items-center gap-2 md:flex" style={{ top: TOP_BAR_OFFSET }}>
-        <div className="flex flex-wrap items-center justify-center gap-2 px-4">
-          <ViewSwitcher value={choice.view} onChange={changeView} />
-          <BrandPicker value={choice.brand} onChange={changeBrand} />
+      {/* Desktop: one header row, the logo card and the controls beside it. */}
+      <div className="fixed top-6 left-6 z-20 hidden flex-col items-start gap-2 md:flex">
+        <div className="flex items-center gap-2.5">
+          <SiteHeader />
+          <FrameControls {...controls} />
         </div>
-        {messaging ? <MessagingAppTabs value={choice.app} onChange={changeApp} /> : null}
+        {/* The app runs on production keys, so anything bought here is bought. */}
+        <p className="rounded-full border border-border bg-background/80 px-3 py-1 text-[12px] font-medium text-muted-foreground backdrop-blur">
+          All purchases are real purchases.
+        </p>
       </div>
 
       {/* Keyed so a change of conversation starts a fresh `useChat`. While the
           messages load, the key differs too, so they land as initial messages. */}
-      <ChatHost key={thread.loading ? `${thread.id}:loading` : thread.id} id={thread.id} initialMessages={thread.messages} persist={persist} shared={shared} />
+      <ChatHost
+        key={thread.loading ? `${thread.id}:loading` : thread.id}
+        id={thread.id}
+        initialMessages={thread.messages}
+        persist={persist}
+        shared={shared}
+      />
 
       {/* Phone: the same controls in a bar at the foot, in the flow so the frame above shrinks to fit. */}
-      <div className="flex w-full shrink-0 flex-col items-center gap-2 px-3 pt-2 pb-[max(env(safe-area-inset-bottom),0.75rem)] md:hidden">
-        <ViewSwitcher value={choice.view} onChange={changeView} />
-        <div className="flex flex-wrap items-center justify-center gap-2">
-          <BrandPicker value={choice.brand} onChange={changeBrand} size="sm" />
-          {messaging ? <MessagingAppTabs value={choice.app} onChange={changeApp} size="sm" /> : null}
-        </div>
+      <div className="flex w-full shrink-0 items-center justify-center px-3 pt-2 pb-[max(env(safe-area-inset-bottom),0.75rem)] md:hidden">
+        <FrameControls {...controls} />
       </div>
     </>
   );
 }
 
 /** Owns the chat, so a switch of frame keeps the conversation. */
-function ChatHost({ id, initialMessages, persist, shared }: { id: string; initialMessages: ChatMessage[]; persist: boolean; shared: Omit<ExperienceProps, "chat"> }) {
+function ChatHost({
+  id,
+  initialMessages,
+  persist,
+  shared,
+}: {
+  id: string;
+  initialMessages: ChatMessage[];
+  persist: boolean;
+  shared: Omit<ExperienceProps, "chat">;
+}) {
   const chat = useAgentChat({ id, initialMessages, persist });
   const props: ExperienceProps = { ...shared, chat };
   const phone = shared.view === "mobile" || shared.view === "messaging";
 
   return (
-    <div key={shared.view} className={cn("flex min-h-0 w-full flex-1 flex-col items-center justify-center", !phone && "px-4 md:px-0")}>
+    <div
+      key={shared.view}
+      className={cn(
+        "flex min-h-0 w-full flex-1 flex-col items-center justify-center",
+        !phone && "px-4 md:px-0",
+      )}
+    >
       {shared.view === "mobile" ? (
         <MobileApp {...props} />
       ) : shared.view === "desktop" ? (
@@ -263,44 +333,4 @@ function ChatHost({ id, initialMessages, persist, shared }: { id: string; initia
       )}
     </div>
   );
-}
-
-/** The three chat apps the messaging frame can imitate, as a pill of tabs in the switcher's style. */
-function MessagingAppTabs({ value, onChange, size = "md" }: { value: MessagingApp; onChange: (app: MessagingApp) => void; size?: "sm" | "md" }) {
-  return (
-    <div role="tablist" aria-label="Chat app" className="flex items-center gap-1 rounded-full bg-card/70 p-1.5 shadow-[0_8px_24px_rgba(0,0,0,0.08)] ring-1 ring-black/5 backdrop-blur-lg">
-      {MESSAGING_APPS.map((app) => {
-        const active = app === value;
-        return (
-          <button
-            key={app}
-            type="button"
-            role="tab"
-            aria-selected={active}
-            onClick={() => onChange(app)}
-            className={cn(
-              "rounded-full font-medium tracking-tight whitespace-nowrap transition-colors duration-200 outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
-              size === "md" ? "h-9 px-4 text-sm" : "h-8 px-3 text-xs",
-              active ? "bg-muted text-foreground" : "text-muted-foreground hover:text-foreground",
-            )}
-          >
-            {MESSAGING_APP_META[app].label}
-          </button>
-        );
-      })}
-    </div>
-  );
-}
-
-/** The rendered height of an element, kept up to date as it changes. Zero while it is hidden or not yet mounted. */
-function useElementHeight(el: HTMLElement | null): number {
-  const [height, setHeight] = useState(0);
-  useEffect(() => {
-    if (!el) return;
-    // Observing fires once at once, so the first measure needs no call of its own.
-    const observer = new ResizeObserver(() => setHeight(el.getBoundingClientRect().height));
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, [el]);
-  return height;
 }

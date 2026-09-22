@@ -71,7 +71,7 @@ export default async function AppPage({ searchParams }: { searchParams: Promise<
   }
 
   return (
-    <FramePage>
+    <FramePage header={false}>
       <AppExperience
         email={session?.email}
         chats={chats}
