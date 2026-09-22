@@ -218,11 +218,18 @@ export function createChatTools(api: AgentCommerceClient) {
     }),
 
     create_checkout: tool({
-      description: describeTool("create_checkout"),
+      description: describeTool(
+        "create_checkout",
+        "The payment step appears in this conversation: call get_checkout, then await_agent_card_approval with the requestId on its paymentRequest.",
+      ),
       inputSchema: z.object({
         startUrl: z.string().url().describe(paramDoc("create_checkout", "startUrl")),
         task: z.string().max(20000).optional().describe(paramDoc("create_checkout", "task")),
-        agentCardId: z.string().min(1).describe(paramDoc("create_checkout", "agentCardId")),
+        agentCardId: z
+          .string()
+          .min(1)
+          .optional()
+          .describe(paramDoc("create_checkout", "agentCardId")),
         maxCost: z
           .object({
             amount: z
@@ -242,7 +249,10 @@ export function createChatTools(api: AgentCommerceClient) {
     }),
 
     get_checkout: tool({
-      description: describeTool("get_checkout"),
+      description: describeTool(
+        "get_checkout",
+        "When the result carries paymentRequest, call await_agent_card_approval with its requestId: the user picks a payment method right here in the chat.",
+      ),
       inputSchema: z.object({
         checkoutId: z.string().min(1).describe(paramDoc("get_checkout", "checkoutId")),
       }),

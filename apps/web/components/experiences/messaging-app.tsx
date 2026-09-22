@@ -1,9 +1,36 @@
 "use client";
 
-import { useCallback, useRef, useState, type ChangeEvent, type FormEvent, type KeyboardEvent, type ReactNode } from "react";
-import { ApproveAgentCard, CheckoutView as CheckoutViewPanel, formatAmount, type ApproveOutcome } from "@agent-commerce/ui";
-import { AGENT_DOMAIN, AGENT_NAME, AgentAvatar, AgentMark, PLATFORM_NAME } from "@/components/brand";
-import { checkoutHost, checkoutOf, findRequest, isCheckoutPart, toApprovalOutcome } from "@/components/chat/parts";
+import {
+  useCallback,
+  useRef,
+  useState,
+  type ChangeEvent,
+  type FormEvent,
+  type KeyboardEvent,
+  type ReactNode,
+} from "react";
+import {
+  ApproveAgentCard,
+  CheckoutView as CheckoutViewPanel,
+  formatAmount,
+  PAYMENT_STEP_ASK,
+  type ApproveOutcome,
+} from "@agent-commerce/ui";
+import {
+  AGENT_DOMAIN,
+  AGENT_NAME,
+  AgentAvatar,
+  AgentMark,
+  PLATFORM_NAME,
+} from "@/components/brand";
+import {
+  checkoutHost,
+  checkoutOf,
+  findPaymentStep,
+  findRequest,
+  isCheckoutPart,
+  toApprovalOutcome,
+} from "@/components/chat/parts";
 import { useScrollToBottom } from "@/components/chat/use-scroll-to-bottom";
 import { DeviceFrame } from "@/components/frame/device-frame";
 import { PAGE_SHEET_TRANSITION_MS, PhonePageSheet } from "@/components/frame/phone-sheet";
@@ -12,13 +39,26 @@ import type { MessagingApp as MessagingAppId } from "@/components/frame/views";
 import { LoginForm } from "@/components/login-form";
 import type { ChatMessage } from "@/lib/chat/types";
 import { cn } from "@/lib/cn";
-import { ArrowUpIcon, CameraIcon, ChevronLeftIcon, ChevronRightIcon, DoubleCheckIcon, ImageIcon, LockIcon, MicIcon, PhoneIcon, PlusIcon, StickerIcon, VideoIcon } from "./messaging-icons";
+import {
+  ArrowUpIcon,
+  CameraIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  DoubleCheckIcon,
+  ImageIcon,
+  LockIcon,
+  MicIcon,
+  PhoneIcon,
+  PlusIcon,
+  StickerIcon,
+  VideoIcon,
+} from "./messaging-icons";
 import { brandAttr, loginNext, type ExperienceProps } from "./types";
 import "./messaging.css";
 
 const DONE_LINGER_MS = 800;
 /** The first bubble of every thread. It stays when the conversation starts. */
-const WELCOME = `Hi, I am ${AGENT_NAME}. What should I buy for you? I will ask you to approve a budget first.`;
+const WELCOME = `Hi, I am ${AGENT_NAME}. What should I buy for you? Send me a link and you can choose how to pay at the checkout.`;
 
 /**
  * The app as a conversation in a chat app. The agent is a contact; what it
@@ -33,9 +73,18 @@ export function MessagingApp(props: ExperienceProps) {
   const Chrome = CHROMES[props.app];
   return (
     <DeviceFrame className="flex-1 md:flex-none" reserveTop={props.reserveTop}>
-      <div className={cn("msg relative flex h-full min-h-0 flex-col text-[15px] leading-[1.3]", `msg-${props.app}`)}>
+      <div
+        className={cn(
+          "msg relative flex h-full min-h-0 flex-col text-[15px] leading-[1.3]",
+          `msg-${props.app}`,
+        )}
+      >
         <PhoneStatusBar />
-        {props.signedIn ? <SignedIn {...props} Chrome={Chrome} /> : <SignedOut {...props} Chrome={Chrome} />}
+        {props.signedIn ? (
+          <SignedIn {...props} Chrome={Chrome} />
+        ) : (
+          <SignedOut {...props} Chrome={Chrome} />
+        )}
       </div>
     </DeviceFrame>
   );
@@ -50,13 +99,30 @@ type Side = "sent" | "recv";
 type Bubble =
   | { key: string; kind: "text"; side: Side; text: string }
   /** A link to one of our pages. `path` is shown under the agent's domain; the page itself opens in a sheet. */
-  | { key: string; kind: "link"; side: "recv"; title: string; path: string; done?: string; onOpen?: () => void }
+  | {
+      key: string;
+      kind: "link";
+      side: "recv";
+      title: string;
+      path: string;
+      done?: string;
+      onOpen?: () => void;
+    }
   | { key: string; kind: "status"; text: string };
 
-type Approval = { toolCallId: string; requestId: string };
+type Approval = {
+  toolCallId: string;
+  requestId: string;
+  /** Set when a checkout's payment step raised this, so the sheet says so. */
+  paying?: boolean;
+};
 
 /** The thread as a flat list of bubbles. A message with two text parts is two bubbles; a tool call is none. */
-function toBubbles(messages: ChatMessage[], onReview: (a: Approval) => void, onOpenCheckout: (id: string) => void): Bubble[] {
+function toBubbles(
+  messages: ChatMessage[],
+  onReview: (a: Approval) => void,
+  onOpenCheckout: (id: string) => void,
+): Bubble[] {
   const out: Bubble[] = [];
   for (const m of messages) {
     if (m.role === "user") {
@@ -75,18 +141,56 @@ function toBubbles(messages: ChatMessage[], onReview: (a: Approval) => void, onO
         if (part.text.trim()) out.push({ key, kind: "text", side: "recv", text: part.text.trim() });
         return;
       }
-      if (part.type === "tool-await_agent_card_approval" && (part.state === "input-available" || part.state === "output-available")) {
+      if (
+        part.type === "tool-await_agent_card_approval" &&
+        (part.state === "input-available" || part.state === "output-available")
+      ) {
         const request = findRequest(m, part.input.requestId);
-        const title = request ? `Approve ${formatAmount(request.amount.value, request.amount.currency)} for ${request.description}` : "Approve a budget";
-        const done = part.state === "output-available" ? (part.output.status === "active" ? "Approved" : part.output.status === "denied" ? "Denied" : part.output.status === "expired" ? "Expired" : "Failed") : undefined;
-        out.push({ key, kind: "link", side: "recv", title, path: `/approve/${part.input.requestId}`, done, onOpen: done ? undefined : () => onReview({ toolCallId: part.toolCallId, requestId: part.input.requestId }) });
+        // A checkout waiting on this is the user choosing how to pay, not an
+        // agent asking for a budget out of the blue.
+        const paying = Boolean(findPaymentStep(m, part.input.requestId));
+        const title = paying
+          ? "Choose how to pay"
+          : request
+            ? `Approve ${formatAmount(request.amount.value, request.amount.currency)} for ${request.description}`
+            : "Approve a budget";
+        const done =
+          part.state === "output-available"
+            ? part.output.status === "active"
+              ? "Approved"
+              : part.output.status === "denied"
+                ? "Denied"
+                : part.output.status === "expired"
+                  ? "Expired"
+                  : "Failed"
+            : undefined;
+        out.push({
+          key,
+          kind: "link",
+          side: "recv",
+          title,
+          path: `/approve/${part.input.requestId}`,
+          done,
+          onOpen: done
+            ? undefined
+            : () =>
+                onReview({ toolCallId: part.toolCallId, requestId: part.input.requestId, paying }),
+        });
         return;
       }
       if (isCheckoutPart(part)) {
         const view = checkoutOf(part);
         if (!view) return;
         const store = checkoutHost(m, part);
-        out.push({ key, kind: "link", side: "recv", title: store ? `Checkout at ${store}` : "Checkout", path: `/checkouts/${view.id}`, done: view.status === "succeeded" ? "Bought" : undefined, onOpen: () => onOpenCheckout(view.id) });
+        out.push({
+          key,
+          kind: "link",
+          side: "recv",
+          title: store ? `Checkout at ${store}` : "Checkout",
+          path: `/checkouts/${view.id}`,
+          done: view.status === "succeeded" ? "Bought" : undefined,
+          onOpen: () => onOpenCheckout(view.id),
+        });
       }
     });
   }
@@ -148,7 +252,10 @@ function Thread({
 
   return (
     <div className="relative min-h-0 flex-1">
-      <div ref={containerRef} className={cn("absolute inset-0 overflow-y-auto scrollbar-none", className)}>
+      <div
+        ref={containerRef}
+        className={cn("absolute inset-0 overflow-y-auto scrollbar-none", className)}
+      >
         <div className="flex min-h-full flex-col justify-end px-3 pt-3 pb-1">
           {dateLine(opened)}
           {bubbles.map((b, i) => {
@@ -163,7 +270,13 @@ function Thread({
             const last = sideOf(bubbles[i + 1]) !== b.side;
             return (
               <div key={b.key} className={cn("flex flex-col", last ? "mb-2" : "mb-[3px]")}>
-                {renderBubble({ bubble: b, first, last, time: timeFor(b.key), seen: i === lastSent })}
+                {renderBubble({
+                  bubble: b,
+                  first,
+                  last,
+                  time: timeFor(b.key),
+                  seen: i === lastSent,
+                })}
               </div>
             );
           })}
@@ -175,7 +288,15 @@ function Thread({
 }
 
 /** A link bubble is a button while its page can still be opened. */
-function LinkShell({ onOpen, className, children }: { onOpen?: () => void; className: string; children: ReactNode }) {
+function LinkShell({
+  onOpen,
+  className,
+  children,
+}: {
+  onOpen?: () => void;
+  className: string;
+  children: ReactNode;
+}) {
   return onOpen ? (
     <button type="button" onClick={onOpen} className={className}>
       {children}
@@ -262,7 +383,12 @@ function IMessageChrome({ bubbles, working, composer }: ChromeProps) {
             <ChevronRightIcon width={10} height={10} strokeWidth={3} className="im-gray ml-px" />
           </span>
         </span>
-        <VideoIcon width={24} height={24} strokeWidth={1.8} className="im-blue mb-3 justify-self-end" />
+        <VideoIcon
+          width={24}
+          height={24}
+          strokeWidth={1.8}
+          className="im-blue mb-3 justify-self-end"
+        />
       </div>
 
       <Thread
@@ -284,7 +410,11 @@ function IMessageChrome({ bubbles, working, composer }: ChromeProps) {
 
 function IMessageBubble({ bubble, last }: Placed) {
   const sent = bubble.side === "sent";
-  const skin = cn("im-bubble rounded-[18px]", sent ? "im-sent-bubble ml-auto" : "im-recv-bubble mr-auto", last && (sent ? "im-tail-sent" : "im-tail-recv"));
+  const skin = cn(
+    "im-bubble rounded-[18px]",
+    sent ? "im-sent-bubble ml-auto" : "im-recv-bubble mr-auto",
+    last && (sent ? "im-tail-sent" : "im-tail-recv"),
+  );
 
   if (bubble.kind === "link") {
     return (
@@ -294,8 +424,12 @@ function IMessageBubble({ bubble, last }: Placed) {
             <AgentMark size={40} />
           </div>
           <div className="flex flex-col gap-px px-3 py-2">
-            <span className="truncate text-[13px] leading-tight font-semibold">{bubble.done ?? bubble.title}</span>
-            <span className="im-gray truncate text-[11px]">{bubble.done ? bubble.title : AGENT_DOMAIN}</span>
+            <span className="truncate text-[13px] leading-tight font-semibold">
+              {bubble.done ?? bubble.title}
+            </span>
+            <span className="im-gray truncate text-[11px]">
+              {bubble.done ? bubble.title : AGENT_DOMAIN}
+            </span>
           </div>
         </div>
       </LinkShell>
@@ -318,8 +452,21 @@ function IMessageComposer(props: ComposerProps) {
         <PlusIcon width={18} height={18} strokeWidth={2.2} />
       </span>
       <div className="im-field flex h-9 min-w-0 flex-1 items-center rounded-full border pr-[3px] pl-3">
-        <input {...inputProps} placeholder="iMessage" aria-label="iMessage" className="msg-input min-w-0 flex-1 bg-transparent text-[15px] outline-none disabled:opacity-60" />
-        <button type="submit" aria-label="Send" disabled={!canSend} className={cn("inline-flex size-7 shrink-0 items-center justify-center rounded-full transition-colors", canSend ? "im-send" : "im-gray im-plus")}>
+        <input
+          {...inputProps}
+          placeholder="iMessage"
+          aria-label="iMessage"
+          className="msg-input min-w-0 flex-1 bg-transparent text-[15px] outline-none disabled:opacity-60"
+        />
+        <button
+          type="submit"
+          aria-label="Send"
+          disabled={!canSend}
+          className={cn(
+            "inline-flex size-7 shrink-0 items-center justify-center rounded-full transition-colors",
+            canSend ? "im-send" : "im-gray im-plus",
+          )}
+        >
           <ArrowUpIcon width={16} height={16} strokeWidth={3} />
         </button>
       </div>
@@ -349,7 +496,9 @@ function WhatsAppChrome({ bubbles, working, composer }: ChromeProps) {
         className="wa-canvas"
         dateLine={() => (
           <div className="mb-3 flex justify-center">
-            <span className="wa-date rounded-[8px] px-2.5 py-1 text-[12px] font-medium shadow-[0_1px_0.5px_rgba(0,0,0,0.13)]">Today</span>
+            <span className="wa-date rounded-[8px] px-2.5 py-1 text-[12px] font-medium shadow-[0_1px_0.5px_rgba(0,0,0,0.13)]">
+              Today
+            </span>
           </div>
         )}
         statusClassName="wa-date wa-status mx-auto my-1 rounded-[8px] px-2.5 py-1 text-center text-[12px] font-medium shadow-[0_1px_0.5px_rgba(0,0,0,0.13)]"
@@ -363,7 +512,11 @@ function WhatsAppChrome({ bubbles, working, composer }: ChromeProps) {
 
 function WhatsAppBubble({ bubble, first, time }: Placed) {
   const sent = bubble.side === "sent";
-  const skin = cn("wa-bubble rounded-[8px]", sent ? "wa-sent ml-auto" : "wa-recv mr-auto", first && (sent ? "wa-tail-sent rounded-tr-none" : "wa-tail-recv rounded-tl-none"));
+  const skin = cn(
+    "wa-bubble rounded-[8px]",
+    sent ? "wa-sent ml-auto" : "wa-recv mr-auto",
+    first && (sent ? "wa-tail-sent rounded-tr-none" : "wa-tail-recv rounded-tl-none"),
+  );
   // Floats to the right of the last line when it fits, else onto a line of its own, as in WhatsApp.
   const meta = (
     <span className="wa-time float-right mt-[7px] ml-2 flex items-center gap-1 text-[11px] leading-none">
@@ -376,8 +529,12 @@ function WhatsAppBubble({ bubble, first, time }: Placed) {
     return (
       <LinkShell onOpen={bubble.onOpen} className={cn(skin, "w-[80%] p-[3px] text-left")}>
         <div className="wa-preview flex flex-col gap-0.5 rounded-[6px] px-3 py-2.5">
-          <span className="text-[14px] leading-tight font-semibold">{bubble.done ?? bubble.title}</span>
-          <span className="wa-time text-[12px] leading-tight">{bubble.done ? bubble.title : `${AGENT_NAME} is waiting for your answer.`}</span>
+          <span className="text-[14px] leading-tight font-semibold">
+            {bubble.done ?? bubble.title}
+          </span>
+          <span className="wa-time text-[12px] leading-tight">
+            {bubble.done ? bubble.title : `${AGENT_NAME} is waiting for your answer.`}
+          </span>
           <span className="wa-time text-[12px]">{AGENT_DOMAIN}</span>
         </div>
         <div className="flow-root px-2 pt-1.5 pb-1">
@@ -399,14 +556,27 @@ function WhatsAppBubble({ bubble, first, time }: Placed) {
 function WhatsAppComposer(props: ComposerProps) {
   const { typing, canSend, onSubmit, inputProps } = useComposer(props);
   return (
-    <form className="wa-bar flex shrink-0 items-center gap-2 border-t px-2 pt-1.5 pb-7" onSubmit={onSubmit}>
+    <form
+      className="wa-bar flex shrink-0 items-center gap-2 border-t px-2 pt-1.5 pb-7"
+      onSubmit={onSubmit}
+    >
       <PlusIcon width={26} height={26} strokeWidth={2} className="wa-blue shrink-0" />
       <div className="wa-field flex h-9 min-w-0 flex-1 items-center rounded-full border pr-2 pl-3">
-        <input {...inputProps} placeholder="Message" aria-label="Message" className="msg-input min-w-0 flex-1 bg-transparent text-[16px] outline-none disabled:opacity-60" />
+        <input
+          {...inputProps}
+          placeholder="Message"
+          aria-label="Message"
+          className="msg-input min-w-0 flex-1 bg-transparent text-[16px] outline-none disabled:opacity-60"
+        />
         <StickerIcon width={22} height={22} strokeWidth={1.8} className="wa-gray shrink-0" />
       </div>
       {typing ? (
-        <button type="submit" aria-label="Send" disabled={!canSend} className="wa-send inline-flex size-8 shrink-0 items-center justify-center rounded-full disabled:opacity-60">
+        <button
+          type="submit"
+          aria-label="Send"
+          disabled={!canSend}
+          className="wa-send inline-flex size-8 shrink-0 items-center justify-center rounded-full disabled:opacity-60"
+        >
           <ArrowUpIcon width={18} height={18} strokeWidth={2.5} />
         </button>
       ) : (
@@ -438,7 +608,9 @@ function InstagramChrome({ bubbles, working, composer }: ChromeProps) {
       <Thread
         bubbles={bubbles}
         working={working}
-        dateLine={(opened) => <p className="ig-gray mb-3 text-center text-[11px] font-medium">Today {opened}</p>}
+        dateLine={(opened) => (
+          <p className="ig-gray mb-3 text-center text-[11px] font-medium">Today {opened}</p>
+        )}
         statusClassName="ig-gray my-1 text-center text-[11px] font-medium"
         renderBubble={(p) => <InstagramBubble {...p} />}
       />
@@ -451,7 +623,9 @@ function InstagramChrome({ bubbles, working, composer }: ChromeProps) {
 function InstagramBubble({ bubble, first, last, seen }: Placed) {
   const sent = bubble.side === "sent";
   // Bubbles in a run flatten the corners that face each other.
-  const radius = sent ? cn("rounded-[18px]", !first && "rounded-tr-[5px]", !last && "rounded-br-[5px]") : cn("rounded-[18px]", !first && "rounded-tl-[5px]", !last && "rounded-bl-[5px]");
+  const radius = sent
+    ? cn("rounded-[18px]", !first && "rounded-tr-[5px]", !last && "rounded-br-[5px]")
+    : cn("rounded-[18px]", !first && "rounded-tl-[5px]", !last && "rounded-bl-[5px]");
   const skin = sent ? "ig-sent" : "ig-recv";
 
   const body =
@@ -462,13 +636,21 @@ function InstagramBubble({ bubble, first, last, seen }: Placed) {
             <AgentMark size={40} />
           </div>
           <div className="flex flex-col gap-px px-3 py-2">
-            <span className="truncate text-[13px] leading-tight font-semibold">{bubble.done ?? bubble.title}</span>
-            <span className="ig-gray truncate text-[11px]">{bubble.done ? bubble.title : AGENT_DOMAIN}</span>
+            <span className="truncate text-[13px] leading-tight font-semibold">
+              {bubble.done ?? bubble.title}
+            </span>
+            <span className="ig-gray truncate text-[11px]">
+              {bubble.done ? bubble.title : AGENT_DOMAIN}
+            </span>
           </div>
         </div>
       </LinkShell>
     ) : (
-      <div className={cn("max-w-[78%] px-3 py-[7px] break-words whitespace-pre-wrap", radius, skin)}>{bubble.text}</div>
+      <div
+        className={cn("max-w-[78%] px-3 py-[7px] break-words whitespace-pre-wrap", radius, skin)}
+      >
+        {bubble.text}
+      </div>
     );
 
   if (sent) {
@@ -482,7 +664,11 @@ function InstagramBubble({ bubble, first, last, seen }: Placed) {
   return (
     <div className="flex items-end gap-1.5">
       {/* The avatar sits by the last bubble of a run; a spacer keeps the others aligned. */}
-      {last ? <AgentAvatar size={24} className="rounded-full ring-1 ring-black/10" /> : <span className="w-6 shrink-0" />}
+      {last ? (
+        <AgentAvatar size={24} className="rounded-full ring-1 ring-black/10" />
+      ) : (
+        <span className="w-6 shrink-0" />
+      )}
       {body}
     </div>
   );
@@ -496,9 +682,18 @@ function InstagramComposer(props: ComposerProps) {
         <span className="ig-sent inline-flex size-9 shrink-0 items-center justify-center rounded-full">
           <CameraIcon width={19} height={19} strokeWidth={2} />
         </span>
-        <input {...inputProps} placeholder="Message..." aria-label="Message" className="msg-input min-w-0 flex-1 bg-transparent text-[15px] outline-none disabled:opacity-60" />
+        <input
+          {...inputProps}
+          placeholder="Message..."
+          aria-label="Message"
+          className="msg-input min-w-0 flex-1 bg-transparent text-[15px] outline-none disabled:opacity-60"
+        />
         {typing ? (
-          <button type="submit" disabled={!canSend} className="ig-send shrink-0 text-[15px] font-semibold disabled:opacity-60">
+          <button
+            type="submit"
+            disabled={!canSend}
+            className="ig-send shrink-0 text-[15px] font-semibold disabled:opacity-60"
+          >
             Send
           </button>
         ) : (
@@ -523,7 +718,13 @@ const CHROMES: Record<MessagingAppId, Chrome> = {
 // Signed in
 // ---------------------------------------------------------------------------
 
-function SignedIn({ chat, thread, chatEnabled, brand, Chrome }: ExperienceProps & { Chrome: Chrome }) {
+function SignedIn({
+  chat,
+  thread,
+  chatEnabled,
+  brand,
+  Chrome,
+}: ExperienceProps & { Chrome: Chrome }) {
   const [approval, setApproval] = useState<Approval | null>(null);
   const [approvalOpen, setApprovalOpen] = useState(false);
   const [checkoutId, setCheckoutId] = useState<string | null>(null);
@@ -554,7 +755,14 @@ function SignedIn({ chat, thread, chatEnabled, brand, Chrome }: ExperienceProps 
   }, []);
 
   const bubbles: Bubble[] = [
-    chatEnabled ? { key: "hello", kind: "text", side: "recv", text: WELCOME } : { key: "off", kind: "text", side: "recv", text: "Chat is off. Set ANTHROPIC_API_KEY or OPENAI_API_KEY to turn it on." },
+    chatEnabled
+      ? { key: "hello", kind: "text", side: "recv", text: WELCOME }
+      : {
+          key: "off",
+          kind: "text",
+          side: "recv",
+          text: "Chat is off. Set ANTHROPIC_API_KEY or OPENAI_API_KEY to turn it on.",
+        },
     ...toBubbles(chat.messages, onReview, openCheckout),
   ];
   if (thread.loading) bubbles.push({ key: "loading", kind: "status", text: "Loading…" });
@@ -562,14 +770,45 @@ function SignedIn({ chat, thread, chatEnabled, brand, Chrome }: ExperienceProps 
 
   return (
     <>
-      <Chrome bubbles={bubbles} working={chat.busy} composer={{ disabled: !chatEnabled, busy: chat.busy, onSend: chat.send }} />
+      <Chrome
+        bubbles={bubbles}
+        working={chat.busy}
+        composer={{ disabled: !chatEnabled, busy: chat.busy, onSend: chat.send }}
+      />
 
-      <BrowserSheet open={approvalOpen} path={`/approve/${approval?.requestId ?? ""}`} brand={brand} onDone={closeApproval} ariaLabel="Approve">
-        {approval ? <ApproveAgentCard key={approval.requestId} requestId={approval.requestId} variant="plain" platformName={PLATFORM_NAME} onDone={onApprovalDone} /> : null}
+      <BrowserSheet
+        open={approvalOpen}
+        path={`/approve/${approval?.requestId ?? ""}`}
+        brand={brand}
+        onDone={closeApproval}
+        ariaLabel="Approve"
+      >
+        {approval ? (
+          <ApproveAgentCard
+            key={approval.requestId}
+            requestId={approval.requestId}
+            variant="plain"
+            platformName={PLATFORM_NAME}
+            ask={approval.paying ? PAYMENT_STEP_ASK : undefined}
+            onDone={onApprovalDone}
+          />
+        ) : null}
       </BrowserSheet>
 
-      <BrowserSheet open={checkoutOpen} path={`/checkouts/${checkoutId ?? ""}`} brand={brand} onDone={closeCheckout} ariaLabel="Checkout">
-        {checkoutId ? <CheckoutViewPanel checkoutId={checkoutId} frameHeight={420} /> : null}
+      <BrowserSheet
+        open={checkoutOpen}
+        path={`/checkouts/${checkoutId ?? ""}`}
+        brand={brand}
+        onDone={closeCheckout}
+        ariaLabel="Checkout"
+      >
+        {checkoutId ? (
+          <CheckoutViewPanel
+            checkoutId={checkoutId}
+            frameHeight={420}
+            platformName={PLATFORM_NAME}
+          />
+        ) : null}
       </BrowserSheet>
     </>
   );
@@ -583,13 +822,35 @@ function SignedOut(props: ExperienceProps & { Chrome: Chrome }) {
   const { onSignedIn, brand, Chrome } = props;
   const [open, setOpen] = useState(false);
   const bubbles: Bubble[] = [
-    { key: "hello", kind: "text", side: "recv", text: `Hi, I am ${AGENT_NAME}. Log in and tell me what to buy for you.` },
-    { key: "login", kind: "link", side: "recv", title: "Log in", path: "/login", onOpen: () => setOpen(true) },
+    {
+      key: "hello",
+      kind: "text",
+      side: "recv",
+      text: `Hi, I am ${AGENT_NAME}. Log in and tell me what to buy for you.`,
+    },
+    {
+      key: "login",
+      kind: "link",
+      side: "recv",
+      title: "Log in",
+      path: "/login",
+      onOpen: () => setOpen(true),
+    },
   ];
   return (
     <>
-      <Chrome bubbles={bubbles} working={false} composer={{ disabled: true, busy: false, onSend: () => undefined }} />
-      <BrowserSheet open={open} path="/login" brand={brand} onDone={() => setOpen(false)} ariaLabel="Log in">
+      <Chrome
+        bubbles={bubbles}
+        working={false}
+        composer={{ disabled: true, busy: false, onSend: () => undefined }}
+      />
+      <BrowserSheet
+        open={open}
+        path="/login"
+        brand={brand}
+        onDone={() => setOpen(false)}
+        ariaLabel="Log in"
+      >
         <LoginForm
           next={loginNext(props)}
           onSignedIn={() => {
@@ -608,11 +869,29 @@ function SignedOut(props: ExperienceProps & { Chrome: Chrome }) {
 // brand; the bar does not.
 // ---------------------------------------------------------------------------
 
-function BrowserSheet({ open, path, brand, onDone, ariaLabel, children }: { open: boolean; path: string; brand: ExperienceProps["brand"]; onDone: () => void; ariaLabel: string; children: ReactNode }) {
+function BrowserSheet({
+  open,
+  path,
+  brand,
+  onDone,
+  ariaLabel,
+  children,
+}: {
+  open: boolean;
+  path: string;
+  brand: ExperienceProps["brand"];
+  onDone: () => void;
+  ariaLabel: string;
+  children: ReactNode;
+}) {
   return (
     <PhonePageSheet open={open} ariaLabel={ariaLabel}>
       <div className="msg-browser-bar flex items-center gap-3 border-b px-3 pt-4 pb-2 md:pt-14">
-        <button type="button" onClick={onDone} className="msg-browser-action w-11 shrink-0 text-left text-[15px] font-semibold">
+        <button
+          type="button"
+          onClick={onDone}
+          className="msg-browser-action w-11 shrink-0 text-left text-[15px] font-semibold"
+        >
           Done
         </button>
         <span className="msg-browser-url flex h-9 min-w-0 flex-1 items-center justify-center gap-1.5 rounded-[10px] px-3 text-[13px]">
@@ -624,7 +903,10 @@ function BrowserSheet({ open, path, brand, onDone, ariaLabel, children }: { open
         </span>
         <span aria-hidden className="w-11 shrink-0" />
       </div>
-      <div data-brand={brandAttr(brand)} className="flex min-h-0 flex-1 flex-col overflow-y-auto bg-background text-foreground scrollbar-none">
+      <div
+        data-brand={brandAttr(brand)}
+        className="flex min-h-0 flex-1 flex-col overflow-y-auto bg-background text-foreground scrollbar-none"
+      >
         <div className="px-6 py-6">{children}</div>
       </div>
     </PhonePageSheet>

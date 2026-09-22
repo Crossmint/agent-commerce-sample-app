@@ -1,9 +1,24 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
-import { describeTool, formatAmount, PARAM_DOCS, paramDoc, renderPendingAction, TOOL_DOCS, toDecimalString, toolNamesFor } from "@agent-commerce/core";
+import {
+  describeTool,
+  formatAmount,
+  PARAM_DOCS,
+  paramDoc,
+  renderPendingAction,
+  TOOL_DOCS,
+  toDecimalString,
+  toolNamesFor,
+} from "@agent-commerce/core";
 import type { RenderedAction, RenderedField, ToolNameFor } from "@agent-commerce/core";
 import { AgentCommerceApiError } from "./api.js";
-import type { AgentCard, AgentCardRequest, CheckoutView, CredentialResult, AgentCommerceApi } from "./api.js";
+import type {
+  AgentCard,
+  AgentCardRequest,
+  CheckoutView,
+  CredentialResult,
+  AgentCommerceApi,
+} from "./api.js";
 import * as z from "zod";
 
 export interface AgentCommerceToolsContext {
@@ -43,7 +58,10 @@ const title = (name: AgentCommerceToolName) => TOOL_DOCS[name].title;
 // Registration
 // ---------------------------------------------------------------------------
 
-export function registerAgentCommerceTools(server: McpServer, ctx: AgentCommerceToolsContext): void {
+export function registerAgentCommerceTools(
+  server: McpServer,
+  ctx: AgentCommerceToolsContext,
+): void {
   const { api } = ctx;
 
   server.registerTool(
@@ -58,7 +76,9 @@ export function registerAgentCommerceTools(server: McpServer, ctx: AgentCommerce
       const lines = paymentMethods.length
         ? paymentMethods.map((pm) => {
             const card = pm.card ? `${pm.card.brand} •••• ${pm.card.last4}` : pm.type;
-            const exp = pm.card?.expiration ? `, exp ${pm.card.expiration.month}/${pm.card.expiration.year}` : "";
+            const exp = pm.card?.expiration
+              ? `, exp ${pm.card.expiration.month}/${pm.card.expiration.year}`
+              : "";
             return `- ${pm.displayName ?? card} (${pm.paymentMethodId})${exp}${pm.default ? ", default" : ""}`;
           })
         : ["No saved cards. The user adds one in the wallet website."];
@@ -79,13 +99,25 @@ export function registerAgentCommerceTools(server: McpServer, ctx: AgentCommerce
         currency: currencySchema.optional(),
         description: z.string().min(1).describe(paramDoc("request_agent_card", "description")),
         merchant: merchantSchema.optional().describe(paramDoc("request_agent_card", "merchant")),
-        expiresInHours: z.number().positive().optional().describe(paramDoc("request_agent_card", "expiresInHours")),
-        requester: z.string().optional().describe(`${paramDoc("request_agent_card", "requester")} Defaults to the server's label.`),
+        expiresInHours: z
+          .number()
+          .positive()
+          .optional()
+          .describe(paramDoc("request_agent_card", "expiresInHours")),
+        requester: z
+          .string()
+          .optional()
+          .describe(
+            `${paramDoc("request_agent_card", "requester")} Defaults to the server's label.`,
+          ),
       },
     },
     guard(async (args) => {
       const req = await api.createAgentCardRequest({
-        amount: { value: toDecimalString(args.amount), currency: (args.currency ?? "USD").toUpperCase() },
+        amount: {
+          value: toDecimalString(args.amount),
+          currency: (args.currency ?? "USD").toUpperCase(),
+        },
         description: args.description,
         merchant: args.merchant,
         expiresInHours: args.expiresInHours,
@@ -115,7 +147,9 @@ export function registerAgentCommerceTools(server: McpServer, ctx: AgentCommerce
     {
       title: title("get_agent_card_request"),
       description: describeTool("get_agent_card_request"),
-      inputSchema: { requestId: z.string().describe(paramDoc("get_agent_card_request", "requestId")) },
+      inputSchema: {
+        requestId: z.string().describe(paramDoc("get_agent_card_request", "requestId")),
+      },
       annotations: { readOnlyHint: true, openWorldHint: true },
     },
     guard(async ({ requestId }) => {
@@ -133,7 +167,9 @@ export function registerAgentCommerceTools(server: McpServer, ctx: AgentCommerce
     },
     guard(async () => {
       const agentCards = await api.listAgentCards();
-      const text = agentCards.length ? agentCards.map(describeAgentCard).join("\n") : "No agent cards.";
+      const text = agentCards.length
+        ? agentCards.map(describeAgentCard).join("\n")
+        : "No agent cards.";
       return ok(text, { agentCards });
     }),
   );
@@ -171,11 +207,19 @@ export function registerAgentCommerceTools(server: McpServer, ctx: AgentCommerce
     guard(async (args) => {
       let amount: { value: string; currency: string } | undefined;
       if (args.amount !== undefined) {
-        const currency = args.currency ?? (await api.getAgentCard(args.agentCardId)).amount.currency;
+        const currency =
+          args.currency ?? (await api.getAgentCard(args.agentCardId)).amount.currency;
         amount = { value: toDecimalString(args.amount), currency: currency.toUpperCase() };
       }
-      const cred = await api.mintCredential(args.agentCardId, { amount, merchant: args.merchant, format: "card" });
-      return ok(describeCredential(cred, amount), { ...cred, warning: cred.enforced ? undefined : enforcedWarning(cred, amount) });
+      const cred = await api.mintCredential(args.agentCardId, {
+        amount,
+        merchant: args.merchant,
+        format: "card",
+      });
+      return ok(describeCredential(cred, amount), {
+        ...cred,
+        warning: cred.enforced ? undefined : enforcedWarning(cred, amount),
+      });
     }),
   );
 
@@ -184,7 +228,9 @@ export function registerAgentCommerceTools(server: McpServer, ctx: AgentCommerce
     {
       title: title("revoke_agent_card"),
       description: describeTool("revoke_agent_card"),
-      inputSchema: { agentCardId: z.string().describe(paramDoc("revoke_agent_card", "agentCardId")) },
+      inputSchema: {
+        agentCardId: z.string().describe(paramDoc("revoke_agent_card", "agentCardId")),
+      },
       annotations: { destructiveHint: true, idempotentHint: true, openWorldHint: true },
     },
     guard(async ({ agentCardId }) => {
@@ -197,16 +243,29 @@ export function registerAgentCommerceTools(server: McpServer, ctx: AgentCommerce
     "create_checkout",
     {
       title: title("create_checkout"),
-      description: describeTool("create_checkout"),
+      description: describeTool(
+        "create_checkout",
+        "Here the payment step arrives as a link on get_checkout: show it to the user and let them choose a payment method in the browser.",
+      ),
       inputSchema: {
         startUrl: z.string().url().describe(paramDoc("create_checkout", "startUrl")),
         task: z.string().max(20000).optional().describe(paramDoc("create_checkout", "task")),
-        agentCardId: z.string().describe(paramDoc("create_checkout", "agentCardId")),
+        agentCardId: z.string().optional().describe(paramDoc("create_checkout", "agentCardId")),
         maxCost: amountSchema.describe(paramDoc("create_checkout", "maxCost")),
         currency: currencySchema.optional(),
-        buyerProfileId: z.string().optional().describe(paramDoc("create_checkout", "buyerProfileId")),
-        browserProfileId: z.string().optional().describe(paramDoc("create_checkout", "browserProfileId")),
-        merchantGuidance: z.string().max(20000).optional().describe(paramDoc("create_checkout", "merchantGuidance")),
+        buyerProfileId: z
+          .string()
+          .optional()
+          .describe(paramDoc("create_checkout", "buyerProfileId")),
+        browserProfileId: z
+          .string()
+          .optional()
+          .describe(paramDoc("create_checkout", "browserProfileId")),
+        merchantGuidance: z
+          .string()
+          .max(20000)
+          .optional()
+          .describe(paramDoc("create_checkout", "merchantGuidance")),
       },
       annotations: { openWorldHint: true },
     },
@@ -215,7 +274,10 @@ export function registerAgentCommerceTools(server: McpServer, ctx: AgentCommerce
         startUrl: args.startUrl,
         task: args.task,
         agentCardId: args.agentCardId,
-        maxCost: { amount: toDecimalString(args.maxCost), currency: (args.currency ?? "USD").toUpperCase() },
+        maxCost: {
+          amount: toDecimalString(args.maxCost),
+          currency: (args.currency ?? "USD").toUpperCase(),
+        },
         buyerProfileId: args.buyerProfileId,
         browserProfileId: args.browserProfileId,
         merchantGuidance: args.merchantGuidance,
@@ -228,14 +290,19 @@ export function registerAgentCommerceTools(server: McpServer, ctx: AgentCommerce
     "get_checkout",
     {
       title: title("get_checkout"),
-      description: describeTool("get_checkout"),
+      description: describeTool(
+        "get_checkout",
+        "Here paymentRequest carries an approvalUrl: show it to the user, then keep polling until they have chosen.",
+      ),
       inputSchema: { checkoutId: z.string().describe(paramDoc("get_checkout", "checkoutId")) },
       annotations: { readOnlyHint: true, openWorldHint: true },
     },
     guard(async ({ checkoutId }) => {
       const checkout = await api.getCheckout(checkoutId);
       const rendered = renderedAction(checkout);
-      return ok(describeCheckout(checkout), { checkout: rendered ? { ...checkout, rendered } : checkout });
+      return ok(describeCheckout(checkout), {
+        checkout: rendered ? { ...checkout, rendered } : checkout,
+      });
     }),
   );
 
@@ -247,8 +314,14 @@ export function registerAgentCommerceTools(server: McpServer, ctx: AgentCommerce
       inputSchema: {
         checkoutId: z.string().describe(paramDoc("answer_checkout", "checkoutId")),
         requestId: z.string().optional().describe(paramDoc("answer_checkout", "requestId")),
-        action: z.enum(["submit", "decline", "alternative"]).optional().describe(paramDoc("answer_checkout", "action")),
-        values: z.record(z.string(), z.unknown()).optional().describe(paramDoc("answer_checkout", "values")),
+        action: z
+          .enum(["submit", "decline", "alternative"])
+          .optional()
+          .describe(paramDoc("answer_checkout", "action")),
+        values: z
+          .record(z.string(), z.unknown())
+          .optional()
+          .describe(paramDoc("answer_checkout", "values")),
         text: z.string().max(20000).optional().describe(paramDoc("answer_checkout", "text")),
       },
       annotations: { openWorldHint: true },
@@ -293,15 +366,23 @@ function fail(err: unknown): CallToolResult {
     return {
       isError: true,
       content: [{ type: "text", text: `Agent Commerce error ${err.code}: ${err.message}.${hint}` }],
-      structuredContent: { error: { code: err.code, message: err.message, status: err.status, details: err.details } },
+      structuredContent: {
+        error: { code: err.code, message: err.message, status: err.status, details: err.details },
+      },
     };
   }
   const message = err instanceof Error ? err.message : String(err);
-  return { isError: true, content: [{ type: "text", text: `Error: ${message}` }], structuredContent: { error: { message } } };
+  return {
+    isError: true,
+    content: [{ type: "text", text: `Error: ${message}` }],
+    structuredContent: { error: { message } },
+  };
 }
 
 /** Wrap a tool body so API failures become `isError` results instead of protocol errors. */
-function guard<A extends unknown[]>(fn: (...args: A) => Promise<CallToolResult>): (...args: A) => Promise<CallToolResult> {
+function guard<A extends unknown[]>(
+  fn: (...args: A) => Promise<CallToolResult>,
+): (...args: A) => Promise<CallToolResult> {
   return async (...args) => {
     try {
       return await fn(...args);
@@ -336,7 +417,9 @@ function describeRequest(req: AgentCardRequest): string {
 }
 
 function describeAgentCard(card: AgentCard): string {
-  const rails = card.rails.map((r) => `${r.rail}${"provider" in r && r.provider ? `/${r.provider}` : ""}:${r.status}`).join(", ");
+  const rails = card.rails
+    .map((r) => `${r.rail}${"provider" in r && r.provider ? `/${r.provider}` : ""}:${r.status}`)
+    .join(", ");
   const merchant = card.merchant ? ` Merchant: ${card.merchant.name}.` : "";
   return (
     `- ${card.orderIntentId}: "${card.description}", ${card.status}. ` +
@@ -345,7 +428,10 @@ function describeAgentCard(card: AgentCard): string {
   );
 }
 
-function enforcedWarning(cred: CredentialResult, amount?: { value: string; currency: string }): string {
+function enforcedWarning(
+  cred: CredentialResult,
+  amount?: { value: string; currency: string },
+): string {
   const limit = amount ? formatAmount(amount.value, amount.currency) : "the agent card limit";
   return (
     `WARNING: the ${cred.rail} rail does not enforce the limit. Crossmint will not block a charge above ${limit}. ` +
@@ -353,7 +439,10 @@ function enforcedWarning(cred: CredentialResult, amount?: { value: string; curre
   );
 }
 
-function describeCredential(cred: CredentialResult, amount?: { value: string; currency: string }): string {
+function describeCredential(
+  cred: CredentialResult,
+  amount?: { value: string; currency: string },
+): string {
   const lines = [
     `Credential for agent card ${cred.agentCardId} on rail ${cred.rail}${cred.provider ? ` (${cred.provider})` : ""}. ` +
       (cred.enforced ? "The limit is enforced by the network." : enforcedWarning(cred, amount)),
@@ -367,7 +456,9 @@ function describeCredential(cred: CredentialResult, amount?: { value: string; cu
   }
   if (cred.token) lines.push(`Token: ${cred.token}`);
   if (cred.expiresAt) lines.push(`Credential expires ${cred.expiresAt}.`);
-  lines.push("Use these fields only in the merchant's checkout form. Do not show or repeat them to the user.");
+  lines.push(
+    "Use these fields only in the merchant's checkout form. Do not show or repeat them to the user.",
+  );
   return lines.join("\n");
 }
 
@@ -384,7 +475,9 @@ function renderedAction(checkout: CheckoutView): RenderedAction | undefined {
 }
 
 function describeField(f: RenderedField, indent = "  "): string {
-  const opts = f.options ? ` one of: ${f.options.map((o) => JSON.stringify(o.value)).join(", ")}` : "";
+  const opts = f.options
+    ? ` one of: ${f.options.map((o) => JSON.stringify(o.value)).join(", ")}`
+    : "";
   const desc = f.description ? ` — ${f.description}` : "";
   const line = `${indent}- ${f.name} (${f.kind}${f.required ? ", required" : ""})${opts}${desc}`;
   const children = f.children?.map((c) => describeField(c, indent + "  ")) ?? [];
@@ -395,7 +488,9 @@ function describeCheckout(checkout: CheckoutView): string {
   const lines = [`Checkout ${checkout.id}: status ${checkout.status}.`];
   const action = renderedAction(checkout);
   if (action) {
-    lines.push(`Question (requestId "${action.id}"): ${action.title}${action.description ? ` — ${action.description}` : ""}`);
+    lines.push(
+      `Question (requestId "${action.id}"): ${action.title}${action.description ? ` — ${action.description}` : ""}`,
+    );
     if (action.fields.length) {
       lines.push("Fields:", ...action.fields.map((f) => describeField(f)));
     }
@@ -405,16 +500,33 @@ function describeCheckout(checkout: CheckoutView): string {
         `(values to submit, or action "decline" / "alternative").`,
     );
   }
-  if (checkout.embedUrl) lines.push(`The user can watch the agent's browser at: ${checkout.embedUrl}`);
+  if (checkout.paymentRequest) {
+    const pr = checkout.paymentRequest;
+    lines.push(
+      `Payment step: the run needs a payment method before it can pay. Show the user this link so they can choose one, which mints an agent card for up to ${pr.amount.value} ${pr.amount.currency}: ${pr.approvalUrl}`,
+      `Then keep polling get_checkout. Do not answer this with answer_checkout, and never send card fields. Request status: ${pr.status}.`,
+    );
+  }
+  if (checkout.embedUrl)
+    lines.push(`The user can watch the agent's browser at: ${checkout.embedUrl}`);
   if (checkout.receipt) {
-    lines.push(`Receipt: total ${checkout.receipt.total.amount} ${checkout.receipt.total.currency}${checkout.receipt.merchantOrderId ? `, order ${checkout.receipt.merchantOrderId}` : ""}.`);
+    lines.push(
+      `Receipt: total ${checkout.receipt.total.amount} ${checkout.receipt.total.currency}${checkout.receipt.merchantOrderId ? `, order ${checkout.receipt.merchantOrderId}` : ""}.`,
+    );
   } else if (checkout.status === "succeeded") {
     lines.push("Succeeded. The order went through but no receipt could be read.");
   }
   if (checkout.result?.summary) lines.push(`Summary: ${checkout.result.summary}`);
   if (checkout.failure) {
-    const label = checkout.status === "blocked" ? "Blocked" : checkout.status === "cancelled" ? "Cancelled" : "Failed";
-    lines.push(`${label}: ${checkout.failure.reason}${checkout.failure.message ? ` — ${checkout.failure.message}` : ""}.`);
+    const label =
+      checkout.status === "blocked"
+        ? "Blocked"
+        : checkout.status === "cancelled"
+          ? "Cancelled"
+          : "Failed";
+    lines.push(
+      `${label}: ${checkout.failure.reason}${checkout.failure.message ? ` — ${checkout.failure.message}` : ""}.`,
+    );
   }
   if (checkout.spentUsd) lines.push(`Spent so far: ${checkout.spentUsd} USD.`);
   if (!action && !checkout.failure && checkout.status !== "succeeded") {

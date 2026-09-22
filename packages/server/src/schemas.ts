@@ -55,7 +55,9 @@ export const createCheckoutSchema = z
     url: z.string().url().optional(),
     task: z.string().min(1).max(20000).optional(),
     request: z.string().min(1).max(20000).optional(),
-    agentCardId: z.string().min(1),
+    // Optional: a checkout can start without a card and get one at its
+    // payment step, when the user chooses a payment method.
+    agentCardId: z.string().min(1).optional(),
     maxCost: z.object({
       amount: decimalAmount,
       currency: z.string().length(3),
@@ -64,7 +66,10 @@ export const createCheckoutSchema = z
     browserProfileId: z.string().min(1).optional(),
     merchantGuidance: z.string().min(1).max(20000).optional(),
   })
-  .refine((b) => Boolean(b.startUrl ?? b.url), { message: "startUrl is required", path: ["startUrl"] });
+  .refine((b) => Boolean(b.startUrl ?? b.url), {
+    message: "startUrl is required",
+    path: ["startUrl"],
+  });
 
 /**
  * Body of POST /v1/checkouts/:id/messages. With `requestId`: answer the open
@@ -82,8 +87,18 @@ export const checkoutMessageSchema = z
   .superRefine((b, ctx) => {
     if (b.requestId) {
       const action = b.action ?? "submit";
-      if (action === "submit" && !b.values) ctx.addIssue({ code: "custom", path: ["values"], message: "values are required to submit" });
-      if (action === "alternative" && !b.text) ctx.addIssue({ code: "custom", path: ["text"], message: "text is required for an alternative" });
+      if (action === "submit" && !b.values)
+        ctx.addIssue({
+          code: "custom",
+          path: ["values"],
+          message: "values are required to submit",
+        });
+      if (action === "alternative" && !b.text)
+        ctx.addIssue({
+          code: "custom",
+          path: ["text"],
+          message: "text is required for an alternative",
+        });
     } else if (!b.text) {
       ctx.addIssue({ code: "custom", path: ["text"], message: "text or requestId is required" });
     }

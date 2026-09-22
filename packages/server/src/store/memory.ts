@@ -94,12 +94,15 @@ export function memorySessionStore(): SessionStore {
 export function memoryCheckoutStore(): CheckoutStore {
   const links = new Map<string, CheckoutLink>();
   return {
-    async linkCheckout(checkoutId, userId, agentCardId) {
+    async linkCheckout(checkoutId, userId, patch) {
+      const existing = links.get(checkoutId);
       links.set(checkoutId, {
-        checkoutId,
+        ...(existing ?? { checkoutId, userId, createdAt: new Date().toISOString() }),
         userId,
-        agentCardId,
-        createdAt: new Date().toISOString(),
+        // Only overwrite what the caller named, so linking a request later
+        // does not drop the card, and vice versa.
+        ...(patch?.agentCardId ? { agentCardId: patch.agentCardId } : {}),
+        ...(patch?.agentCardRequestId ? { agentCardRequestId: patch.agentCardRequestId } : {}),
       });
     },
     async getCheckout(checkoutId) {

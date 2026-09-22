@@ -67,16 +67,29 @@ export interface RequestStore {
 export interface CheckoutLink {
   checkoutId: string;
   userId: string;
-  agentCardId: string;
+  /**
+   * The agent card that pays. Absent until there is one: a checkout may
+   * start without any, and get its card at the payment step.
+   */
+  agentCardId?: string;
+  /** The agent card request raised at the payment step, while the user chooses a payment method. */
+  agentCardRequestId?: string;
   createdAt: string;
 }
 
+/** What `linkCheckout` may set. Fields left out keep whatever the row holds. */
+export interface CheckoutLinkPatch {
+  agentCardId?: string;
+  agentCardRequestId?: string;
+}
+
 /**
- * Maps a Crossmint checkout to the agent card that pays for it.
- * The server needs this to answer payment actions itself.
+ * Maps a Crossmint checkout to the agent card that pays for it, and to the
+ * request the user answers when the run asks for a payment method. The
+ * server needs both to answer payment actions itself.
  */
 export interface CheckoutStore {
-  linkCheckout(checkoutId: string, userId: string, agentCardId: string): Promise<void>;
+  linkCheckout(checkoutId: string, userId: string, patch?: CheckoutLinkPatch): Promise<void>;
   getCheckout(checkoutId: string): Promise<CheckoutLink | null>;
 }
 

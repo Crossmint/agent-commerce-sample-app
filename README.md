@@ -33,9 +33,11 @@ It is not a crypto wallet. It wraps the Crossmint Agents APIs and adds the parts
 
 ## How it flows
 
-1. The agent runs `agent-commerce agent-card request --amount 50 --description "Flight to SF"` and gets an approval link.
-2. The user opens the link, logs in, picks a card or adds one, and taps Allow. A passkey prompt appears once per device.
-3. The agent polls until the card is active, then runs `agent-commerce agent-card reveal <id>` for a scoped card number, or `agent-commerce checkout create --url ... --agent-card <id>` to let Crossmint buy the item.
+1. The agent runs `agent-commerce checkout create --url ... --max-cost 50` and Crossmint starts buying the item in a real browser. No card is asked for yet.
+2. Partway through, the run reaches its **payment step** and the agent gets an approval link. The user opens it, logs in, and picks one of their saved payment methods. A passkey prompt appears once per device.
+3. That mints an **agent card** for this purchase alone, capped at the max cost and locked to the store. Crossmint pays the store with it, and the agent polls until the receipt lands.
+
+An agent can also ask for an agent card up front, with `agent-commerce agent-card request --amount 50 --description "Flight to SF"`, and then spend it with `agent-commerce agent-card reveal <id>` — for paying somewhere a checkout cannot reach.
 
 Read [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the full design and [docs/API.md](docs/API.md) for the HTTP contract.
 

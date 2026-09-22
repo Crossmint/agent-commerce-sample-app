@@ -80,7 +80,8 @@ export interface Me {
   email?: string;
 }
 
-export type AgentCardRequestStatus = "pending" | "approved" | "active" | "denied" | "expired" | "failed";
+export type AgentCardRequestStatus =
+  "pending" | "approved" | "active" | "denied" | "expired" | "failed";
 
 export interface AgentCardRequest {
   id: string;
@@ -160,10 +161,27 @@ export interface CheckoutMessageInput {
   messageId?: string;
 }
 
+/**
+ * The run reached its payment step and nothing pays for it yet. The user
+ * picks one of their saved payment methods on this request, which mints the
+ * agent card the server then pays with.
+ */
+export interface CheckoutPaymentRequest {
+  requestId: string;
+  status: AgentCardRequestStatus;
+  approvalUrl: string;
+  amount: Amount;
+  description: string;
+  merchant?: Merchant;
+  agentCardId?: string;
+  failureReason?: string;
+}
+
 export interface CheckoutView {
   id: string;
   status: CheckoutStatus;
   agentCardId?: string;
+  paymentRequest?: CheckoutPaymentRequest;
   pendingUserAction?: PendingUserAction;
   rendered?: RenderedAction;
   embedUrl?: string;

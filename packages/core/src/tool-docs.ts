@@ -41,18 +41,20 @@ export const TOOL_DOCS = {
   list_payment_methods: {
     title: "List saved cards",
     summary:
-      "List the user's saved cards, masked: brand, last four digits, expiry. Never a full number. These are the cards an agent card can draw from.",
+      "List the user's saved payment methods, masked: brand, last four digits, expiry. Never a full number. A payment method is what an agent card is minted from, and what the user picks at a checkout's payment step.",
     params: {},
     surfaces: ["mcp", "chat"],
   },
   request_agent_card: {
     title: "Request an agent card",
     summary:
-      "Ask the user to approve an agent card: a bounded budget on one of their saved cards. Returns a requestId and the request status. Nothing is spent until the user approves.",
+      "Ask the user to approve an agent card: scoped, user-approved spending minted from one of their saved payment methods. Returns a requestId and the request status. Nothing is spent until the user approves. " +
+      "You do not need one to buy something. Prefer create_checkout and let the payment step mint the card. Request one up front only when the agent needs a card number of its own, for instance to drive a store in your own browser.",
     params: {
       amount: "Spending limit.",
       currency: PARAM_DOCS.currency,
-      description: "What the money is for, in the user's words, e.g. Flight to SF. Shown on the approval screen.",
+      description:
+        "What the money is for, in the user's words, e.g. Flight to SF. Shown on the approval screen.",
       merchant: "Lock the card to one merchant when the store is known.",
       expiresInHours: "How long the agent card stays valid. Default 24.",
       requester: "Name of the agent shown to the user.",
@@ -63,20 +65,26 @@ export const TOOL_DOCS = {
     title: "Check an agent card request",
     summary:
       "Poll an agent card request. Status goes pending → approved → active, or denied / expired / failed. Once active, the result carries the agentCardId.",
-    params: { requestId: "The requestId from request_agent_card." },
+    params: {
+      requestId:
+        "The requestId from request_agent_card, or the one on a checkout's paymentRequest.",
+    },
     surfaces: ["mcp"],
   },
   await_agent_card_approval: {
     title: "Wait for approval in the chat",
     summary:
-      "Wait for the user to approve or deny an agent card request in the chat. Call it right after request_agent_card. The result carries the agentCardId when approved.",
-    params: { requestId: "The requestId from request_agent_card." },
+      "Wait for the user to choose a payment method and approve an agent card, right here in the chat. Call it after request_agent_card, and whenever get_checkout returns a paymentRequest. The result carries the agentCardId when approved.",
+    params: {
+      requestId:
+        "The requestId from request_agent_card, or the one on a checkout's paymentRequest.",
+    },
     surfaces: ["chat"],
   },
   list_agent_cards: {
     title: "List agent cards",
     summary:
-      "List the user's agent cards (approved budgets) with status, total, available balance and expiry. Check this before requesting a new one: reuse an active card that fits the purchase.",
+      "List the user's agent cards (approved spending permissions) with status, total, available balance and expiry. Worth a look when you mean to reuse one; a checkout does not need it, because its payment step mints its own.",
     params: {},
     surfaces: ["mcp", "chat"],
   },
@@ -89,7 +97,7 @@ export const TOOL_DOCS = {
   reveal_agent_card: {
     title: "Reveal card details",
     summary:
-      "Mint a scoped card credential from an active agent card. Prefer create_checkout when the target is a website: its maxCost is enforced. Check enforced: false means the limit is advisory on that rail.",
+      "Mint a scoped card credential from an active agent card, for paying somewhere Agent Checkouts does not reach: your own browser automation, or a form you drive yourself. Prefer create_checkout when the target is a website: its maxCost is enforced and it runs its own payment step. Check enforced: false means the limit is advisory on that rail.",
     params: {
       agentCardId: PARAM_DOCS.agentCardId,
       amount: "Amount for this payment. Default: the agent card's available balance.",
@@ -101,19 +109,22 @@ export const TOOL_DOCS = {
   },
   revoke_agent_card: {
     title: "Revoke an agent card",
-    summary: "Revoke an agent card. Existing card numbers stop working. Cannot be undone. Ask the user first.",
+    summary:
+      "Revoke an agent card. Existing card numbers stop working. Cannot be undone. Ask the user first.",
     params: { agentCardId: PARAM_DOCS.agentCardId },
     surfaces: ["mcp", "chat"],
   },
   create_checkout: {
     title: "Create a checkout",
     summary:
-      "Buy at a product URL with an active agent card. Crossmint drives the store's checkout in a real browser and pays with the card; the card number never reaches you. " +
+      "Buy at a product URL with Agent Checkouts. Crossmint drives the store's checkout in a real browser and pays; the card number never reaches you. " +
+      "Start here when the user asks to buy something. Do not request an agent card first: the run reaches a payment step of its own, where the user chooses a payment method and an agent card is minted for this purchase. " +
       "maxCost is a hard cap: the run stops as blocked instead of paying more. Returns the checkoutId. Poll get_checkout every few seconds until it is done or asks a question.",
     params: {
       startUrl: "Product or cart page URL to start from.",
       task: "What to buy and how, e.g. medium, black, cheapest shipping, pay by card. The more you say here, the fewer questions the agent stops to ask.",
-      agentCardId: "An active agent card id. It pays.",
+      agentCardId:
+        "Optional. An agent card the user already approved, to pay from it without asking again. Leave it out and the user chooses a payment method when the run reaches its payment step.",
       maxCost: "Maximum total to pay, including shipping and tax. Enforced.",
       currency: PARAM_DOCS.currency,
       buyerProfileId: "Saved buyer profile (name, contact, shipping).",
@@ -126,7 +137,8 @@ export const TOOL_DOCS = {
     title: "Get a checkout",
     summary:
       "Get a checkout's status: queued, running, awaiting_input, succeeded, blocked, failed or cancelled. When it is awaiting_input the result carries the question and its fields; answer with answer_checkout. " +
-      "Payment questions never appear: the server answers them from the agent card. Finished runs carry the receipt, or the blocked code or failure reason.",
+      "When the run reaches its payment step the result carries paymentRequest instead: the user chooses a payment method, that mints an agent card scoped to this purchase, and Agent Commerce answers the store from it. Wait for it, then keep polling; never answer a payment question yourself and never send card fields. " +
+      "Finished runs carry the receipt, or the blocked code or failure reason.",
     params: { checkoutId: PARAM_DOCS.checkoutId },
     surfaces: ["mcp", "chat"],
   },
@@ -134,7 +146,7 @@ export const TOOL_DOCS = {
     title: "Answer a checkout question",
     summary:
       "Answer the open question on a checkout. Pass requestId with values keyed by field name (as listed by get_checkout) to submit, action decline to refuse it, or action alternative with text to suggest another way (e.g. use the cheapest shipping). " +
-      "Without requestId, text is a note to the agent mid-run. Never send card fields: the server pays.",
+      "Without requestId, text is a note to the agent mid-run. Never send card fields: the payment step is answered from the agent card the user picks.",
     params: {
       checkoutId: PARAM_DOCS.checkoutId,
       requestId: "The pending request id from get_checkout.",
@@ -162,7 +174,9 @@ export type ToolNameFor<S extends ToolSurface> = {
 export const AGENT_COMMERCE_TOOL_NAMES = Object.keys(TOOL_DOCS) as AgentCommerceToolName[];
 
 export function toolNamesFor<S extends ToolSurface>(surface: S): ToolNameFor<S>[] {
-  return AGENT_COMMERCE_TOOL_NAMES.filter((name) => (TOOL_DOCS[name].surfaces as readonly ToolSurface[]).includes(surface)) as ToolNameFor<S>[];
+  return AGENT_COMMERCE_TOOL_NAMES.filter((name) =>
+    (TOOL_DOCS[name].surfaces as readonly ToolSurface[]).includes(surface),
+  ) as ToolNameFor<S>[];
 }
 
 /** The shared summary, plus one surface-specific sentence when given. */
@@ -172,6 +186,9 @@ export function describeTool(name: AgentCommerceToolName, addendum?: string): st
 }
 
 /** A parameter's shared description. Typed to the tool's own parameter names. */
-export function paramDoc<N extends AgentCommerceToolName>(name: N, param: keyof (typeof TOOL_DOCS)[N]["params"] & string): string {
+export function paramDoc<N extends AgentCommerceToolName>(
+  name: N,
+  param: keyof (typeof TOOL_DOCS)[N]["params"] & string,
+): string {
   return (TOOL_DOCS[name].params as Record<string, string>)[param] ?? param;
 }

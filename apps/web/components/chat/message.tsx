@@ -3,13 +3,23 @@
 import { useState } from "react";
 import { Check, Copy } from "lucide-react";
 import type { CheckoutView } from "@agent-commerce/server";
+import { PAYMENT_STEP_ASK } from "@agent-commerce/ui";
 import { AgentAvatar } from "@/components/brand";
 import type { ApprovalOutcome } from "@/lib/chat/tools";
 import type { ChatMessage, ChatMessagePart } from "@/lib/chat/types";
 import { AgentCardApproval, AgentCardRequestCard } from "./agent-card-approval";
 import { AttachmentPreview } from "./attachment-preview";
 import { CheckoutCard } from "./checkout-card";
-import { CHECKOUT_TITLES, isCheckoutPart, messageText, toolSummary, toolTitle, type RequestSummary, type ToolError } from "./parts";
+import {
+  CHECKOUT_TITLES,
+  findPaymentStep,
+  isCheckoutPart,
+  messageText,
+  toolSummary,
+  toolTitle,
+  type RequestSummary,
+  type ToolError,
+} from "./parts";
 import { Text } from "./text";
 import { ToolCard, type ToolState } from "./tool-card";
 
@@ -28,7 +38,9 @@ export function Message({ message, streaming, onApprovalOutcome }: MessageProps)
   if (message.role === "user") return <UserMessage message={message} />;
   if (message.role !== "assistant") return null;
 
-  const hasContent = message.parts.some((p) => (p.type === "text" && p.text.trim()) || p.type.startsWith("tool-") || p.type === "file");
+  const hasContent = message.parts.some(
+    (p) => (p.type === "text" && p.text.trim()) || p.type.startsWith("tool-") || p.type === "file",
+  );
 
   return (
     <div className="flex items-start gap-3" data-role="assistant">
@@ -36,7 +48,13 @@ export function Message({ message, streaming, onApprovalOutcome }: MessageProps)
       <div className="flex min-w-0 flex-1 flex-col gap-3">
         {!hasContent && streaming ? <Thinking /> : null}
         {message.parts.map((part, i) => (
-          <Part key={`${message.id}-${i}`} part={part} streaming={streaming} onApprovalOutcome={onApprovalOutcome} />
+          <Part
+            key={`${message.id}-${i}`}
+            message={message}
+            part={part}
+            streaming={streaming}
+            onApprovalOutcome={onApprovalOutcome}
+          />
         ))}
         {!streaming && hasContent ? <CopyAction message={message} /> : null}
       </div>
@@ -48,7 +66,11 @@ export function Thinking() {
   return (
     <div className="flex h-8 items-center gap-1.5 text-muted-foreground" aria-label="Thinking">
       {[0, 1, 2].map((i) => (
-        <span key={i} className="size-1.5 animate-bounce rounded-full bg-current" style={{ animationDelay: `${i * 120}ms` }} />
+        <span
+          key={i}
+          className="size-1.5 animate-bounce rounded-full bg-current"
+          style={{ animationDelay: `${i * 120}ms` }}
+        />
       ))}
     </div>
   );
@@ -62,11 +84,18 @@ function UserMessage({ message }: { message: ChatMessage }) {
       {files.length ? (
         <div className="flex flex-wrap justify-end gap-2">
           {files.map((f) => (
-            <AttachmentPreview key={f.url} attachment={{ name: f.filename ?? "file", url: f.url, contentType: f.mediaType }} />
+            <AttachmentPreview
+              key={f.url}
+              attachment={{ name: f.filename ?? "file", url: f.url, contentType: f.mediaType }}
+            />
           ))}
         </div>
       ) : null}
-      {text ? <div className="max-w-[min(85%,42rem)] rounded-2xl rounded-br-md bg-muted px-4 py-2.5 text-[15px] leading-relaxed break-words whitespace-pre-wrap text-foreground">{text}</div> : null}
+      {text ? (
+        <div className="max-w-[min(85%,42rem)] rounded-2xl rounded-br-md bg-muted px-4 py-2.5 text-[15px] leading-relaxed break-words whitespace-pre-wrap text-foreground">
+          {text}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -97,32 +126,76 @@ function CopyAction({ message }: { message: ChatMessage }) {
 // Parts
 // ---------------------------------------------------------------------------
 
-function Part({ part, streaming, onApprovalOutcome }: { part: ChatMessagePart; streaming: boolean; onApprovalOutcome: MessageProps["onApprovalOutcome"] }) {
+function Part({
+  message,
+  part,
+  streaming,
+  onApprovalOutcome,
+}: {
+  message: ChatMessage;
+  part: ChatMessagePart;
+  streaming: boolean;
+  onApprovalOutcome: MessageProps["onApprovalOutcome"];
+}) {
   switch (part.type) {
     case "text":
       return part.text.trim() ? <Text text={part.text} /> : null;
 
     case "file":
-      return <AttachmentPreview attachment={{ name: part.filename ?? "file", url: part.url, contentType: part.mediaType }} />;
+      return (
+        <AttachmentPreview
+          attachment={{ name: part.filename ?? "file", url: part.url, contentType: part.mediaType }}
+        />
+      );
 
     case "tool-request_agent_card":
       return (
         <AgentCardRequestCard
           state={part.state}
           input={part.input}
-          output={part.state === "output-available" ? (part.output as RequestSummary | ToolError) : undefined}
+          output={
+            part.state === "output-available"
+              ? (part.output as RequestSummary | ToolError)
+              : undefined
+          }
           errorText={part.state === "output-error" ? part.errorText : undefined}
         />
       );
 
     case "tool-await_agent_card_approval": {
+      // A checkout waiting on this is the user choosing how to pay, not an
+      // agent asking for a budget, so the screen says so.
+      const ask = findPaymentStep(message, part.input?.requestId ?? "")
+        ? PAYMENT_STEP_ASK
+        : undefined;
       if (part.state === "input-available") {
-        return <AgentCardApproval toolCallId={part.toolCallId} requestId={part.input.requestId} onOutcome={onApprovalOutcome} />;
+        return (
+          <AgentCardApproval
+            toolCallId={part.toolCallId}
+            requestId={part.input.requestId}
+            ask={ask}
+            onOutcome={onApprovalOutcome}
+          />
+        );
       }
       if (part.state === "output-available") {
-        return <AgentCardApproval toolCallId={part.toolCallId} requestId={part.input.requestId} output={part.output} onOutcome={onApprovalOutcome} />;
+        return (
+          <AgentCardApproval
+            toolCallId={part.toolCallId}
+            requestId={part.input.requestId}
+            output={part.output}
+            ask={ask}
+            onOutcome={onApprovalOutcome}
+          />
+        );
       }
-      return <ToolCard title="Waiting for your approval" state={part.state} errorText={part.state === "output-error" ? part.errorText : undefined} />;
+      return (
+        <ToolCard
+          title="Waiting for your approval"
+          state={part.state}
+          errorText={part.state === "output-error" ? part.errorText : undefined}
+        />
+      );
     }
 
     default:
@@ -132,7 +205,11 @@ function Part({ part, streaming, onApprovalOutcome }: { part: ChatMessagePart; s
             title={CHECKOUT_TITLES[part.type]}
             state={part.state}
             input={part.input}
-            checkout={part.state === "output-available" ? (part.output as CheckoutView | ToolError) : undefined}
+            checkout={
+              part.state === "output-available"
+                ? (part.output as CheckoutView | ToolError)
+                : undefined
+            }
             errorText={part.state === "output-error" ? part.errorText : undefined}
           />
         );
@@ -146,7 +223,9 @@ function Part({ part, streaming, onApprovalOutcome }: { part: ChatMessagePart; s
             input={tool.input}
             output={tool.state === "output-available" ? tool.output : undefined}
             errorText={tool.state === "output-error" ? tool.errorText : undefined}
-            summary={tool.state === "output-available" ? toolSummary(tool.type, tool.output) : undefined}
+            summary={
+              tool.state === "output-available" ? toolSummary(tool.type, tool.output) : undefined
+            }
           />
         );
       }

@@ -76,6 +76,20 @@ export function checkoutOf(part: ChatMessagePart): CheckoutView | undefined {
   return isToolError(output) ? undefined : output;
 }
 
+/**
+ * The checkout waiting on this approval, when the request came from a
+ * checkout's payment step rather than a bare `request_agent_card`. It lets a
+ * surface say the user is choosing how to pay for something already in front
+ * of them, rather than granting a budget out of the blue.
+ */
+export function findPaymentStep(message: ChatMessage, requestId: string): CheckoutView | undefined {
+  for (const part of message.parts) {
+    const view = checkoutOf(part);
+    if (view?.paymentRequest?.requestId === requestId) return view;
+  }
+  return undefined;
+}
+
 /** "Looking at your saved cards", the line a phone shows while a tool runs. */
 export function toolTitle(type: string): string {
   const titles: Record<string, string> = {
@@ -120,6 +134,7 @@ export function checkoutStatusLine(view: CheckoutView): string {
     const head = view.status === "blocked" ? "Stopped" : view.status === "cancelled" ? "Cancelled" : "Failed";
     return `${head}: ${view.failure.message ?? view.failure.reason}`;
   }
+  if (view.paymentRequest) return "Waiting for you to choose a payment method";
   if (view.rendered) return `Waiting for input: ${view.rendered.title}`;
   if (view.status === "succeeded") return `Bought${view.receipt ? ` for ${view.receipt.total.amount} ${view.receipt.total.currency}` : ""}`;
   return view.status.replace(/_/g, " ");

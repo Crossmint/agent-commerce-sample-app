@@ -20,6 +20,7 @@ import type {
   AgentCardRequestStatus,
   AgentSession,
   CheckoutLink,
+  CheckoutLinkPatch,
   CheckoutStore,
   ListRevealsOptions,
   NewAgentCardRequest,
@@ -55,7 +56,10 @@ export const agentCardRequests = pgTable("agent_card_requests", {
 export const checkouts = pgTable("checkouts", {
   id: text("id").primaryKey(),
   userId: text("user_id").notNull(),
-  agentCardId: text("agent_card_id").notNull(),
+  // Null until the run has a card: a checkout may start without one and get
+  // it at the payment step.
+  agentCardId: text("agent_card_id"),
+  agentCardRequestId: text("agent_card_request_id"),
   createdAt: timestamp("created_at", tz).notNull().defaultNow(),
 });
 
@@ -107,7 +111,9 @@ export type AnyPgDatabase = PgDatabase<PgQueryResultHKT, any, any>;
  * Request store plus checkout links on Postgres.
  * Create the tables with drizzle-kit from `agentCommerceSchema`, or run the SQL in the README.
  */
-export function drizzleRequestStore(db: AnyPgDatabase): RequestStore & CheckoutStore & SessionStore & RevealStore {
+export function drizzleRequestStore(
+  db: AnyPgDatabase,
+): RequestStore & CheckoutStore & SessionStore & RevealStore {
   return {
     async getSession(accessTokenHash: string): Promise<AgentSession | null> {
       const [row] = await db
@@ -142,7 +148,12 @@ export function drizzleRequestStore(db: AnyPgDatabase): RequestStore & CheckoutS
         .values(values)
         .onConflictDoUpdate({
           target: agentSessions.accessTokenHash,
-          set: { jwt: values.jwt, jwtExpiresAt: values.jwtExpiresAt, sessionToken: values.sessionToken, updatedAt: values.updatedAt },
+          set: {
+            jwt: values.jwt,
+            jwtExpiresAt: values.jwtExpiresAt,
+            sessionToken: values.sessionToken,
+            updatedAt: values.updatedAt,
+          },
         });
     },
 
@@ -204,11 +215,22 @@ export function drizzleRequestStore(db: AnyPgDatabase): RequestStore & CheckoutS
       return rows.map(toRequest);
     },
 
-    async linkCheckout(checkoutId: string, userId: string, agentCardId: string): Promise<void> {
+    async linkCheckout(
+      checkoutId: string,
+      userId: string,
+      patch?: CheckoutLinkPatch,
+    ): Promise<void> {
+      // Only the named columns are written, so linking a request later does
+      // not drop the card, and vice versa.
+      const set = {
+        userId,
+        ...(patch?.agentCardId ? { agentCardId: patch.agentCardId } : {}),
+        ...(patch?.agentCardRequestId ? { agentCardRequestId: patch.agentCardRequestId } : {}),
+      };
       await db
         .insert(checkouts)
-        .values({ id: checkoutId, userId, agentCardId })
-        .onConflictDoUpdate({ target: checkouts.id, set: { userId, agentCardId } });
+        .values({ id: checkoutId, ...set })
+        .onConflictDoUpdate({ target: checkouts.id, set });
     },
 
     async recordReveal(reveal: NewReveal): Promise<Reveal> {
@@ -233,7 +255,10 @@ export function drizzleRequestStore(db: AnyPgDatabase): RequestStore & CheckoutS
       return toReveal(row!);
     },
 
-    async listReveals(userId: string, { limit = 100, agentCardId }: ListRevealsOptions = {}): Promise<Reveal[]> {
+    async listReveals(
+      userId: string,
+      { limit = 100, agentCardId }: ListRevealsOptions = {},
+    ): Promise<Reveal[]> {
       const rows = await db
         .select()
         .from(reveals)
@@ -253,7 +278,8 @@ export function drizzleRequestStore(db: AnyPgDatabase): RequestStore & CheckoutS
       return {
         checkoutId: row.id,
         userId: row.userId,
-        agentCardId: row.agentCardId,
+        ...(row.agentCardId ? { agentCardId: row.agentCardId } : {}),
+        ...(row.agentCardRequestId ? { agentCardRequestId: row.agentCardRequestId } : {}),
         createdAt: row.createdAt.toISOString(),
       };
     },

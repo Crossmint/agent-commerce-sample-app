@@ -133,12 +133,12 @@ Server picks the rail (`selectRail`), mints, decrypts the encrypted-card rail wi
 
 ## Checkouts
 
-Wraps [Crossmint Agent Checkouts](https://docs.crossmint.com/api-reference/agent-checkouts/create-agent-checkout): a run that drives the store's checkout in a real browser. Agent Commerce adds the agent card that pays and hides the payment step.
+Wraps [Crossmint Agent Checkouts](https://docs.crossmint.com/api-reference/agent-checkouts/create-agent-checkout): a run that drives the store's checkout in a real browser. The store's card form never reaches the caller: Agent Commerce answers it from a credential it mints. `agentCardId` is optional, and which agent card pays depends on whether you pass one — see `paymentRequest` below.
 
 `POST /v1/checkouts` (agent) body:
 
 ```json
-{ "startUrl": "https://shop.example/p/1", "task"?: "medium, black", "agentCardId": "…", "maxCost": { "amount": "100.00", "currency": "USD" }, "buyerProfileId"?: "…", "browserProfileId"?: "…", "merchantGuidance"?: "…" }
+{ "startUrl": "https://shop.example/p/1", "task"?: "medium, black", "agentCardId"?: "…", "maxCost": { "amount": "100.00", "currency": "USD" }, "buyerProfileId"?: "…", "browserProfileId"?: "…", "merchantGuidance"?: "…" }
 ```
 
 `url` and `request` are accepted as older names for `startUrl` and `task`. → `201 CheckoutView`.
@@ -148,6 +148,16 @@ interface CheckoutView {
   id: string;                            // Crossmint runId
   status: "queued" | "running" | "awaiting_input" | "succeeded" | "blocked" | "failed" | "cancelled";
   agentCardId?: string;
+  paymentRequest?: {                     // the run's payment step; the user picks a payment method
+    requestId: string;                   // an agent card request: approve, deny and poll it as usual
+    status: "pending" | "approved" | "active" | "denied" | "expired" | "failed";
+    approvalUrl: string;                 // show this to the user
+    amount: { value: string; currency: string };  // the run's maxCost
+    description: string;
+    merchant?: { name: string; url?: string; countryCode?: string };
+    agentCardId?: string;                // set once a card exists but cannot pay yet
+    failureReason?: string;
+  };
   pendingUserAction?: {                  // the open input request; never a payment one
     id: string;                          // requestId to answer
     messageId?: string;
@@ -166,7 +176,12 @@ interface CheckoutView {
 }
 ```
 
-`GET /v1/checkouts/:id` → `CheckoutView`. Poll it about every 1.5s; there are no webhooks. While polling, if the open input request asks for **card fields** and the checkout has an `agentCardId`, the server mints a credential from that agent card and answers the request itself before returning. Callers never see card fields; while the payment step is in flight the view reports `running`.
+`GET /v1/checkouts/:id` → `CheckoutView`. Poll it about every 1.5s; there are no webhooks.
+
+While polling, when the open input request asks for **card fields** the server never passes it on. What it does depends on the checkout:
+
+- **With an `agentCardId`** (passed to `POST /v1/checkouts`, or minted earlier in this run): the server mints a credential from that agent card and answers the request itself before returning. The view reports `running` while that is in flight.
+- **Without one**: the server creates an agent card request scoped to the run — `maxCost` for the amount, the start URL's host for the merchant lock — and returns it as `paymentRequest`. The status stays `awaiting_input`. The user answers it through the ordinary `POST /v1/agent-card-requests/:id/approve`, or at `approvalUrl`; once the card is active the next poll mints from it, answers the store, and the run carries on. One request per run: it is reused on every poll, and a denial is returned as it is rather than replaced.
 
 `POST /v1/checkouts/:id/messages` body, one of:
 

@@ -23,6 +23,7 @@ import {
   AgentCardDetailBody,
   AgentCardTable,
   ApproveAgentCard,
+  PAYMENT_STEP_ASK,
   Badge,
   Button,
   CardMark,
@@ -54,6 +55,7 @@ import {
   checkoutOf,
   checkoutStatusLine,
   checkoutBadgeVariant,
+  findPaymentStep,
   findRequest,
   isCheckoutPart,
   messageText,
@@ -106,7 +108,12 @@ export function MobileApp(props: ExperienceProps) {
 // Signed in
 // ---------------------------------------------------------------------------
 
-type Approval = { toolCallId: string; requestId: string };
+type Approval = {
+  toolCallId: string;
+  requestId: string;
+  /** Set when a checkout's payment step raised this, so the sheet says so. */
+  paying?: boolean;
+};
 
 function Home({
   screen,
@@ -188,6 +195,7 @@ function Home({
             requestId={approval.requestId}
             variant="plain"
             platformName={PLATFORM_NAME}
+            ask={approval.paying ? PAYMENT_STEP_ASK : undefined}
             onDone={onApprovalDone}
           />
         ) : null}
@@ -201,7 +209,13 @@ function Home({
           <h2 className="text-lg font-medium tracking-[-0.02em]">Checkout</h2>
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-8 scrollbar-none">
-          {checkoutId ? <CheckoutViewPanel checkoutId={checkoutId} frameHeight={420} /> : null}
+          {checkoutId ? (
+            <CheckoutViewPanel
+              checkoutId={checkoutId}
+              frameHeight={420}
+              platformName={PLATFORM_NAME}
+            />
+          ) : null}
         </div>
       </PhonePageSheet>
     </>
@@ -275,7 +289,7 @@ function Thread({
             Hi, I am {AGENT_NAME}. What should I buy for you?
           </p>
           <p className="text-sm text-muted-foreground">
-            I ask for a budget on one of your cards. You approve it here.
+            Send me a link and I will go buy it. You choose how to pay at the checkout.
           </p>
         </div>
         <ul className="flex flex-col gap-2" aria-label="Suggestions">
@@ -377,14 +391,20 @@ function CompactPart({
       ) : null;
 
     case "tool-await_agent_card_approval": {
-      const request = findRequest(message, part.input?.requestId ?? "");
+      const requestId = part.input?.requestId ?? "";
+      const request = findRequest(message, requestId);
+      // A checkout waiting on this is the user choosing how to pay for
+      // something already underway, not an agent asking for a budget.
+      const paying = Boolean(findPaymentStep(message, requestId));
       if (part.state === "input-available") {
         return (
           <ApprovalCard
             title={
-              request
-                ? `Your agent wants to spend up to ${formatAmount(request.amount.value, request.amount.currency)} for ${request.description}`
-                : "Your agent is asking for a budget"
+              paying
+                ? "Choose how to pay for this"
+                : request
+                  ? `Your agent wants to spend up to ${formatAmount(request.amount.value, request.amount.currency)} for ${request.description}`
+                  : "Your agent is asking for a budget"
             }
             action={
               <Button
@@ -392,7 +412,7 @@ function CompactPart({
                 size="xl"
                 className="w-full"
                 onClick={() =>
-                  onReview({ toolCallId: part.toolCallId, requestId: part.input.requestId })
+                  onReview({ toolCallId: part.toolCallId, requestId: part.input.requestId, paying })
                 }
               >
                 Review

@@ -11,6 +11,7 @@ import { Badge, type BadgeProps } from "./primitives/badge.js";
 import { Button } from "./primitives/button.js";
 import { Skeleton } from "./primitives/skeleton.js";
 import { Spinner } from "./primitives/spinner.js";
+import { ApproveAgentCard, PAYMENT_STEP_ASK } from "./approve-agent-card.js";
 import { PendingActionForm } from "./pending-action-form.js";
 
 export interface CheckoutViewProps {
@@ -22,6 +23,11 @@ export interface CheckoutViewProps {
   className?: string;
   /** Height of the browser iframe. Default 560px. */
   frameHeight?: number;
+  /**
+   * The name the card network shows while the user saves a card at the
+   * payment step. It is the platform saving it, not the agent asking.
+   */
+  platformName?: string;
 }
 
 function statusBadge(status: string): { label: string; variant: BadgeProps["variant"] } {
@@ -52,10 +58,24 @@ function receiptTotal(receipt: CheckoutViewData["receipt"]): string | undefined 
 /**
  * Watches an Agent Checkout. Shows the live browser when Crossmint provides
  * one, asks the user any question the store asks, and ends with a receipt.
- * Payment questions never reach this component. The server answers them.
+ *
+ * The store's card form never reaches this component. When the run wants
+ * paying, the view carries a `paymentRequest` instead and the user picks one
+ * of their saved payment methods here; that mints an agent card scoped to the
+ * purchase, and the server answers the store from it.
  */
-export function CheckoutView({ checkoutId, poll = true, onDone, className, frameHeight = 560 }: CheckoutViewProps) {
-  const { data, error, loading, refetch, submitAction, decline, cancel, submitting } = useCheckout(checkoutId, { poll });
+export function CheckoutView({
+  checkoutId,
+  poll = true,
+  onDone,
+  className,
+  frameHeight = 560,
+  platformName,
+}: CheckoutViewProps) {
+  const { data, error, loading, refetch, submitAction, decline, cancel, submitting } = useCheckout(
+    checkoutId,
+    { poll },
+  );
   const [actionError, setActionError] = React.useState<unknown>(undefined);
 
   const doneRef = React.useRef(false);
@@ -79,7 +99,13 @@ export function CheckoutView({ checkoutId, poll = true, onDone, className, frame
     return (
       <div className={cn("flex flex-col gap-4", className)}>
         <Problem title="Could not load this checkout" message={errorMessage(error)} />
-        <Button type="button" size="xl" variant="secondary" className="w-full sm:w-auto" onClick={() => void refetch()}>
+        <Button
+          type="button"
+          size="xl"
+          variant="secondary"
+          className="w-full sm:w-auto"
+          onClick={() => void refetch()}
+        >
           Try again
         </Button>
       </div>
@@ -91,12 +117,15 @@ export function CheckoutView({ checkoutId, poll = true, onDone, className, frame
   const total = receiptTotal(data.receipt);
   const merchantOrderId = data.receipt?.merchantOrderId;
   const summary = data.result?.summary;
-  const stopped = data.status === "failed" || data.status === "blocked" || data.status === "cancelled";
+  const stopped =
+    data.status === "failed" || data.status === "blocked" || data.status === "cancelled";
 
   return (
     <div className={cn("flex flex-col gap-6", className)}>
       <div className="flex flex-wrap items-center gap-3">
-        <h2 className="text-[28px] leading-[1.2] font-medium tracking-[-0.02em] text-foreground">Checkout</h2>
+        <h2 className="text-[28px] leading-[1.2] font-medium tracking-[-0.02em] text-foreground">
+          Checkout
+        </h2>
         <Badge variant={badge.variant}>{badge.label}</Badge>
         {!terminal ? <Spinner className="text-muted-foreground" /> : null}
         <span className="ml-auto font-mono text-xs text-muted-foreground">{data.id}</span>
@@ -115,22 +144,59 @@ export function CheckoutView({ checkoutId, poll = true, onDone, className, frame
       {data.status === "succeeded" ? (
         <div className="flex flex-col gap-2 rounded-2xl bg-card p-6 ring-1 ring-foreground/10">
           <p className="text-[28px] leading-[1.2] font-medium tracking-[-0.02em]">Bought.</p>
-          {total ? <p className="font-display text-4xl font-semibold tracking-tight text-primary tabular-nums">{total}</p> : null}
+          {total ? (
+            <p className="font-display text-4xl font-semibold tracking-tight text-primary tabular-nums">
+              {total}
+            </p>
+          ) : null}
           {summary ? <p className="text-base text-muted-foreground">{summary}</p> : null}
-          {merchantOrderId ? <p className="font-mono text-xs text-muted-foreground">Order {merchantOrderId}</p> : null}
+          {merchantOrderId ? (
+            <p className="font-mono text-xs text-muted-foreground">Order {merchantOrderId}</p>
+          ) : null}
         </div>
       ) : null}
 
       {stopped ? (
         <Problem
-          title={data.status === "cancelled" ? "Cancelled" : data.status === "blocked" ? "Stopped before buying" : "Did not go through"}
-          message={data.failure?.message ?? summary ?? data.failure?.reason?.replace(/[_.]/g, " ") ?? "The store did not complete the order."}
+          title={
+            data.status === "cancelled"
+              ? "Cancelled"
+              : data.status === "blocked"
+                ? "Stopped before buying"
+                : "Did not go through"
+          }
+          message={
+            data.failure?.message ??
+            summary ??
+            data.failure?.reason?.replace(/[_.]/g, " ") ??
+            "The store did not complete the order."
+          }
         />
+      ) : null}
+
+      {!terminal && data.paymentRequest ? (
+        <div className="rounded-2xl bg-card p-6 ring-1 ring-foreground/10">
+          <ApproveAgentCard
+            requestId={data.paymentRequest.requestId}
+            variant="plain"
+            platformName={platformName}
+            ask={PAYMENT_STEP_ASK}
+            // Once the card is live the server can pay, but only on the next
+            // read of the run. Ask for one rather than waiting out the poll.
+            onDone={() => void refetch()}
+          />
+        </div>
       ) : null}
 
       {!terminal && data.rendered ? (
         <div className="rounded-2xl bg-card p-6 ring-1 ring-foreground/10">
-          {actionError ? <Problem className="mb-4" title="Could not send your answer" message={errorMessage(actionError)} /> : null}
+          {actionError ? (
+            <Problem
+              className="mb-4"
+              title="Could not send your answer"
+              message={errorMessage(actionError)}
+            />
+          ) : null}
           <PendingActionForm
             action={data.rendered}
             submitting={submitting}
@@ -175,8 +241,10 @@ export function CheckoutView({ checkoutId, poll = true, onDone, className, frame
         </div>
       ) : null}
 
-      {!terminal && !data.embedUrl && !data.rendered ? (
-        <p className="text-sm text-muted-foreground">The agent is working on it. This page updates on its own.</p>
+      {!terminal && !data.embedUrl && !data.rendered && !data.paymentRequest ? (
+        <p className="text-sm text-muted-foreground">
+          The agent is working on it. This page updates on its own.
+        </p>
       ) : null}
 
       {!terminal ? (
@@ -203,7 +271,15 @@ export function CheckoutView({ checkoutId, poll = true, onDone, className, frame
 }
 
 /** A fault, said plainly: the icon, a title, one line. */
-function Problem({ title, message, className }: { title: string; message: string; className?: string }) {
+function Problem({
+  title,
+  message,
+  className,
+}: {
+  title: string;
+  message: string;
+  className?: string;
+}) {
   return (
     <div role="alert" className={cn("flex items-start gap-3", className)}>
       <AlertCircle aria-hidden className="mt-0.5 size-5 shrink-0 text-destructive" />

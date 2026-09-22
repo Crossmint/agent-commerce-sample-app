@@ -266,7 +266,7 @@ Two layers: headless hooks (`useAgentCardRequest`, `useCheckout`, ...) and style
 - `get_agent_card({ agentCardId })`
 - `list_agent_cards`
 - `reveal_agent_card({ agentCardId, amount?, currency?, merchant? })` → card number, expiry, CVC. Gated by scope `credentials:mint`.
-- `create_checkout({ startUrl, task?, agentCardId, maxCost, currency?, buyerProfileId?, browserProfileId?, merchantGuidance? })`
+- `create_checkout({ startUrl, task?, agentCardId?, maxCost, currency?, buyerProfileId?, browserProfileId?, merchantGuidance? })`. `agentCardId` is optional: without one the run raises its payment step and the user chooses a payment method there.
 - `get_checkout({ checkoutId })`
 - `answer_checkout({ checkoutId, requestId?, action?, values?, text? })`
 - `cancel_checkout({ checkoutId })`
@@ -287,7 +287,7 @@ agent-commerce agent-card request --amount 50 --description "Flight to SF"  [--m
 agent-commerce agent-card status <requestId> [--wait]        # resume waiting after a timeout
 agent-commerce agent-card list | get <id> | revoke <id>
 agent-commerce agent-card reveal <id> [--amount 25]       # prints card number, expiry, cvc; --json
-agent-commerce checkout create --url <product url> --agent-card <id> --max-cost 100 [--task "medium, black"] [--buyer-profile <id>] [--wait]
+agent-commerce checkout create --url <product url> --max-cost 100 [--task "medium, black"] [--agent-card <id>] [--buyer-profile <id>] [--wait]
 agent-commerce checkout get <id> | answer <id> <requestId> --values '{...}' | --decline | --alternative "<text>"
 agent-commerce checkout message <id> "<note>" | cancel <id>
 agent-commerce whoami | logout
@@ -380,16 +380,23 @@ Same start. After the agent card is active:
 ```mermaid
 sequenceDiagram
   participant A as Agent
+  participant U as User
   participant S as Agent Commerce server
   participant X as Crossmint
 
-  A->>S: POST /checkouts {url, request, agentCardId, maxCost}
+  A->>S: POST /checkouts {url, request, maxCost}
   S->>X: POST agent-checkouts (server key + x-crossmint-user-id)
   loop every 1.5 s
     A->>S: GET /checkouts/:id
     S->>X: GET agent-checkouts/:id
   end
   Note over S: status awaiting_user_action, type payment
+  S->>S: create an agent card request for maxCost, locked to the store
+  S-->>A: paymentRequest {requestId, approvalUrl}
+  Note over A: shows the link; the user picks a payment method
+  U->>S: POST /agent-card-requests/:id/approve {paymentMethodId}
+  S->>X: POST order-intents (the agent card)
+  A->>S: GET /checkouts/:id
   S->>X: POST order-intents/:id/credentials
   S->>X: POST agent-checkouts/:id/messages {input_response: card}
   Note over A: a shipping or size question comes back to the agent instead
@@ -397,7 +404,9 @@ sequenceDiagram
   S-->>A: status succeeded, receipt
 ```
 
-The server answers payment actions itself. The agent never holds a card number in this path. That is the preferred path and the skill says so.
+The agent never holds a card number in this path, and never sees the store's card form: the server answers it from a credential it mints. What changes with the payment step is *when* the agent card is made. A checkout created with an `agentCardId` pays from it silently. One created without — the ordinary case, where the user just asked to buy something — reaches the payment step with nothing to pay from, so the server raises an agent card request scoped to the run's `maxCost` and locked to the store, and hands it back as `paymentRequest`. The user chooses a payment method there, and the next poll pays with the card that mints. One request per run: it is reused on every poll, and a denial sticks.
+
+That is the preferred path and the skill says so. Asking for an agent card up front is for spending somewhere a checkout cannot reach.
 
 ### 4.3 Agent inside a web app (the chat half of apps/web)
 

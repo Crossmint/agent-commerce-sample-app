@@ -22,6 +22,13 @@
       "when": 1789910738264,
       "tag": "0002_curved_lorna_dane",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1790093530130,
+      "tag": "0003_exotic_swarm",
+      "breakpoints": true
     }
   ]
 }

@@ -2,7 +2,15 @@
  * Shapes the CLI reads from the Agent Commerce HTTP API. They mirror docs/API.md.
  * Crossmint shapes (AgentCard, PaymentMethod, PendingUserAction) come from @agent-commerce/core.
  */
-import type { Amount, CheckoutReceipt, CheckoutResult, CheckoutStatus, Merchant, PendingUserAction, RenderedAction } from "@agent-commerce/core";
+import type {
+  Amount,
+  CheckoutReceipt,
+  CheckoutResult,
+  CheckoutStatus,
+  Merchant,
+  PendingUserAction,
+  RenderedAction,
+} from "@agent-commerce/core";
 
 export interface PublicConfig {
   name: string;
@@ -76,7 +84,8 @@ export interface CredentialResponse {
 export interface CreateCheckoutBody {
   startUrl: string;
   task?: string;
-  agentCardId: string;
+  /** Omit to let the user choose a payment method at the run's payment step. */
+  agentCardId?: string;
   maxCost: { amount: string; currency: string };
   buyerProfileId?: string;
   browserProfileId?: string;
@@ -91,10 +100,26 @@ export interface CheckoutMessageBody {
   text?: string;
 }
 
+/**
+ * The run reached its payment step. The user chooses a payment method at
+ * `approvalUrl`, which mints the agent card that pays.
+ */
+export interface CheckoutPaymentRequest {
+  requestId: string;
+  status: string;
+  approvalUrl: string;
+  amount: { value: string; currency: string };
+  description: string;
+  merchant?: { name: string; url?: string; countryCode?: string };
+  agentCardId?: string;
+  failureReason?: string;
+}
+
 export interface CheckoutView {
   id: string;
   status: CheckoutStatus;
   agentCardId?: string;
+  paymentRequest?: CheckoutPaymentRequest;
   pendingUserAction?: PendingUserAction;
   rendered?: RenderedAction;
   embedUrl?: string;

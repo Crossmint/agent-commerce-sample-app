@@ -18,6 +18,15 @@ import { Spinner } from "./primitives/spinner.js";
 import { CardPicker } from "./card-picker.js";
 import { VerifyAgentCard, type VerificationAppearance } from "./verify-agent-card.js";
 
+/**
+ * What the approval screen is called when a checkout reached its payment
+ * step. Exported so every surface that shows the step words it the same way.
+ */
+export const PAYMENT_STEP_ASK = {
+  title: "Choose a payment method",
+  sub: "The agent pays with a card made for this purchase alone.",
+} as const;
+
 export type ApproveOutcomeStatus = "active" | "denied" | "expired" | "failed";
 
 export interface ApproveOutcome {
@@ -38,6 +47,13 @@ export interface ApproveAgentCardProps {
    */
   platformName?: string;
   verificationAppearance?: VerificationAppearance;
+  /**
+   * What the ask screen is called. The default speaks for an agent that asked
+   * for a card out of the blue; a checkout that has reached its payment step
+   * passes its own, because there the user is choosing how to pay for
+   * something already in front of them.
+   */
+  ask?: { title: string; sub: string };
   /**
    * "card" stands the screen on its own white panel, which is what a host
    * page usually wants. "plain" drops the panel so the page's own frame, a
@@ -72,6 +88,7 @@ export function ApproveAgentCard({
   countryCode = "US",
   platformName = "Agent Commerce",
   verificationAppearance,
+  ask,
   variant = "card",
   className,
 }: ApproveAgentCardProps) {
@@ -364,8 +381,8 @@ export function ApproveAgentCard({
     <Shell {...shell}>
       <Header
         scale={scale}
-        title="Your agent is requesting to use your card"
-        sub="Approve it once, for this budget only."
+        title={ask?.title ?? "Your agent is requesting to use your card"}
+        sub={ask?.sub ?? "Approve it once, for this budget only."}
       />
 
       <dl className="flex flex-col rounded-2xl border border-border px-5">

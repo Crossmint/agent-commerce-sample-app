@@ -1,5 +1,10 @@
 import type { AuthenticatedUser } from "@agent-commerce/auth";
-import { expiresInHours, isReadyForAgent, pendingVerificationRails, withAgentRails } from "@agent-commerce/core";
+import {
+  expiresInHours,
+  isReadyForAgent,
+  pendingVerificationRails,
+  withAgentRails,
+} from "@agent-commerce/core";
 import { parseBody, requireUser, type Ctx, resolveEmail } from "../context.js";
 import { forbidden, HttpError, invalidRequest, json, notFound } from "../errors.js";
 import { agentCardRequestId } from "../ids.js";
@@ -32,22 +37,41 @@ export async function createRequest(req: Request, ctx: Ctx): Promise<Response> {
 /** GET /v1/agent-card-requests/:id */
 export async function getRequest(req: Request, ctx: Ctx, params: Params): Promise<Response> {
   const user = await requireUser(req, ctx);
-  let request = await loadOwnedRequest(ctx, user, params.id!);
-  // An "approved" card may have been verified from the wallet list rather than the
-  // approval page. Check Crossmint so a polling agent sees it turn active.
-  if (request.status === "approved" && request.agentCardId) {
-    try {
-      const agentCard = await ctx.crossmint.orderIntents.get({ jwt: user.jwt }, request.agentCardId);
-      if (agentCard.status !== "active") {
-        request = await ctx.store.update(request.id, { status: "failed", failureReason: `agent card ${agentCard.status}` });
-      } else if (isReadyForAgent(agentCard)) {
-        request = await ctx.store.update(request.id, { status: "active" });
-      }
-    } catch (e) {
-      console.warn("[agent-commerce] could not reconcile request", request.id, e instanceof Error ? e.message : e);
+  const request = await loadOwnedRequest(ctx, user, params.id!);
+  return json(await reconcileRequest(ctx, user, request));
+}
+
+/**
+ * Settle an `approved` request against Crossmint.
+ *
+ * An approved card may have been verified somewhere other than the approval
+ * page — the wallet list, or a checkout's payment step — so the stored status
+ * can lag behind the card. Checking here is what lets a polling agent see the
+ * request turn active. Anything else is returned untouched.
+ */
+export async function reconcileRequest(
+  ctx: Ctx,
+  user: AuthenticatedUser,
+  request: AgentCardRequest,
+): Promise<AgentCardRequest> {
+  if (request.status !== "approved" || !request.agentCardId) return request;
+  try {
+    const agentCard = await ctx.crossmint.orderIntents.get({ jwt: user.jwt }, request.agentCardId);
+    if (agentCard.status !== "active") {
+      return ctx.store.update(request.id, {
+        status: "failed",
+        failureReason: `agent card ${agentCard.status}`,
+      });
     }
+    if (isReadyForAgent(agentCard)) return ctx.store.update(request.id, { status: "active" });
+  } catch (e) {
+    console.warn(
+      "[agent-commerce] could not reconcile request",
+      request.id,
+      e instanceof Error ? e.message : e,
+    );
   }
-  return json(request);
+  return request;
 }
 
 /**
@@ -166,11 +190,19 @@ function assertAnswerable(request: AgentCardRequest): void {
  * Crossmint will not revoke must not block the new one, and an unverified
  * card can spend nothing in the meantime. It is logged, never raised.
  */
-async function revokePreviousCard(ctx: Ctx, jwt: { jwt: string }, request: AgentCardRequest): Promise<void> {
+async function revokePreviousCard(
+  ctx: Ctx,
+  jwt: { jwt: string },
+  request: AgentCardRequest,
+): Promise<void> {
   if (!request.agentCardId) return;
   try {
     await ctx.crossmint.orderIntents.revoke(jwt, request.agentCardId);
   } catch (e) {
-    console.warn("[agent-commerce] could not revoke the previous agent card", request.agentCardId, e instanceof Error ? e.message : e);
+    console.warn(
+      "[agent-commerce] could not revoke the previous agent card",
+      request.agentCardId,
+      e instanceof Error ? e.message : e,
+    );
   }
 }

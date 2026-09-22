@@ -27,7 +27,8 @@ const CHECKOUT_POLL_MS = 1500;
 
 interface CreateOptions extends JsonOption {
   url: string;
-  agentCard: string;
+  /** Optional: without one, the run's payment step asks the user to choose a payment method. */
+  agentCard?: string;
   maxCost: number;
   currency: string;
   task?: string;
@@ -54,9 +55,9 @@ interface AnswerOptions extends WaitOptions {
 export function buildCheckoutBody(opts: CreateOptions): CreateCheckoutBody {
   const body: CreateCheckoutBody = {
     startUrl: opts.url,
-    agentCardId: opts.agentCard,
     maxCost: { amount: toDecimalString(opts.maxCost), currency: opts.currency.toUpperCase() },
   };
+  if (opts.agentCard) body.agentCardId = opts.agentCard;
   const task = opts.task ?? opts.request;
   if (task) body.task = task;
   if (opts.buyerProfile) body.buyerProfileId = opts.buyerProfile;
@@ -67,12 +68,17 @@ export function buildCheckoutBody(opts: CreateOptions): CreateCheckoutBody {
 
 /** Turn the answer flags into one message body. Exactly one of values, --decline, --alternative. */
 export function buildAnswerBody(requestId: string, opts: AnswerOptions): CheckoutMessageBody {
-  const picked = [opts.values !== undefined, Boolean(opts.decline), opts.alternative !== undefined].filter(Boolean).length;
+  const picked = [
+    opts.values !== undefined,
+    Boolean(opts.decline),
+    opts.alternative !== undefined,
+  ].filter(Boolean).length;
   if (picked !== 1) {
     throw fail("Pass exactly one of --values <json>, --decline, or --alternative <text>.");
   }
   if (opts.decline) return { requestId, action: "decline" };
-  if (opts.alternative !== undefined) return { requestId, action: "alternative", text: opts.alternative };
+  if (opts.alternative !== undefined)
+    return { requestId, action: "alternative", text: opts.alternative };
   return { requestId, action: "submit", values: parseJsonValues(opts.values!) };
 }
 
@@ -83,8 +89,15 @@ export function registerCheckoutCommands(program: Command, ctx: CliContext): voi
 
   const withWait = (cmd: Command) =>
     cmd
-      .option("--wait", "poll until done, blocked, failed, or a question needs an answer")
-      .option("--timeout <s>", "with --wait: give up after this many seconds", parsePositiveNumber("--timeout"));
+      .option(
+        "--wait",
+        "poll until done, blocked, failed, or something needs you: a question, or a payment method",
+      )
+      .option(
+        "--timeout <s>",
+        "with --wait: give up after this many seconds",
+        parsePositiveNumber("--timeout"),
+      );
 
   withJson(
     withWait(
@@ -92,8 +105,15 @@ export function registerCheckoutCommands(program: Command, ctx: CliContext): voi
         .command("create")
         .description("start a checkout")
         .requiredOption("--url <url>", "product or cart URL to start from")
-        .requiredOption("--agent-card <id>", "active agent card that pays")
-        .requiredOption("--max-cost <n>", "hard cap for the whole order, shipping and tax included", parseAmount("--max-cost"))
+        .option(
+          "--agent-card <id>",
+          "pay from an agent card the user already approved; omit to let them choose a payment method at the payment step",
+        )
+        .requiredOption(
+          "--max-cost <n>",
+          "hard cap for the whole order, shipping and tax included",
+          parseAmount("--max-cost"),
+        )
         .option("--currency <code>", "ISO currency", "USD")
         .option("--task <text>", 'what to buy and how, e.g. "medium, black, cheapest shipping"')
         .option("--request <text>", "older name for --task")
@@ -114,7 +134,9 @@ export function registerCheckoutCommands(program: Command, ctx: CliContext): voi
   });
 
   withJson(
-    withWait(co.command("get <id>").description("show a checkout; exit 2 when it waits on an answer")),
+    withWait(
+      co.command("get <id>").description("show a checkout; exit 2 when it waits on an answer"),
+    ),
   ).action(async (id: string, opts: WaitOptions) => {
     const api = getApi(ctx);
     let view = await api.getCheckout(id);
@@ -139,7 +161,11 @@ export function registerCheckoutCommands(program: Command, ctx: CliContext): voi
   });
 
   withJson(
-    withWait(co.command("message <id> <text>").description("send the agent a note while the checkout runs")),
+    withWait(
+      co
+        .command("message <id> <text>")
+        .description("send the agent a note while the checkout runs"),
+    ),
   ).action(async (id: string, text: string, opts: WaitOptions) => {
     const api = getApi(ctx);
     let view = await api.answerCheckout(id, { text });
@@ -147,15 +173,21 @@ export function registerCheckoutCommands(program: Command, ctx: CliContext): voi
     report(ctx, view, opts.json);
   });
 
-  withJson(co.command("cancel <id>").description("stop a checkout")).action(async (id: string, opts: JsonOption) => {
-    const api = getApi(ctx);
-    const view = await api.cancelCheckout(id);
-    if (opts.json) ctx.out(toJson(view));
-    else {
-      for (const line of checkoutSummary(view)) ctx.out(line);
-      ctx.out(pc.dim("Cancel requested. The checkout reaches cancelled on a later `agent-commerce checkout get`."));
-    }
-  });
+  withJson(co.command("cancel <id>").description("stop a checkout")).action(
+    async (id: string, opts: JsonOption) => {
+      const api = getApi(ctx);
+      const view = await api.cancelCheckout(id);
+      if (opts.json) ctx.out(toJson(view));
+      else {
+        for (const line of checkoutSummary(view)) ctx.out(line);
+        ctx.out(
+          pc.dim(
+            "Cancel requested. The checkout reaches cancelled on a later `agent-commerce checkout get`.",
+          ),
+        );
+      }
+    },
+  );
 
   const bp = program
     .command("buyer-profile")
@@ -179,14 +211,19 @@ export function registerCheckoutCommands(program: Command, ctx: CliContext): voi
   });
 }
 
-/** Poll until terminal or a question appears. Payment questions never reach the CLI. */
+/**
+ * Poll until the run ends, a question appears, or it reaches its payment step.
+ * The store's own card form never reaches the CLI: the payment step is a link
+ * the user opens to choose a payment method, so waiting past it is pointless.
+ */
 async function waitForCheckout(
   ctx: CliContext,
   api: AgentCommerceApi,
   initial: CheckoutView,
   timeoutS: number | undefined,
 ): Promise<CheckoutView> {
-  const done = (v: CheckoutView) => isTerminalCheckout(v) || pendingAction(v) !== undefined;
+  const done = (v: CheckoutView) =>
+    isTerminalCheckout(v) || pendingAction(v) !== undefined || v.paymentRequest !== undefined;
   if (done(initial)) return initial;
   let last = initial;
   try {
@@ -214,15 +251,33 @@ async function waitForCheckout(
 /** Print the view. Exit 2 with instructions when a question waits, 1 when the run did not buy. */
 function report(ctx: CliContext, view: CheckoutView, json: boolean | undefined): void {
   const action = pendingAction(view);
+  const payment = view.paymentRequest;
   if (json) {
     ctx.out(toJson(view));
   } else {
     for (const line of checkoutSummary(view)) ctx.out(line);
     if (view.embedUrl) ctx.out(`  ${pc.dim("Watch:")}    ${view.embedUrl}`);
+    if (payment) {
+      // The run cannot pay until somebody picks a card. Nothing to answer
+      // here: the choice happens in a browser, and the server pays from it.
+      ctx.out("");
+      ctx.out(`  ${pc.bold("Payment step.")} Open this to choose a payment method:`);
+      ctx.out(`  ${payment.approvalUrl}`);
+      ctx.out(
+        `  ${pc.dim(`It mints an agent card for up to ${payment.amount.value} ${payment.amount.currency}. Then run: agent-commerce checkout get ${view.id} --wait`)}`,
+      );
+    }
     if (action) {
       ctx.out("");
       for (const line of describeAction(view.id, action)) ctx.out(line);
     }
+  }
+  if (payment && !action) {
+    throw new CliExit(
+      EXIT.NEEDS_USER_ACTION,
+      json ? `Checkout ${view.id} is waiting for a payment method at ${payment.approvalUrl}.` : "",
+      "payment_method_needed",
+    );
   }
   if (action) {
     throw new CliExit(

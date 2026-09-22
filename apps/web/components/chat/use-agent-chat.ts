@@ -3,7 +3,11 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useChat } from "@ai-sdk/react";
-import { DefaultChatTransport, lastAssistantMessageIsCompleteWithToolCalls, type ChatStatus } from "ai";
+import {
+  DefaultChatTransport,
+  lastAssistantMessageIsCompleteWithToolCalls,
+  type ChatStatus,
+} from "ai";
 import type { ApprovalOutcome } from "@/lib/chat/tools";
 import type { Attachment, ChatMessage } from "@/lib/chat/types";
 
@@ -72,7 +76,12 @@ export function useAgentChat({ id, initialMessages, persist }: UseAgentChatOptio
       void sendMessage({
         role: "user",
         parts: [
-          ...attachments.map((a) => ({ type: "file" as const, url: a.url, mediaType: a.contentType, filename: a.name })),
+          ...attachments.map((a) => ({
+            type: "file" as const,
+            url: a.url,
+            mediaType: a.contentType,
+            filename: a.name,
+          })),
           ...(text ? [{ type: "text" as const, text }] : []),
         ],
       });
@@ -101,7 +110,4 @@ export function useAgentChat({ id, initialMessages, persist }: UseAgentChatOptio
 }
 
 /** The three openers a new chat offers. */
-export const SUGGESTIONS = [
-  "Set up a $50 budget for lunch this week",
-  "Buy this for me: https://",
-];
+export const SUGGESTIONS = ["Buy this for me: https://", "Give me a $50 card for lunch this week"];

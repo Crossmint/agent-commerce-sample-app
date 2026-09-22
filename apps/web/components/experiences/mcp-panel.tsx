@@ -29,7 +29,7 @@ export function McpPanel(props: ExperienceProps) {
   return (
     <Panel
       title="Connect an MCP agent"
-      sub="Any MCP host can shop with your cards. You approve every budget first."
+      sub="Any MCP host can shop with your cards. You choose how to pay before anything is spent."
     >
       {/* Who it works with comes first: it answers "is my host one of these?". */}
       <ul className="flex flex-wrap gap-2" aria-label="MCP hosts">

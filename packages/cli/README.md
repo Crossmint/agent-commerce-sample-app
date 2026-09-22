@@ -53,11 +53,15 @@ agent-commerce agent-card status <requestId> --wait   # resume waiting on a requ
 
 ## Flow 2: checkout at a URL (preferred)
 
-Crossmint buys the item. It fills in the card itself. The card number never reaches the agent.
+Crossmint buys the item. It fills in the card itself. The card number never reaches the agent. Start here: no agent card is needed up front.
 
 ```sh
-agent-commerce checkout create --url https://shop.example/p/1 --agent-card <id> --max-cost 100 --request "medium, black" --wait
+agent-commerce checkout create --url https://shop.example/p/1 --max-cost 100 --request "medium, black" --wait
 ```
+
+When the run reaches its payment step it exits with code 2 and prints a link. Show it to the user: they pick a saved payment method there, which mints an agent card for this purchase alone. Then keep waiting with `agent-commerce checkout get <checkoutId> --wait`.
+
+To pay from a card the user already approved, pass `--agent-card <id>` and the payment step never appears.
 
 If the shop asks a question (size, shipping address), the command prints the fields and exits with code 2. Answer it:
 

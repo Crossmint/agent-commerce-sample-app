@@ -54,7 +54,8 @@ export interface PaymentMethodSummary {
   card?: { brand: string; last4: string; expiration?: { month: string; year: string } };
 }
 
-export type AgentCardRequestStatus = "pending" | "approved" | "active" | "denied" | "expired" | "failed";
+export type AgentCardRequestStatus =
+  "pending" | "approved" | "active" | "denied" | "expired" | "failed";
 
 export interface AgentCardRequest {
   id: string;
@@ -102,7 +103,8 @@ export interface CredentialResult {
 export interface CreateCheckoutInput {
   startUrl: string;
   task?: string;
-  agentCardId: string;
+  /** Omit to let the user choose a payment method at the run's payment step. */
+  agentCardId?: string;
   maxCost: { amount: string; currency: string };
   buyerProfileId?: string;
   browserProfileId?: string;
@@ -118,10 +120,26 @@ export interface CheckoutMessageInput {
   messageId?: string;
 }
 
+/**
+ * The run reached its payment step. The user chooses a payment method at
+ * `approvalUrl`, which mints the agent card that pays.
+ */
+export interface CheckoutPaymentRequest {
+  requestId: string;
+  status: string;
+  approvalUrl: string;
+  amount: { value: string; currency: string };
+  description: string;
+  merchant?: { name: string; url?: string; countryCode?: string };
+  agentCardId?: string;
+  failureReason?: string;
+}
+
 export interface CheckoutView {
   id: string;
   status: CheckoutStatus;
   agentCardId?: string;
+  paymentRequest?: CheckoutPaymentRequest;
   pendingUserAction?: PendingUserAction;
   rendered?: RenderedAction;
   embedUrl?: string;
@@ -142,7 +160,13 @@ export class AgentCommerceApiError extends Error {
   readonly details: unknown;
   readonly url: string;
 
-  constructor(opts: { status: number; url: string; code?: string; message?: string; details?: unknown }) {
+  constructor(opts: {
+    status: number;
+    url: string;
+    code?: string;
+    message?: string;
+    details?: unknown;
+  }) {
     super(opts.message ?? `Agent Commerce request failed with ${opts.status}`);
     this.name = "AgentCommerceApiError";
     this.status = opts.status;
@@ -193,7 +217,10 @@ export class AgentCommerceApi {
   }
 
   async listPaymentMethods(): Promise<PaymentMethodSummary[]> {
-    const res = await this.call<{ paymentMethods: PaymentMethodSummary[] }>("GET", "/v1/payment-methods");
+    const res = await this.call<{ paymentMethods: PaymentMethodSummary[] }>(
+      "GET",
+      "/v1/payment-methods",
+    );
     return res.paymentMethods;
   }
 
@@ -250,7 +277,13 @@ export class AgentCommerceApi {
     const url = `${this.baseUrl}${path}`;
     const headers: Record<string, string> = { Accept: "application/json" };
     if (opts.auth !== false) {
-      if (!this.token) throw new AgentCommerceApiError({ status: 401, url, code: "unauthorized", message: "No bearer token." });
+      if (!this.token)
+        throw new AgentCommerceApiError({
+          status: 401,
+          url,
+          code: "unauthorized",
+          message: "No bearer token.",
+        });
       headers.Authorization = `Bearer ${this.token}`;
     }
     if (opts.body !== undefined) headers["Content-Type"] = "application/json";
@@ -272,7 +305,9 @@ export class AgentCommerceApi {
       }
     }
     if (!res.ok) {
-      const err = (json as { error?: { code?: string; message?: string; details?: unknown } } | undefined)?.error;
+      const err = (
+        json as { error?: { code?: string; message?: string; details?: unknown } } | undefined
+      )?.error;
       throw new AgentCommerceApiError({
         status: res.status,
         url,
