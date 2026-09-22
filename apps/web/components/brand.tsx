@@ -130,6 +130,26 @@ export function AgentMark({
   );
 }
 
+/**
+ * Acme's logotype: the mark beside the company name. It stands where the
+ * Crossmint one does on screens that belong to the agent rather than to
+ * Crossmint — the OAuth consent screen is the agent asking for access, so it
+ * wears the agent's brand.
+ */
+export function AgentLockup({ height = 20, className }: { height?: number; className?: string }) {
+  return (
+    <span className={cn("inline-flex items-center gap-2", className)} aria-label={AGENT_NAME}>
+      <AgentMark size={height} />
+      <span
+        aria-hidden
+        className="text-[17px] leading-none font-semibold tracking-[-0.02em] text-foreground"
+      >
+        {AGENT_NAME}
+      </span>
+    </span>
+  );
+}
+
 /** The agent's face in a conversation: the Acme mark as a disc. */
 export function AgentAvatar({ size = 32, className }: { size?: number; className?: string }) {
   return (
