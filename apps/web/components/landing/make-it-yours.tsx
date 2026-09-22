@@ -6,7 +6,7 @@ import { ArrowRight, Blocks, Component, Palette } from "lucide-react";
 import { BRAND_THEME_META, type BrandTheme, DEFAULT_BRAND_THEME } from "@/components/brand-themes";
 import { BrandPicker } from "@/components/frame/brand-picker";
 import { LandingPhone } from "./landing-phone";
-import { APPROVE_FULL_END, ApproveScreen } from "./screen-approve";
+import { APPROVE_END, ApproveScreen } from "./screen-approve";
 import { Reveal } from "./reveal";
 import { Section } from "./section";
 import { STORY } from "./story";
@@ -96,11 +96,11 @@ const LABEL = `A phone in the chosen brand: the user asks ${STORY.agent} to ${ST
  * bezel and screen read the tokens under it.
  */
 function BrandPhone({ brand }: { brand: BrandTheme }) {
-  const { ref, cycle } = useStepLoop<HTMLDivElement>(1, { interval: APPROVE_FULL_END + 700 });
+  const { ref, cycle } = useStepLoop<HTMLDivElement>(1, { interval: APPROVE_END + 700 });
   return (
     <div ref={ref} data-brand={brand} className="flex" style={{ backgroundColor: "transparent" }}>
       <LandingPhone key={brand} label={LABEL}>
-        <ApproveScreen key={`${brand}-${cycle}`} state="full" />
+        <ApproveScreen key={`${brand}-${cycle}`} />
       </LandingPhone>
     </div>
   );

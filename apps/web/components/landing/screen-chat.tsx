@@ -6,7 +6,6 @@ import { cn } from "@/lib/cn";
 import { delay, RunMark, RunStep } from "./bits";
 import { type ChatMessage, delayStyle, endsGroup } from "./chat/model";
 import { messageAttrs, useFollowLatest } from "./chat/use-follow-latest";
-import { ReceiptCard } from "./receipt-card";
 import { STORY } from "./story";
 
 /*
@@ -170,75 +169,28 @@ export interface RequestTimes {
   request: number;
 }
 
-export const REQUEST_T: RequestTimes = { ask: 300, reply: 1300, request: 2000 };
-/** The ask and the agent's request. */
-export const REQUEST_END = REQUEST_T.request;
-
-export function requestThread(
-  opts: { pressAt?: number; settled?: boolean; times?: RequestTimes } = {},
-): ChatMessage[] {
-  const t = opts.times ?? REQUEST_T;
-  const at = (ms: number) => (opts.settled ? 0 : ms);
+export function requestThread({
+  times,
+  pressAt,
+}: {
+  times: RequestTimes;
+  /** When the card's own button presses itself. Left out, it never presses. */
+  pressAt?: number;
+}): ChatMessage[] {
   return [
-    { key: "ask", from: "user", at: at(t.ask), node: STORY.ask },
+    { key: "ask", from: "user", at: times.ask, node: STORY.ask },
     {
       key: "reply",
       from: "agent",
-      at: at(t.reply),
+      at: times.reply,
       node: <>On it. I need a {STORY.amount} budget for this order. Approve it here:</>,
     },
     {
       key: "request",
       from: "agent",
-      at: at(t.request),
+      at: times.request,
       bare: true,
-      card: <RequestCard press={opts.pressAt} />,
+      card: <RequestCard press={pressAt} />,
     },
-  ];
-}
-
-/** After approval: the checkout runs in the thread, then the receipt lands. */
-export const CHECKOUT_T = {
-  approved: 200,
-  ordering: 700,
-  card: 1200,
-  steps: [1900, 2700, 3500, 4300, 5100],
-  done: 5800,
-  receipt: 6400,
-} as const;
-
-export function checkoutThread(): ChatMessage[] {
-  return [
-    ...requestThread({ settled: true }),
-    {
-      key: "approved",
-      from: "status",
-      at: CHECKOUT_T.approved,
-      node: (
-        <>
-          You approved {STORY.amount} · {STORY.card}
-        </>
-      ),
-    },
-    {
-      key: "ordering",
-      from: "agent",
-      at: CHECKOUT_T.ordering,
-      node: <>Ordering at {STORY.domain}…</>,
-    },
-    {
-      key: "progress",
-      from: "agent",
-      at: CHECKOUT_T.card,
-      bare: true,
-      card: <ProgressCard from={CHECKOUT_T.card} steps={[...CHECKOUT_T.steps]} />,
-    },
-    {
-      key: "done",
-      from: "agent",
-      at: CHECKOUT_T.done,
-      node: <>Done. Order #{STORY.order} arrives Thursday.</>,
-    },
-    { key: "receipt", from: "agent", at: CHECKOUT_T.receipt, bare: true, card: <ReceiptCard /> },
   ];
 }

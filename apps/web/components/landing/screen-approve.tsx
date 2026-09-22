@@ -2,7 +2,6 @@
 
 import type { ReactNode } from "react";
 import { ChevronsUpDown, Lock } from "lucide-react";
-import { cn } from "@/lib/cn";
 import { CardBadge, CheckBurst, delay, FauxButton } from "./bits";
 import { AgentChatScreen, requestThread } from "./screen-chat";
 import { STORY } from "./story";
@@ -11,23 +10,14 @@ import { STORY } from "./story";
  * The approval sheet over the chat, the screen your platform hosts. Same
  * bones as the real `ApproveAgentCard`: headline, Purpose and Limit, the
  * card picker, one reassurance line, Allow. Timings are ms from mount.
- * Tokens only, so a `data-brand` wrapper re-themes the whole sheet.
+ * Tokens only, so a `data-brand` wrapper re-themes the whole sheet, which is
+ * what `make-it-yours` uses it for.
  *
- * - request: the chat is settled; the sheet slides up, Allow pulses, then presses.
- * - approved: the sheet is already up and shows the Approved state.
- * - full: the chat plays (ask, reply, request card), the card's button
- *   presses itself, the sheet slides up, Allow presses, Approved shows.
+ * One run: the chat plays (ask, reply, request card), the card's button
+ * presses itself, the sheet slides up, Allow presses, Approved shows.
  */
-export type ApproveState = "request" | "approved" | "full";
 
 export const APPROVE_T = {
-  sheet: 150,
-  ready: 800,
-  press: 1900,
-} as const;
-
-/** The "full" run, from the first bubble to Approved. */
-export const APPROVE_FULL_T = {
   chat: { ask: 200, reply: 900, request: 1500 },
   /** The request card's button presses itself. */
   cardPress: 2300,
@@ -36,50 +26,33 @@ export const APPROVE_FULL_T = {
   press: 4200,
   approvedAt: 4800,
 } as const;
-/** When the "full" run has shown Approved for a moment, ms from mount. */
-export const APPROVE_FULL_END = APPROVE_FULL_T.approvedAt + 1900;
+/** When the run has shown Approved for a moment, ms from mount. */
+export const APPROVE_END = APPROVE_T.approvedAt + 1900;
 
-export function ApproveScreen({ state }: { state: ApproveState }) {
-  const full = state === "full";
-  // A negative delay finishes the slide before the first frame: the sheet
-  // was already up on the screen before this one.
-  const sheetAt = state === "approved" ? -1000 : full ? APPROVE_FULL_T.sheet : APPROVE_T.sheet;
-  const showForm = state !== "approved";
-  const showDone = state !== "request";
-  const switchAt = full ? APPROVE_FULL_T.approvedAt : 0;
-  const messages = full
-    ? requestThread({ pressAt: APPROVE_FULL_T.cardPress, times: APPROVE_FULL_T.chat })
-    : requestThread({ settled: true });
+export function ApproveScreen() {
   return (
     <div className="relative h-full">
-      <AgentChatScreen messages={messages} />
+      <AgentChatScreen
+        messages={requestThread({ times: APPROVE_T.chat, pressAt: APPROVE_T.cardPress })}
+      />
       <div
         aria-hidden
         className="landing-scrim absolute inset-0 z-30 bg-black/10"
-        style={delay(sheetAt)}
+        style={delay(APPROVE_T.sheet)}
       />
       <div
         className="landing-sheet absolute inset-x-0 bottom-0 z-40 flex flex-col rounded-t-[calc(var(--radius)+18px)] bg-background px-5 pt-3 pb-7 text-foreground"
-        style={delay(sheetAt)}
+        style={delay(APPROVE_T.sheet)}
       >
         <span aria-hidden className="mx-auto mb-3 h-1 w-9 rounded-full bg-muted-strong" />
         <div className="relative">
-          {showForm ? (
-            <div
-              className={cn("flex flex-col gap-3", full && "landing-vanish")}
-              style={full ? delay(switchAt) : undefined}
-            >
-              <RequestForm
-                ready={full ? APPROVE_FULL_T.ready : APPROVE_T.ready}
-                press={full ? APPROVE_FULL_T.press : APPROVE_T.press}
-              />
-            </div>
-          ) : null}
-          {showDone ? (
-            <div className={cn("flex flex-col gap-3", full && "absolute inset-x-0 top-0")}>
-              <Approved at={state === "approved" ? 150 : switchAt + 100} />
-            </div>
-          ) : null}
+          {/* The form gives way to the outcome in place, so the sheet keeps its height. */}
+          <div className="landing-vanish flex flex-col gap-3" style={delay(APPROVE_T.approvedAt)}>
+            <RequestForm ready={APPROVE_T.ready} press={APPROVE_T.press} />
+          </div>
+          <div className="absolute inset-x-0 top-0 flex flex-col gap-3">
+            <Approved at={APPROVE_T.approvedAt + 100} />
+          </div>
         </div>
       </div>
     </div>
