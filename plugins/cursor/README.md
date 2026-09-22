@@ -4,7 +4,7 @@ Gives the agent in Cursor a way to pay with the user's own card, with the user's
 
 What it installs:
 
-- **MCP server** `agent-commerce`, pointed at the hosted Agent Commerce wallet at `https://goat-jade.vercel.app/api/mcp`. Cursor signs the user in through OAuth on first use. The user sees Agent Commerce's consent screen, then approves each budget on the wallet.
+- **MCP server** `agent-commerce`, pointed at the hosted Agent Commerce wallet at `https://agent-commerce-sample-app.vercel.app/api/mcp`. Cursor signs the user in through OAuth on first use. The user sees Agent Commerce's consent screen, then approves each budget on the wallet.
 - **Skill** `agent-commerce`: when to request an agent card, how to show the approval link, why checkouts beat raw card numbers.
 - **Rule** `agent-commerce-payments`: the short version, applied whenever a task involves buying or paying.
 
