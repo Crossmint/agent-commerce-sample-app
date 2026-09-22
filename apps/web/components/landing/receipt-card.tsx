@@ -1,3 +1,4 @@
+import Image from "next/image";
 import { CreditCard } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { STORY } from "./story";
@@ -7,14 +8,25 @@ import { STORY } from "./story";
  * order number, the line items, the total, and the card that paid. Sized
  * for the phone: 11-12px text. A card in the theme's own terms: white,
  * 16px corners, a hairline ring.
+ *
+ * The merchant tile carries Starbucks' siren in white on Starbucks green,
+ * the one place on the page that wears a real merchant's mark: a receipt with
+ * a letter tile on it does not read as a receipt.
  */
+
+/** Starbucks green, from the brand's own palette. */
+const STARBUCKS_GREEN = "#00704A";
 
 export function ReceiptCard({ className }: { className?: string }) {
   return (
     <div className={cn("flex w-full flex-col gap-2 rounded-2xl bg-card px-3 py-2.5 text-left text-[11.5px] leading-tight text-card-foreground ring-1 ring-foreground/10", className)}>
       <div className="flex items-center gap-2">
-        <span aria-hidden className="inline-flex size-[26px] shrink-0 items-center justify-center rounded-[7px] bg-foreground text-[13px] leading-none font-bold text-background">
-          {STORY.merchant.charAt(0)}
+        <span
+          aria-hidden
+          className="inline-flex size-[26px] shrink-0 items-center justify-center rounded-full"
+          style={{ backgroundColor: STARBUCKS_GREEN }}
+        >
+          <Image src="/logos/starbucks.svg" alt="" width={18} height={18} className="size-[18px]" />
         </span>
         <div className="flex min-w-0 flex-col gap-px">
           <span className="truncate text-[12px] font-semibold">{STORY.merchant}</span>

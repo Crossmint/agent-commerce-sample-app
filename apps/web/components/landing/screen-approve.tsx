@@ -86,7 +86,8 @@ export function ApproveScreen({ state }: { state: ApproveState }) {
   );
 }
 
-function RequestForm({ ready, press }: { ready: number; press: number }) {
+/** The sheet body before approval: the request, the figures, the card, Allow. */
+export function RequestForm({ ready, press }: { ready: number; press: number }) {
   return (
     <>
       <div className="flex flex-col gap-1">
@@ -102,6 +103,7 @@ function RequestForm({ ready, press }: { ready: number; press: number }) {
         <Row label="Limit">
           <span className="font-display text-[14px] font-medium tabular-nums">{STORY.amount}</span>
         </Row>
+        <Row label="Merchant">{STORY.merchant}</Row>
         <Row label="Expires">{STORY.expires}</Row>
       </dl>
       <div className="flex flex-col gap-1">
@@ -119,11 +121,15 @@ function RequestForm({ ready, press }: { ready: number; press: number }) {
         <Lock className="size-3 shrink-0" strokeWidth={2.2} />
         Your card is never shared with the agent.
       </p>
-      <div className="flex flex-col items-center gap-1.5">
+      {/* Allow, then a grey full-width Deny under it, as the real screen has. */}
+      <div className="flex flex-col gap-2">
         <FauxButton ready={ready} press={press} className="w-full">
           Allow
         </FauxButton>
-        <span aria-hidden className="text-[11px] font-medium text-muted-foreground">
+        <span
+          aria-hidden
+          className="flex h-12 items-center justify-center rounded-2xl bg-muted text-[14px] font-semibold text-foreground select-none"
+        >
           Deny
         </span>
       </div>
@@ -131,7 +137,8 @@ function RequestForm({ ready, press }: { ready: number; press: number }) {
   );
 }
 
-function Approved({ at }: { at: number }) {
+/** The sheet body after approval: the check, the headline, what it granted. */
+export function Approved({ at }: { at: number }) {
   return (
     <div className="flex flex-col items-start gap-3 pb-1">
       <CheckBurst at={at} size={48} />

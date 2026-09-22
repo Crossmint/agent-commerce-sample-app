@@ -11,7 +11,7 @@ import { WindowMock } from "./window-mock";
  * budget where the conversation is. Rises in once on mount.
  */
 
-const HISTORY = ["Running socks", "Coffee beans, 1 kg", "Flight to Denver"];
+const HISTORY = ["Usual coffee", "Coffee beans, 1 kg", "Flight to Denver"];
 
 export function AgentAppMock({ className }: { className?: string }) {
   return (

@@ -1,5 +1,6 @@
 import type { CSSProperties } from "react";
 import Link from "next/link";
+import { Check } from "lucide-react";
 import { Button } from "@agent-commerce/ui";
 import { CrossmintMark } from "@/components/brand";
 import { GITHUB_URL } from "./links";
@@ -9,6 +10,13 @@ import { GitHubMark } from "./social-marks";
 import { StoryPhone } from "./story-phone";
 
 const rise = (ms: number) => ({ "--delay": `${ms}ms` }) as CSSProperties;
+
+/** The three things the sample app shows how to do. */
+const WHAT_IT_SHOWS = [
+  "Save your users’ cards",
+  "Create secure spending limits",
+  "Check out at any store",
+];
 
 /**
  * The hero: the pitch on the left, the phone playing the story on the
@@ -25,11 +33,25 @@ export function Hero() {
               <CrossmintMark size={16} />
               Agent Commerce Sample App
             </span>
-            <h1 className="landing-rise max-w-[15ch] text-[44px] leading-[1.05] font-medium tracking-[-0.02em] text-foreground sm:text-[56px]" style={rise(60)}>
-              All the APIs you need to enable agentic commerce for your agent platform
+            <h1 className="landing-rise max-w-[16ch] text-[44px] leading-[1.05] font-medium tracking-[-0.02em] text-foreground sm:text-[56px]" style={rise(60)}>
+              All the APIs you need for agentic commerce.
             </h1>
-            <p className="landing-rise max-w-xl text-lg leading-snug text-muted-foreground sm:text-xl" style={rise(110)}>
-              Save your users&rsquo; cards, let agents ask for spending limits, and check out at any store. An open source sample app on the Crossmint Agents APIs.
+            <div className="landing-rise flex max-w-xl flex-col gap-3" style={rise(110)}>
+              <p className="text-lg leading-snug text-muted-foreground sm:text-xl">
+                An open source sample app that showcases how you can enable your agents to:
+              </p>
+              <ul className="flex flex-col gap-2 text-lg leading-snug text-foreground sm:text-xl">
+                {WHAT_IT_SHOWS.map((item) => (
+                  <li key={item} className="flex items-start gap-2.5">
+                    <Check className="mt-1.5 size-4 shrink-0 text-primary sm:mt-2" strokeWidth={3} />
+                    {item}
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <p className="landing-rise max-w-xl text-lg leading-snug text-muted-foreground sm:text-xl" style={rise(150)}>
+              Build your own alternative to Stripe Link.{" "}
+              <span className="text-foreground">Your users, your brand.</span>
             </p>
             <div className="landing-rise flex w-full flex-col gap-3 pt-2 sm:w-auto sm:flex-row" style={rise(200)}>
               <Button asChild size="xl" className="sm:min-w-[11rem]">

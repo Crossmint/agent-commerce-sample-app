@@ -3,14 +3,16 @@
 import { ArrowUp, ChevronLeft, ChevronRight, Lock, Plus, Video } from "lucide-react";
 import { AgentAvatar } from "@/components/brand";
 import { cn } from "@/lib/cn";
+import { HomeIndicator } from "../landing-phone";
 import { STORY } from "../story";
 import { type ChatMessage, delayStyle, endsGroup, isLastFromUser } from "./model";
 import { messageAttrs, useFollowLatest } from "./use-follow-latest";
 
 /*
  * iMessage, iOS light appearance, in Apple's own colors: white canvas,
- * #E9E9EB received bubbles, #0A84FF sent bubbles, a tail on the last bubble
- * of each group, "Delivered" under the last sent one, a rich card for links.
+ * #E9E9EB received bubbles, #007AFF sent bubbles (systemBlue, light), a tail
+ * on the last bubble of each group, "Delivered" under the last sent one, a
+ * rich card for links, and the home indicator at the foot.
  * The nav bar is a three-column grid, so the contact stays centered whatever
  * the side widths are. The contact is Acme Agent.
  *
@@ -30,7 +32,7 @@ export function IMessageScreen({
 }) {
   const thread = useFollowLatest<HTMLDivElement>();
   return (
-    <div className="flex h-full flex-col bg-white text-[13px] leading-[1.3] text-black antialiased">
+    <div className="relative flex h-full flex-col bg-white text-[13px] leading-[1.3] text-black antialiased">
       <div className="grid grid-cols-[1fr_auto_1fr] items-end border-b border-black/10 bg-[#F6F6F6] px-2.5 pt-9 pb-1.5">
         <ChevronLeft className={cn("mb-4 -ml-1 size-6", BLUE)} strokeWidth={2.4} />
         <div className="flex flex-col items-center gap-[5px]">
@@ -45,7 +47,7 @@ export function IMessageScreen({
       <div ref={thread} className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
         <div className="mt-auto flex flex-col px-2.5 pt-3 pb-1">
           <p className={cn("mb-2.5 text-center text-[10.5px]", GRAY)}>
-            <span className="font-semibold">Today</span> 9:41
+            <span className="font-semibold">Today</span> 9:41 AM
           </p>
           {messages.map((m, i) => (
             <div
@@ -67,6 +69,7 @@ export function IMessageScreen({
         </div>
       </div>
       <Composer />
+      <HomeIndicator className="bg-black/85" />
     </div>
   );
 }
@@ -77,7 +80,7 @@ function Message({ m, tail, delivered }: { m: ChatMessage; tail: boolean; delive
   const sent = m.from === "user";
   const side = sent ? "ml-auto" : "mr-auto";
   const tailCls = tail ? (sent ? "landing-im-tail-sent" : "landing-im-tail-recv") : "";
-  const color = sent ? "bg-[#0A84FF] text-white" : "bg-[#E9E9EB] text-black";
+  const color = sent ? "bg-[#007AFF] text-white" : "bg-[#E9E9EB] text-black";
 
   if (m.link) {
     return (
@@ -162,7 +165,7 @@ function Composer() {
         )}
       >
         iMessage
-        <span className="inline-flex size-6 items-center justify-center rounded-full bg-[#0A84FF] text-white">
+        <span className="inline-flex size-6 items-center justify-center rounded-full bg-[#007AFF] text-white">
           <ArrowUp className="size-3.5" strokeWidth={3} />
         </span>
       </span>

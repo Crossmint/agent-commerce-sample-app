@@ -1,4 +1,5 @@
 import type { CSSProperties, ReactNode } from "react";
+import Image from "next/image";
 import { Check } from "lucide-react";
 import { cn } from "@/lib/cn";
 
@@ -60,20 +61,34 @@ export function CheckBurst({ at = 0, size = 56, className }: { at?: number; size
   );
 }
 
-/** The saved card row's mark: the network's short code on a white card. */
-export function CardBadge({ code = "VISA", at, className }: { code?: string; at?: number; className?: string }) {
+/**
+ * The saved card row's mark: the network's own artwork, the same files the
+ * real `CardMark` shows when Crossmint sends `display.imageUrl`. The files are
+ * 780x500, so the 36x24 box keeps their proportions exactly.
+ */
+export function CardBadge({
+  network = "mastercard",
+  at,
+  className,
+}: {
+  network?: "mastercard" | "visa";
+  at?: number;
+  className?: string;
+}) {
   return (
-    <span
+    <Image
       aria-hidden
+      alt=""
+      src={`/icons/payments/${network}.svg`}
+      width={36}
+      height={24}
       className={cn(
-        "inline-flex h-6 w-9 shrink-0 items-center justify-center rounded-[3px] border border-border bg-background text-[8px] leading-none font-black tracking-tight text-foreground",
+        "h-6 w-9 shrink-0 rounded-[3px] object-cover",
         at !== undefined && "landing-pop",
         className,
       )}
       style={at !== undefined ? delay(at) : undefined}
-    >
-      {code}
-    </span>
+    />
   );
 }
 

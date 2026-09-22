@@ -3,8 +3,12 @@
 import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/cn";
 import { LandingPhone } from "./landing-phone";
-import { AgentChatScreen, CHECKOUT_T, checkoutThread } from "./screen-chat";
-import { APPROVE_FULL_END, ApproveScreen } from "./screen-approve";
+import {
+  APP_APPROVE_END,
+  APP_CHECKOUT_END,
+  AppApproveScreen,
+  AppCheckoutScreen,
+} from "./screen-app-steps";
 import { CARDS_END, CardsScreen } from "./screen-cards";
 import { Section, SectionHeading } from "./section";
 import { ScreenStack, useActivationKeys } from "./step-ui";
@@ -20,7 +24,7 @@ import { useReducedMotion } from "./use-step-loop";
  */
 
 /** How long each step's screen holds, ms: its timeline plus a beat to read the result. */
-const STEP_MS = [CARDS_END + 1000, APPROVE_FULL_END + 300, CHECKOUT_T.receipt + 1600];
+const STEP_MS = [CARDS_END + 1000, APP_APPROVE_END, APP_CHECKOUT_END];
 const HOLD_AFTER_CLICK_MS = 12000;
 
 interface Step {
@@ -32,33 +36,31 @@ interface Step {
 
 const STEPS: Step[] = [
   {
-    title: "Save cards in a PCI vault",
+    title: "Save your users' cards in a PCI vault",
     summary: "The card goes to Crossmint, never to your servers.",
     body: "Crossmint's payment method component saves the card straight into Crossmint's PCI vault. Your app only ever holds a token and the last four digits.",
     facts: [
       "The card number never touches your servers.",
-      "Registered for agentic tokenization with Visa Intelligent Commerce and Mastercard Agent Pay.",
       "One component, dropped into your own page.",
     ],
   },
   {
-    title: "Create mandates and spending limits",
+    title: "Create secure spending limits",
     summary: "The agent asks for a budget. The user approves it once.",
-    body: "The agent asks for an agent card, which Crossmint calls an order intent: an amount, a purpose, an expiry, and an optional merchant lock. The user approves once, on a screen your platform hosts.",
+    body: "Allow agents to ask for permissions to use your card. Set an amount, expiry date, merchant and more.",
     facts: [
-      "The network mints a scoped token per merchant and enforces the limit.",
-      "Visa Intelligent Commerce and Mastercard Agent Pay.",
-      "Revocable at any time.",
+      "Powered by Visa Intelligent Commerce and Mastercard Agent Pay, with Union Pay and AMEX coming soon.",
+      "This is not a new one time use card like Stripe Link. Users keep their points and see regular charges on file.",
     ],
   },
   {
-    title: "Check out anywhere with one API call",
+    title: "Check out at any store with one API call",
     summary: "A product URL and the agent card. Crossmint does the rest.",
-    body: "Agent Checkouts: one call with a product URL and the agent card. Crossmint drives the store's checkout in a real browser, pays with the agent card, asks the user only for what it cannot fill, and returns a receipt.",
+    body: "Crossmint's Agent Checkouts API figures out the best way to purchase from a website. Supports UCP and any browser checkout.",
     facts: [
-      "Works with millions of merchants and Shop Pay.",
-      "Uses cards the user already has saved at a store.",
-      "Shipping, size and other gaps come back as questions.",
+      "Works with any payment method, from agent cards to saved cards on the merchant.",
+      "Bring your own browser sessions and re-use them across Agent Checkouts.",
+      "Fastest and cheapest way to check out in the market.",
     ],
   },
 ];
@@ -116,10 +118,7 @@ export function HowItWorks() {
 
   return (
     <Section id="how">
-      <SectionHeading
-        title="How it works"
-        sub="Three APIs, one approval screen you host. The phone plays each step."
-      />
+      <SectionHeading title="How it works" sub="Three APIs, one approval screen you host." />
       <div
         ref={ref}
         className="grid items-start gap-12 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)] lg:gap-16"
@@ -128,8 +127,8 @@ export function HowItWorks() {
           <LandingPhone label={`The phone shows step ${step + 1}: ${STEPS[step]?.title ?? ""}`}>
             <ScreenStack active={step}>
               <CardsScreen key={keys[0]} />
-              <ApproveScreen key={keys[1]} state="full" />
-              <AgentChatScreen key={keys[2]} messages={checkoutThread()} />
+              <AppApproveScreen key={keys[1]} />
+              <AppCheckoutScreen key={keys[2]} />
             </ScreenStack>
           </LandingPhone>
         </div>

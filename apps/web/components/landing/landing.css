@@ -318,6 +318,29 @@ html {
     landing-scrim-out 0.3s ease both;
   animation-delay: var(--delay, 0ms), var(--leave, 4000ms);
 }
+
+/*
+ * A sheet that comes and goes over a screen that stays put, driven by
+ * `data-open` instead of a keyframe timeline. The hero needs this: its
+ * thread is mounted once for the whole story, so the sheet cannot ride on
+ * an animation that restarts the screen under it. Transitions also read the
+ * open state both ways, which two `both`-filled keyframes cannot: the later
+ * one wins its properties from the first frame and the sheet starts up.
+ */
+.landing-sheet-toggle {
+  transform: translateY(100%);
+  transition: transform 0.46s cubic-bezier(0.32, 0.72, 0, 1);
+}
+.landing-sheet-toggle[data-open="true"] {
+  transform: none;
+}
+.landing-scrim-toggle {
+  opacity: 0;
+  transition: opacity 0.36s ease;
+}
+.landing-scrim-toggle[data-open="true"] {
+  opacity: 1;
+}
 .landing-sheet-leave {
   animation:
     landing-sheet-in 0.45s cubic-bezier(0.2, 0.8, 0.2, 1) both,
@@ -347,7 +370,7 @@ html {
 .landing-im-tail-sent::before {
   right: -7px;
   width: 20px;
-  background: #0a84ff;
+  background: #007aff;
   border-bottom-left-radius: 16px 14px;
 }
 .landing-im-tail-sent::after {
@@ -459,7 +482,9 @@ html {
   }
   .landing-reveal[data-reveal="shown"],
   .landing-screen-layer,
-  .landing-fold {
+  .landing-fold,
+  .landing-sheet-toggle,
+  .landing-scrim-toggle {
     transition: none;
   }
 }
