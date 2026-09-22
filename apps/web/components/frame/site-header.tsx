@@ -11,8 +11,9 @@ const CONTACT_SALES_URL = "https://www.crossmint.com/contact/sales";
 const LINK_BUTTON_CLASS =
   "flex size-10 items-center justify-center rounded-lg border border-border bg-background shadow-[0px_1px_2px_rgba(0,0,0,0.05)] transition-shadow hover:shadow-[0px_2px_6px_rgba(0,0,0,0.08)]";
 
-// Matches the phone mockup's zoom-in.
-const HEADER_ENTER_DELAY_MS = 400;
+// Matches the phone mockup's zoom-in. Shared, so the controls card beside
+// this one arrives with it.
+export const HEADER_ENTER_DELAY_MS = 400;
 
 function HeaderLink({
   href,

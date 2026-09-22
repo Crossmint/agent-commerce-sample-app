@@ -274,7 +274,7 @@ export function AppExperience({
       <div className="fixed top-6 left-6 z-20 hidden flex-col items-start gap-2 md:flex">
         <div className="flex items-center gap-2.5">
           <SiteHeader />
-          <FrameControls {...controls} />
+          <FrameControls {...controls} animate />
         </div>
         {/* The app runs on production keys, so anything bought here is bought. */}
         <p className="rounded-full border border-border bg-background/80 px-3 py-1 text-[12px] font-medium text-muted-foreground backdrop-blur">

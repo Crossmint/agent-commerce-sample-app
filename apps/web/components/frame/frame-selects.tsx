@@ -15,6 +15,7 @@ import {
 import { BRAND_THEME_META, BRAND_THEMES, type BrandTheme } from "@/components/brand-themes";
 import { cn } from "@/lib/cn";
 import { Swatch } from "./brand-picker";
+import { HEADER_ENTER_DELAY_MS } from "./site-header";
 import {
   MESSAGING_APP_META,
   MESSAGING_APPS,
@@ -34,8 +35,9 @@ import {
  * it: picking iMessage there both moves to the messaging platform and names
  * the app, in one gesture, which is one change for the caller to make.
  *
- * The card repeats `SiteHeader`'s shell and its 40px buttons, because it sits
- * immediately beside it.
+ * The card repeats `SiteHeader`'s shell and its 40px buttons, and enters on
+ * the same animation and the same delay, because it sits immediately beside
+ * it and the two should arrive as one row.
  */
 
 const CARD =
@@ -55,6 +57,7 @@ export function FrameControls({
   onApp,
   onBrand,
   hideViews,
+  animate = false,
   className,
 }: {
   view: View;
@@ -70,10 +73,15 @@ export function FrameControls({
    * to the body, so this cannot be done by hiding rows with CSS.
    */
   hideViews?: readonly View[];
+  /** Enter from the top with the logo card. False in the phone's foot bar, which is not up there. */
+  animate?: boolean;
   className?: string;
 }) {
   return (
-    <div className={cn(CARD, className)}>
+    <div
+      className={cn(CARD, animate && "enter-down enter-down-far", className)}
+      style={animate ? { animationDelay: `${HEADER_ENTER_DELAY_MS}ms` } : undefined}
+    >
       <PlatformMenu view={view} app={app} onView={onView} onApp={onApp} hideViews={hideViews} />
       <TemplateMenu brand={brand} onBrand={onBrand} />
     </div>
