@@ -102,7 +102,6 @@ export function useAgentChat({ id, initialMessages, persist }: UseAgentChatOptio
 
 /** The three openers a new chat offers. */
 export const SUGGESTIONS = [
-  "What agent cards do I have?",
   "Set up a $50 budget for lunch this week",
   "Buy this for me: https://",
 ];
