@@ -44,20 +44,20 @@ const EXPERIENCES: Experience[] = [
     Visual: MessagingMock,
   },
   {
-    id: "terminal",
-    tab: "Terminal agents",
-    title: "Your own CLI for agents in a shell",
-    body: "Coding agents and scripts drive the same APIs from the command line, through a CLI that carries your name. Request a budget, wait for the approval, create the checkout, wait for the receipt.",
-    view: "cli",
-    Visual: TerminalMock,
-  },
-  {
     id: "mcp",
     tab: "MCP server",
     title: "Plug it into any MCP host",
     body: "One URL on your domain in the host's settings and the agent sees six tools: list the saved cards, request an agent card, create a checkout, answer its questions. OAuth signs the user in the first time.",
     view: "mcp",
     Visual: McpMock,
+  },
+  {
+    id: "terminal",
+    tab: "Terminal agents",
+    title: "Your own CLI for agents in a shell",
+    body: "Coding agents and scripts drive the same APIs from the command line, through a CLI that carries your name. Request a budget, wait for the approval, create the checkout, wait for the receipt.",
+    view: "cli",
+    Visual: TerminalMock,
   },
 ];
 
@@ -70,7 +70,7 @@ export function Experiences() {
     <Section id="experiences">
       <SectionHeading
         title="Support any agentic user experience"
-        sub="The same three APIs behind a chat app, a messaging bot, a terminal agent or an MCP host."
+        sub="The same three APIs behind a chat app, a messaging bot, an MCP host or a terminal agent."
       />
 
       <div
