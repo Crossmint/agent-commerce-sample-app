@@ -22,7 +22,7 @@ export function CliPanel(props: ExperienceProps) {
           {origin ? <CopyChip label="Teach the agent" value={`Set up ${origin}/install`} /> : <ChipSkeleton label="Teach the agent" />}
           <p className="text-xs text-muted-foreground">Paste this into Claude Code, Codex or OpenClaw and it installs the skill.</p>
         </div>
-        <CopyChip label="Or add the skill by hand" value="npx skills add crossmint/goat" />
+        <CopyChip label="Or add the skill by hand" value="npx skills add crossmint/agent-commerce-sample-app" />
       </div>
 
       <section className="flex flex-col gap-3">

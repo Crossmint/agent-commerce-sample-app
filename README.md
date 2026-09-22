@@ -28,7 +28,7 @@ It is not a crypto wallet. It wraps the Crossmint Agents APIs and adds the parts
 | [`@agent-commerce/cli`](packages/cli) | The CLI, installed as `agent-commerce`. Same surface as MCP, for terminal agents and humans. |
 | [`skills/agent-commerce`](skills/agent-commerce) | A skill that teaches coding agents how to use the CLI. |
 | [`plugins/cursor`](plugins/cursor) | Cursor plugin: the hosted MCP server, the skill, and a payments rule. Also loads in Grok Bot. |
-| [`plugins/claude`](plugins/claude) | Claude Code plugin: the same MCP server and skill. Install with `/plugin marketplace add Crossmint/goat`. |
+| [`plugins/claude`](plugins/claude) | Claude Code plugin: the same MCP server and skill. Install with `/plugin marketplace add Crossmint/agent-commerce-sample-app`. |
 | [`apps/web`](apps/web) | The reference website: the landing page, the app, the API, the MCP endpoint. |
 
 ## How it flows

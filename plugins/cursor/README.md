@@ -13,7 +13,7 @@ What it installs:
 From the Cursor Marketplace, once listed. Until then, add this repository as a plugin source:
 
 ```
-https://github.com/Crossmint/goat
+https://github.com/Crossmint/agent-commerce-sample-app
 ```
 
 ## Point it at your own wallet

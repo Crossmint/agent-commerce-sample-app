@@ -14,7 +14,7 @@ agent-commerce login --api https://wallet.example.com/api/agent-commerce
 With the skills CLI:
 
 ```sh
-npx skills add crossmint/goat
+npx skills add crossmint/agent-commerce-sample-app
 ```
 
 Or copy the folder by hand:

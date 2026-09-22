@@ -6,8 +6,8 @@
     "name": "Crossmint",
     "email": "hello@crossmint.com"
   },
-  "homepage": "https://github.com/Crossmint/goat",
-  "repository": "https://github.com/Crossmint/goat",
+  "homepage": "https://github.com/Crossmint/agent-commerce-sample-app",
+  "repository": "https://github.com/Crossmint/agent-commerce-sample-app",
   "license": "MIT",
   "keywords": ["payments", "agent cards", "checkout", "crossmint", "wallet", "mcp", "commerce"]
 }

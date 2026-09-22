@@ -10,7 +10,7 @@ What it installs:
 ## Install
 
 ```
-/plugin marketplace add Crossmint/goat
+/plugin marketplace add Crossmint/agent-commerce-sample-app
 /plugin install agent-commerce@agent-commerce
 ```
 

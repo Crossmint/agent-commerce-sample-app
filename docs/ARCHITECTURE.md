@@ -301,7 +301,7 @@ Config lives in `~/.config/agent-commerce/config.json`: API base URL, OAuth acce
 
 ### 3.7 `skills/agent-commerce`
 
-A `SKILL.md` that teaches a coding agent when and how to use the CLI. It covers: log in first, request before reveal, show the approval URL to the user, prefer `checkout create` over `reveal` when the target is a website, never paste a revealed card number into chat logs. Published alongside the CLI so `npx skills add crossmint/goat` or a plain copy works.
+A `SKILL.md` that teaches a coding agent when and how to use the CLI. It covers: log in first, request before reveal, show the approval URL to the user, prefer `checkout create` over `reveal` when the target is a website, never paste a revealed card number into chat logs. Published alongside the CLI so `npx skills add crossmint/agent-commerce-sample-app` or a plain copy works.
 
 ### 3.8 `apps/web`
 
