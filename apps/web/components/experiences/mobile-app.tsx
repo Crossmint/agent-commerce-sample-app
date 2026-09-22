@@ -9,7 +9,6 @@ import {
   Button,
   CardMark,
   CheckoutView as CheckoutViewPanel,
-  ConnectedAgents,
   SaveCard,
   Skeleton,
   Spinner,
@@ -70,7 +69,7 @@ export function MobileApp(props: ExperienceProps) {
 
 type Approval = { toolCallId: string; requestId: string };
 
-function Home({ screen, email, chat, thread, chatEnabled, sessions, sessionsNote, revokeSession, onSignOut }: ExperienceProps & { screen: HTMLDivElement | null }) {
+function Home({ screen, email, chat, thread, chatEnabled, onSignOut }: ExperienceProps & { screen: HTMLDivElement | null }) {
   const [cardsOpen, setCardsOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
   const [approval, setApproval] = useState<Approval | null>(null);
@@ -116,7 +115,7 @@ function Home({ screen, email, chat, thread, chatEnabled, sessions, sessionsNote
       </PhoneSheet>
 
       <PhoneSheet open={accountOpen} onOpenChange={setAccountOpen} container={screen} title="Account" height="h-[80%]">
-        <AccountSheetBody email={email} sessions={sessions} sessionsNote={sessionsNote} revokeSession={revokeSession} onSignOut={onSignOut} />
+        <AccountSheetBody email={email} onSignOut={onSignOut} />
       </PhoneSheet>
 
       <PhoneSheet open={approval !== null} onOpenChange={(open) => !open && setApproval(null)} container={screen} title="Approve">
@@ -500,13 +499,7 @@ function SavedCardRows({ cards }: { cards: ReturnType<typeof usePaymentMethods> 
 // The Account sheet
 // ---------------------------------------------------------------------------
 
-function AccountSheetBody({
-  email,
-  sessions,
-  sessionsNote,
-  revokeSession,
-  onSignOut,
-}: Pick<ExperienceProps, "email" | "sessions" | "sessionsNote" | "revokeSession" | "onSignOut">) {
+function AccountSheetBody({ email, onSignOut }: Pick<ExperienceProps, "email" | "onSignOut">) {
   const [busy, setBusy] = useState(false);
   return (
     <div className="flex min-h-full flex-col gap-8 pt-2">
@@ -514,13 +507,6 @@ function AccountSheetBody({
         <span className="flex size-16 items-center justify-center rounded-full bg-muted text-2xl font-semibold text-primary">{initialOf(email)}</span>
         <p className="text-sm font-medium">{email ?? "Signed in"}</p>
       </div>
-      <section className="flex flex-col gap-3">
-        <div className="flex flex-col gap-0.5">
-          <p className="text-sm font-medium">Connected agents</p>
-          <p className="text-xs text-muted-foreground">{sessionsNote ?? "Each CLI or MCP login is a session. Revoke one to log that agent out."}</p>
-        </div>
-        <ConnectedAgents sessions={sessions} onRevoke={revokeSession} />
-      </section>
       <Button
         type="button"
         variant="secondary"

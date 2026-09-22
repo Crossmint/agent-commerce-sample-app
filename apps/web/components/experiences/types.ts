@@ -37,6 +37,13 @@ export interface ExperienceProps extends Choice {
   onDeleteChat: (id: string) => Promise<void>;
   chatEnabled: boolean;
   attachmentsEnabled: boolean;
+  /**
+   * The user's sessions, and a way to end one. Only the MCP and CLI panels
+   * show these: a session is how an agent connects from outside, so it is
+   * those two that have anything to revoke. The mobile, desktop and messaging
+   * frames are the platform's own surfaces — the user is signed in there
+   * directly, not through an agent, so they say nothing about connections.
+   */
   sessions: ConnectedAgentSession[];
   sessionsNote?: string;
   revokeSession: (sessionId: string) => Promise<void>;
