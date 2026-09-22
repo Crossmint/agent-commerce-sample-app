@@ -160,7 +160,11 @@ export function ApproveAgentCard({
       } catch {
         email = undefined;
       }
-      const result = await api.approveAgentCardRequest(req.id, { paymentMethodId: selected, email, countryCode });
+      const result = await api.approveAgentCardRequest(req.id, {
+        paymentMethodId: selected,
+        email,
+        countryCode,
+      });
       // This screen is already showing the new card, so the resume effect has
       // nothing left to do for it.
       resumedFor.current = result.agentCard.orderIntentId;
@@ -289,13 +293,22 @@ export function ApproveAgentCard({
       <Shell {...shell}>
         <div className="flex flex-col gap-2">
           <p className="text-sm font-medium text-foreground">Approved</p>
-          <p className={cn("font-display font-semibold tracking-tight text-primary tabular-nums", scale === "page" ? "text-5xl" : "text-4xl")}>{limit}</p>
+          <p
+            className={cn(
+              "font-display font-semibold tracking-tight text-primary tabular-nums",
+              scale === "page" ? "text-5xl" : "text-4xl",
+            )}
+          >
+            {limit}
+          </p>
           <p className="text-base text-muted-foreground">
             Your agent can spend up to {limit}
             {until ? ` until ${until}` : ""}.
           </p>
         </div>
-        <p className="text-sm text-muted-foreground">You can close this tab. Revoke it any time from the app.</p>
+        <p className="text-sm text-muted-foreground">
+          You can close this tab. Revoke it any time from the app.
+        </p>
       </Shell>
     );
   }
@@ -314,7 +327,11 @@ export function ApproveAgentCard({
     return (
       <Shell {...shell}>
         <Clock aria-hidden className="size-12 text-muted-foreground" />
-        <Header scale={scale} title="This request expired" sub={`Ask ${req.requester} to send a new one.`} />
+        <Header
+          scale={scale}
+          title="This request expired"
+          sub={`Ask ${req.requester} to send a new one.`}
+        />
       </Shell>
     );
   }
@@ -323,13 +340,18 @@ export function ApproveAgentCard({
     return (
       <Shell {...shell}>
         <AlertCircle aria-hidden className="size-12 text-destructive" />
-        <Header scale={scale} title="Something went wrong" sub={req.failureReason ?? "The card could not be set up."} />
+        <Header
+          scale={scale}
+          title="Something went wrong"
+          sub={req.failureReason ?? "The card could not be set up."}
+        />
       </Shell>
     );
   }
 
   // pending or approved
-  const busy = phase.kind === "approving" || phase.kind === "denying" || phase.kind === "confirming";
+  const busy =
+    phase.kind === "approving" || phase.kind === "denying" || phase.kind === "confirming";
   const hasCards = Boolean(paymentMethods.data?.length);
   // A card is already made and the user came back for a different one. The
   // server takes the second answer and revokes the first card.
@@ -340,7 +362,11 @@ export function ApproveAgentCard({
 
   return (
     <Shell {...shell}>
-      <Header scale={scale} title="Your agent is requesting to use your card" sub="Approve it once, for this budget only." />
+      <Header
+        scale={scale}
+        title="Your agent is requesting to use your card"
+        sub="Approve it once, for this budget only."
+      />
 
       <dl className="flex flex-col rounded-2xl border border-border px-5">
         <Row label="Purpose">{req.description}</Row>
@@ -350,7 +376,12 @@ export function ApproveAgentCard({
         {req.merchant ? (
           <Row label="Merchant">
             {req.merchant.url ? (
-              <a href={req.merchant.url} target="_blank" rel="noreferrer" className="underline-offset-4 hover:underline">
+              <a
+                href={req.merchant.url}
+                target="_blank"
+                rel="noreferrer"
+                className="underline-offset-4 hover:underline"
+              >
                 {req.merchant.name}
               </a>
             ) : (
@@ -363,9 +394,12 @@ export function ApproveAgentCard({
 
       {canChooseCard ? (
         <div className="flex flex-col gap-2">
-          <Label htmlFor="approve-card" className="text-sm font-medium">
-            {hasCards ? "Choose card" : "Add a card"}
-          </Label>
+          {/* With no cards the picker is one button that names itself. */}
+          {hasCards ? (
+            <Label htmlFor="approve-card" className="text-sm font-medium">
+              Choose card
+            </Label>
+          ) : null}
           <CardPicker
             id="approve-card"
             paymentMethods={paymentMethods.data}
@@ -386,7 +420,9 @@ export function ApproveAgentCard({
         Your card is never shared with the agent.
       </p>
 
-      {actionError ? <Problem title="That did not work" message={errorMessage(actionError)} /> : null}
+      {actionError ? (
+        <Problem title="That did not work" message={errorMessage(actionError)} />
+      ) : null}
 
       {phase.kind === "verifying" ? (
         <VerifyAgentCard
@@ -404,11 +440,24 @@ export function ApproveAgentCard({
         </div>
       ) : (
         <div className="flex flex-col gap-2">
-          <Button type="button" size="xl" className="w-full" disabled={busy || !selected} onClick={() => void allow()}>
+          <Button
+            type="button"
+            size="xl"
+            className="w-full"
+            disabled={busy || !selected}
+            onClick={() => void allow()}
+          >
             {phase.kind === "approving" ? <Spinner /> : null}
             Allow
           </Button>
-          <Button type="button" variant="secondary" size="xl" className="w-full" disabled={busy} onClick={() => void deny()}>
+          <Button
+            type="button"
+            variant="secondary"
+            size="xl"
+            className="w-full"
+            disabled={busy}
+            onClick={() => void deny()}
+          >
             {phase.kind === "denying" ? <Spinner /> : null}
             Deny
           </Button>
@@ -423,12 +472,21 @@ export function ApproveAgentCard({
  * leaves it to the page, which is what the sample app's pages do: the phone
  * screen is the frame.
  */
-function Shell({ variant = "card", className, children }: { variant?: "card" | "plain"; className?: string; children: React.ReactNode }) {
+function Shell({
+  variant = "card",
+  className,
+  children,
+}: {
+  variant?: "card" | "plain";
+  className?: string;
+  children: React.ReactNode;
+}) {
   return (
     <div
       className={cn(
         "mx-auto flex w-full flex-col gap-6",
-        variant === "card" && "max-w-md rounded-2xl bg-card p-6 text-card-foreground ring-1 ring-foreground/10",
+        variant === "card" &&
+          "max-w-md rounded-2xl bg-card p-6 text-card-foreground ring-1 ring-foreground/10",
         className,
       )}
     >
@@ -444,11 +502,32 @@ type HeaderScale = "page" | "panel";
  * screens: on a page the step's name is 28px medium; inside a host panel it
  * steps down so it can sit among other type.
  */
-function Header({ title, sub, scale = "panel" }: { title: string; sub?: string; scale?: HeaderScale }) {
+function Header({
+  title,
+  sub,
+  scale = "panel",
+}: {
+  title: string;
+  sub?: string;
+  scale?: HeaderScale;
+}) {
   return (
     <div className="flex flex-col gap-2">
-      <h1 className={cn("text-balance text-foreground", scale === "page" ? "text-[28px] leading-[1.2] font-medium tracking-[-0.02em]" : "text-xl font-medium")}>{title}</h1>
-      {sub ? <p className={cn("text-muted-foreground", scale === "page" ? "text-base" : "text-sm")}>{sub}</p> : null}
+      <h1
+        className={cn(
+          "text-balance text-foreground",
+          scale === "page"
+            ? "text-[28px] leading-[1.2] font-medium tracking-[-0.02em]"
+            : "text-xl font-medium",
+        )}
+      >
+        {title}
+      </h1>
+      {sub ? (
+        <p className={cn("text-muted-foreground", scale === "page" ? "text-base" : "text-sm")}>
+          {sub}
+        </p>
+      ) : null}
     </div>
   );
 }
@@ -467,11 +546,33 @@ function Problem({ title, message }: { title: string; message: string }) {
 }
 
 /** One line of the request: what it is on the left, what it says on the right. */
-function Row({ label, strong = false, children }: { label: string; strong?: boolean; children: React.ReactNode }) {
+function Row({
+  label,
+  strong = false,
+  children,
+}: {
+  label: string;
+  strong?: boolean;
+  children: React.ReactNode;
+}) {
   return (
     <div className="flex items-center justify-between gap-6 border-b border-border/60 py-4 last:border-0">
-      <dt className={cn("shrink-0 text-sm", strong ? "font-medium text-foreground" : "text-muted-foreground")}>{label}</dt>
-      <dd className={cn("min-w-0 text-right text-sm", strong ? "font-semibold tabular-nums" : "font-medium")}>{children}</dd>
+      <dt
+        className={cn(
+          "shrink-0 text-sm",
+          strong ? "font-medium text-foreground" : "text-muted-foreground",
+        )}
+      >
+        {label}
+      </dt>
+      <dd
+        className={cn(
+          "min-w-0 text-right text-sm",
+          strong ? "font-semibold tabular-nums" : "font-medium",
+        )}
+      >
+        {children}
+      </dd>
     </div>
   );
 }

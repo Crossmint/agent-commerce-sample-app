@@ -7,9 +7,17 @@ import { paymentMethodLabel } from "../lib/format.js";
 import { cn } from "../lib/utils.js";
 import { AddCardDialog } from "./add-card-dialog.js";
 import { CardMark } from "./card-mark.js";
-import { Select, SelectContent, SelectItem, SelectSeparator, SelectTrigger, SelectValue } from "./primitives/select.js";
+import { Button } from "./primitives/button.js";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectSeparator,
+  SelectTrigger,
+  SelectValue,
+} from "./primitives/select.js";
 import { Skeleton } from "./primitives/skeleton.js";
-import { SaveCard, type SaveCardProps, type SaveCardResult } from "./save-card.js";
+import type { SaveCardProps, SaveCardResult } from "./save-card.js";
 
 export const ADD_NEW_CARD = "__add_new_card__";
 
@@ -38,9 +46,12 @@ export interface CardPickerProps {
  * opens the card form on its own surface, a bottom sheet on a phone and a
  * modal on a wider screen, so the approval screen stays a single decision.
  *
- * With nothing saved there is nothing to pick from, so the form takes the
- * dropdown's place and the screen asks for a card directly. That is the one
- * case where it shows up unasked.
+ * With nothing saved there is nothing to pick from, so the dropdown's place
+ * is taken by one full-width button that opens the same surface. It used to
+ * be the bare form inline: a card field with no field around it, which read
+ * as a heading with nothing under it whenever Crossmint's iframe was slow or
+ * blocked, and gave the reader nothing to press. A button says what to do and
+ * says it plainly, and it fails where its own errors can be seen.
  */
 export function CardPicker({
   paymentMethods,
@@ -55,7 +66,10 @@ export function CardPicker({
   className,
 }: CardPickerProps) {
   const [adding, setAdding] = React.useState(false);
-  const cards = React.useMemo(() => (paymentMethods ?? []).filter((pm) => pm.type === "card" || pm.card), [paymentMethods]);
+  const cards = React.useMemo(
+    () => (paymentMethods ?? []).filter((pm) => pm.type === "card" || pm.card),
+    [paymentMethods],
+  );
 
   function saved(result: SaveCardResult) {
     onAdded?.(result);
@@ -69,7 +83,26 @@ export function CardPicker({
   }
 
   if (cards.length === 0 && allowAdd) {
-    return <SaveCard {...saveCardProps} showResult={false} onSaved={saved} className={className} />;
+    return (
+      <div className={cn("flex flex-col gap-3", className)}>
+        <Button
+          type="button"
+          size="xl"
+          className="w-full"
+          disabled={disabled}
+          onClick={() => setAdding(true)}
+        >
+          <Plus aria-hidden />
+          Add a card
+        </Button>
+        <AddCardDialog
+          open={adding}
+          onOpenChange={setAdding}
+          onSaved={saved}
+          saveCardProps={saveCardProps}
+        />
+      </div>
+    );
   }
 
   return (
@@ -91,8 +124,13 @@ export function CardPicker({
         }}
       >
         {/* The phone-screen field: tall, 12px corners, on the grey fill, no border. */}
-        <SelectTrigger id={id} className="h-12 rounded-xl border-0 bg-muted px-4 data-[size=default]:h-12">
-          {value ? null : <CreditCard aria-hidden className="size-4 shrink-0 text-muted-foreground" />}
+        <SelectTrigger
+          id={id}
+          className="h-12 rounded-xl border-0 bg-muted px-4 data-[size=default]:h-12"
+        >
+          {value ? null : (
+            <CreditCard aria-hidden className="size-4 shrink-0 text-muted-foreground" />
+          )}
           <SelectValue placeholder={cards.length ? "Choose a card" : "No saved cards"} />
         </SelectTrigger>
         <SelectContent>
@@ -100,7 +138,9 @@ export function CardPicker({
             <SelectItem key={pm.paymentMethodId} value={pm.paymentMethodId}>
               <CardMark paymentMethod={pm} />
               <span className="min-w-0 flex-1 truncate">{paymentMethodLabel(pm)}</span>
-              {pm.default ? <span className="shrink-0 text-xs text-muted-foreground">Default</span> : null}
+              {pm.default ? (
+                <span className="shrink-0 text-xs text-muted-foreground">Default</span>
+              ) : null}
             </SelectItem>
           ))}
           {allowAdd ? (
@@ -115,7 +155,14 @@ export function CardPicker({
         </SelectContent>
       </Select>
 
-      {allowAdd ? <AddCardDialog open={adding} onOpenChange={setAdding} onSaved={saved} saveCardProps={saveCardProps} /> : null}
+      {allowAdd ? (
+        <AddCardDialog
+          open={adding}
+          onOpenChange={setAdding}
+          onSaved={saved}
+          saveCardProps={saveCardProps}
+        />
+      ) : null}
     </div>
   );
 }

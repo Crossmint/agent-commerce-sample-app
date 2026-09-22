@@ -32,13 +32,19 @@ export function PhoneSheet({
   className,
   dismissible = true,
   height = "h-[92%]",
+  hideTitle = false,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   /** Unused. The sheet renders in place, inside the phone screen. */
   container?: HTMLElement | null;
-  /** The sheet's name, shown as the heading. */
+  /** The sheet's name. Always the accessible name; shown as a heading unless `hideTitle`. */
   title: string;
+  /**
+   * Keep the name for assistive tech but not on screen, for a sheet whose
+   * contents open with a heading of their own. The close button stays.
+   */
+  hideTitle?: boolean;
   children: ReactNode;
   className?: string;
   dismissible?: boolean;
@@ -78,11 +84,14 @@ export function PhoneSheet({
           className,
         )}
       >
-        <div className="flex shrink-0 items-start justify-between p-6 pb-2">
-          <h2 id={titleId} className="mt-1 text-[28px] leading-[1.2] font-semibold tracking-[-0.02em]">
+        <div className={cn("flex shrink-0 items-start justify-between p-6", hideTitle ? "pb-0" : "pb-2")}>
+          <h2
+            id={titleId}
+            className={cn("mt-1 text-[28px] leading-[1.2] font-semibold tracking-[-0.02em]", hideTitle && "sr-only")}
+          >
             {title}
           </h2>
-          <button type="button" onClick={() => onOpenChange(false)} className="flex size-9 shrink-0 items-center justify-center rounded-full bg-muted">
+          <button type="button" onClick={() => onOpenChange(false)} className="ml-auto flex size-9 shrink-0 items-center justify-center rounded-full bg-muted">
             <X className="size-4.5" />
             <span className="sr-only">Close</span>
           </button>

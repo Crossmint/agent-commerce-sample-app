@@ -118,7 +118,7 @@ function Home({ screen, email, chat, thread, chatEnabled, onSignOut }: Experienc
         <AccountSheetBody email={email} onSignOut={onSignOut} />
       </PhoneSheet>
 
-      <PhoneSheet open={approval !== null} onOpenChange={(open) => !open && setApproval(null)} container={screen} title="Approve">
+      <PhoneSheet open={approval !== null} onOpenChange={(open) => !open && setApproval(null)} container={screen} title="Approve" hideTitle>
         {approval ? <ApproveAgentCard requestId={approval.requestId} variant="plain" platformName={PLATFORM_NAME} onDone={onApprovalDone} /> : null}
       </PhoneSheet>
 

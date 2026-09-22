@@ -62,7 +62,9 @@ export function SaveCard({
   const [phase, setPhase] = React.useState<"idle" | "registering" | "done" | "error">("idle");
   const [error, setError] = React.useState<unknown>(undefined);
   const [result, setResult] = React.useState<SaveCardResult | undefined>(undefined);
-  const [themeAppearance, setThemeAppearance] = React.useState<PaymentMethodAppearance | undefined>(undefined);
+  const [themeAppearance, setThemeAppearance] = React.useState<PaymentMethodAppearance | undefined>(
+    undefined,
+  );
 
   React.useEffect(() => {
     if (!appearance) setThemeAppearance(paymentMethodAppearanceFromTheme());
@@ -108,7 +110,13 @@ export function SaveCard({
   );
 
   if (!crossmint.clientApiKey) {
-    return <Problem className={className} title="Saving cards is not set up" message="The Crossmint client API key is missing." />;
+    return (
+      <Problem
+        className={className}
+        title="Saving cards is not set up"
+        message="The Crossmint client API key is missing."
+      />
+    );
   }
 
   if (!jwt) {
@@ -121,9 +129,17 @@ export function SaveCard({
 
   if (phase === "done" && result && showResult) {
     return (
-      <div className={cn("flex flex-col gap-4 rounded-2xl bg-card p-5 ring-1 ring-foreground/10", className)}>
+      <div
+        className={cn(
+          "flex flex-col gap-4 rounded-2xl bg-card p-5 ring-1 ring-foreground/10",
+          className,
+        )}
+      >
         <div className="flex items-center gap-3">
-          <span aria-hidden className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground">
+          <span
+            aria-hidden
+            className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground"
+          >
             <Check className="size-4.5" strokeWidth={3} />
           </span>
           <div>
@@ -134,7 +150,11 @@ export function SaveCard({
         {result.rails.length ? (
           <div className="flex flex-wrap gap-1.5">
             {result.rails.map((r) => (
-              <Badge key={`${r.rail}-${r.provider ?? ""}`} variant={railBadgeVariant(r.status)} title={r.error?.message}>
+              <Badge
+                key={`${r.rail}-${r.provider ?? ""}`}
+                variant={railBadgeVariant(r.status)}
+                title={r.error?.message}
+              >
                 {registrationRailLabel(r)} · {r.status}
               </Badge>
             ))}
@@ -148,8 +168,17 @@ export function SaveCard({
     <div className={cn("flex flex-col gap-4", className)}>
       {phase === "error" ? (
         <div className="flex flex-col gap-3">
-          <Problem title="Card saved, but not registered for agents" message={errorMessage(error)} />
-          <Button type="button" size="xl" variant="secondary" className="w-full" onClick={() => setPhase("idle")}>
+          <Problem
+            title="Card saved, but not registered for agents"
+            message={errorMessage(error)}
+          />
+          <Button
+            type="button"
+            size="xl"
+            variant="secondary"
+            className="w-full"
+            onClick={() => setPhase("idle")}
+          >
             Try another card
           </Button>
         </div>
@@ -160,7 +189,15 @@ export function SaveCard({
         </div>
       ) : null}
       <div className={cn(phase === "registering" && "pointer-events-none opacity-60")}>
-        <CrossmintScope fallback={<Skeleton className="h-64" />}>
+        <CrossmintScope
+          fallback={<Skeleton className="h-64" />}
+          failedFallback={
+            <Problem
+              title="The card form could not load"
+              message="Crossmint's card component did not start. Check the browser console, and that this site's origin is allowed on the Crossmint client key."
+            />
+          }
+        >
           <CrossmintPaymentMethodManagement
             jwt={jwt}
             allowedModes={["new"]}
@@ -175,7 +212,15 @@ export function SaveCard({
 }
 
 /** A fault, said plainly: the icon, a title, one line. */
-function Problem({ title, message, className }: { title: string; message: string; className?: string }) {
+function Problem({
+  title,
+  message,
+  className,
+}: {
+  title: string;
+  message: string;
+  className?: string;
+}) {
   return (
     <div role="alert" className={cn("flex items-start gap-3", className)}>
       <AlertCircle aria-hidden className="mt-0.5 size-5 shrink-0 text-destructive" />
