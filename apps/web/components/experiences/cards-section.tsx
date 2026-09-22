@@ -6,28 +6,16 @@ import {
   AddCardDialog,
   AgentCardDetail,
   AgentCardTable,
-  Badge,
   Button,
   CardMark,
   EmptyState,
   Skeleton,
   Spinner,
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
   agentCardGroup,
-  cn,
   errorMessage,
-  formatAmount,
-  formatDateTime,
-  formatRelativeTime,
   paymentMethodLabel,
   useAgentCards,
   usePaymentMethods,
-  useReveals,
   type AgentCard,
   type AgentCardGroup,
   type UsePaymentMethodsResult,
@@ -42,9 +30,9 @@ const PILES: Array<{ group: AgentCardGroup; title: string; description: string }
 ];
 
 /**
- * The Cards section of the desktop app: the cards the user saved, the budgets
- * drawn from them, and every time an agent turned a budget into a card.
- * One scrolling column, each block a heading and the thing itself.
+ * The Cards section of the desktop app: the cards the user saved and the
+ * budgets drawn from them, in one scrolling column, each block a heading and
+ * the thing itself.
  */
 export function CardsSection() {
   const agentCards = useAgentCards();
@@ -100,10 +88,6 @@ export function CardsSection() {
           </Block>
         ))
       )}
-
-      <Block title="Transactions" description="Every time an agent turned one of your budgets into a card. The newest is at the top.">
-        <Transactions paymentMethods={paymentMethods} />
-      </Block>
 
       <AgentCardDetail
         agentCard={open}
@@ -211,81 +195,3 @@ export function SavedCards({ cards, onAdd }: { cards: UsePaymentMethodsResult; o
 }
 
 /** The one column a narrow window cannot fit. */
-const WHEN = "hidden sm:table-cell";
-
-/**
- * Every credential an agent minted from a budget, newest first. A reveal is
- * the moment a budget turned into something spendable: Crossmint tells us the
- * card was minted, not what the store later charged. The row holds what was
- * asked for and never what came back.
- */
-function Transactions({ paymentMethods }: { paymentMethods: UsePaymentMethodsResult }) {
-  const reveals = useReveals();
-  const rows = reveals.data;
-
-  if (reveals.error && !rows) return <p className="text-sm text-destructive">{errorMessage(reveals.error)}</p>;
-  if (reveals.loading && !rows) {
-    return (
-      <div className="flex flex-col gap-3">
-        <Skeleton className="h-10 rounded-xl" />
-        <Skeleton className="h-14 rounded-xl" />
-        <Skeleton className="h-14 rounded-xl" />
-      </div>
-    );
-  }
-  if (!rows?.length) return <EmptyState title="Nothing spent yet" description="When an agent uses one of your budgets, the reveal shows up here." />;
-
-  return (
-    <div className="overflow-hidden rounded-2xl bg-card ring-1 ring-foreground/10">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>What for</TableHead>
-            <TableHead className="text-right">Amount</TableHead>
-            <TableHead className={WHEN}>Merchant</TableHead>
-            <TableHead>Rail</TableHead>
-            <TableHead className={WHEN}>When</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {rows.map((r) => {
-            const pm = paymentMethods.data?.find((p) => p.paymentMethodId === r.paymentMethodId);
-            return (
-              <TableRow key={r.id}>
-                <TableCell className="max-w-[14rem] lg:max-w-[20rem]">
-                  <span className="block truncate font-medium">{r.description ?? "Agent card"}</span>
-                  {r.requester ? <span className="block truncate text-xs text-muted-foreground">{r.requester}</span> : null}
-                </TableCell>
-                <TableCell className="text-right whitespace-nowrap tabular-nums">
-                  <span className="font-display font-semibold">{formatAmount(r.amount.value, r.amount.currency)}</span>
-                  {/* A rail that cannot hold the agent to the amount is worth saying out loud. */}
-                  {r.enforced === false ? <span className="block text-xs text-warning">not enforced</span> : null}
-                </TableCell>
-                <TableCell className={cn(WHEN, "max-w-[12rem]")}>
-                  <span className="block truncate text-muted-foreground">{r.merchant?.name ?? "—"}</span>
-                </TableCell>
-                <TableCell className="whitespace-nowrap">
-                  <span className="flex items-center gap-2">
-                    {pm ? <CardMark paymentMethod={pm} /> : null}
-                    <Badge variant="outline">{railLabel(r.rail, r.provider)}</Badge>
-                  </span>
-                </TableCell>
-                <TableCell className={cn(WHEN, "whitespace-nowrap text-muted-foreground")}>
-                  <span title={formatDateTime(r.createdAt)}>{formatRelativeTime(r.createdAt)}</span>
-                </TableCell>
-              </TableRow>
-            );
-          })}
-        </TableBody>
-      </Table>
-    </div>
-  );
-}
-
-/** "Mastercard Agent Pay", "Visa IC", "Encrypted card". */
-function railLabel(rail: string, provider?: string): string {
-  if (rail === "agentic-token") return provider === "vic" ? "Visa IC" : provider === "agentpay" ? "Mastercard Agent Pay" : "Network token";
-  if (rail === "encrypted-card") return "Encrypted card";
-  if (rail === "spt") return "Stripe SPT";
-  return rail;
-}
