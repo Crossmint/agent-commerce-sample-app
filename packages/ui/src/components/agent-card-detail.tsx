@@ -40,7 +40,7 @@ export function AgentCardDetail({ agentCard, onOpenChange, paymentMethods, onRev
   const pm = paymentMethods?.find((p) => p.paymentMethodId === agentCard?.paymentMethodId);
 
   const body = agentCard ? (
-    <Body
+    <AgentCardDetailBody
       agentCard={agentCard}
       paymentMethod={pm}
       busy={busy}
@@ -86,19 +86,26 @@ export function AgentCardDetail({ agentCard, onOpenChange, paymentMethods, onRev
   );
 }
 
-function Body({
-  agentCard,
-  paymentMethod,
-  busy,
-  onRevoke,
-  onVerify,
-}: {
+export interface AgentCardDetailBodyProps {
   agentCard: AgentCard;
   paymentMethod?: PaymentMethod;
   busy: boolean;
   onRevoke?: () => void;
   onVerify?: () => void;
-}) {
+}
+
+/**
+ * The detail on its own, with no surface around it, for a host that already
+ * has one — the phone on /app puts it in its own panel rather than a Radix
+ * sheet, which would portal out of the phone frame.
+ */
+export function AgentCardDetailBody({
+  agentCard,
+  paymentMethod,
+  busy,
+  onRevoke,
+  onVerify,
+}: AgentCardDetailBodyProps) {
   return (
     <div className="flex flex-col gap-6">
       <AgentCardArt agentCard={agentCard} paymentMethod={paymentMethod} />

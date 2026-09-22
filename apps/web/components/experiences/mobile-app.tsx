@@ -1,9 +1,27 @@
 "use client";
 
-import { useCallback, useRef, useState, type FormEvent, type KeyboardEvent, type ReactNode } from "react";
-import { ArrowLeft, ArrowUp, ChevronRight, CircleAlert, CircleCheck, CreditCard, LogOut, Plus, Square } from "lucide-react";
 import {
-  AgentCardList,
+  useCallback,
+  useRef,
+  useState,
+  type FormEvent,
+  type KeyboardEvent,
+  type ReactNode,
+} from "react";
+import {
+  ArrowLeft,
+  ArrowUp,
+  ChevronRight,
+  CircleAlert,
+  CircleCheck,
+  CreditCard,
+  LogOut,
+  Plus,
+  Square,
+} from "lucide-react";
+import {
+  AgentCardDetailBody,
+  AgentCardTable,
   ApproveAgentCard,
   Badge,
   Button,
@@ -15,17 +33,34 @@ import {
   errorMessage,
   formatAmount,
   paymentMethodLabel,
+  agentCardGroup,
   useAgentCards,
   usePaymentMethods,
+  type AgentCardGroup,
   type ApproveOutcome,
 } from "@agent-commerce/ui";
 import type { CheckoutView } from "@agent-commerce/server";
 import { AGENT_NAME, AgentAvatar, PLATFORM_NAME } from "@/components/brand";
 import { DeviceFrame } from "@/components/frame/device-frame";
-import { PAGE_SHEET_TRANSITION_MS, PhonePageSheet, PhoneSheet } from "@/components/frame/phone-sheet";
+import {
+  PAGE_SHEET_TRANSITION_MS,
+  PhonePageSheet,
+  PhoneSheet,
+} from "@/components/frame/phone-sheet";
 import { PhoneStatusBar } from "@/components/frame/phone-status-bar";
 import { LoginForm } from "@/components/login-form";
-import { approvalLabel, checkoutOf, checkoutStatusLine, checkoutBadgeVariant, findRequest, isCheckoutPart, messageText, toApprovalOutcome, toolBusy, toolTitle } from "@/components/chat/parts";
+import {
+  approvalLabel,
+  checkoutOf,
+  checkoutStatusLine,
+  checkoutBadgeVariant,
+  findRequest,
+  isCheckoutPart,
+  messageText,
+  toApprovalOutcome,
+  toolBusy,
+  toolTitle,
+} from "@/components/chat/parts";
 import { Text } from "@/components/chat/text";
 import { SUGGESTIONS, type AgentChat } from "@/components/chat/use-agent-chat";
 import { useScrollToBottom } from "@/components/chat/use-scroll-to-bottom";
@@ -49,7 +84,11 @@ export function MobileApp(props: ExperienceProps) {
   return (
     <DeviceFrame className="flex-1 md:flex-none" reserveTop={props.reserveTop}>
       {/* The brand wraps the screen, not the phone: the chrome stays, the app re-themes. */}
-      <div ref={setScreen} data-brand={brandAttr(props.brand)} className="relative flex h-full min-h-0 flex-1 flex-col bg-background text-foreground">
+      <div
+        ref={setScreen}
+        data-brand={brandAttr(props.brand)}
+        className="relative flex h-full min-h-0 flex-1 flex-col bg-background text-foreground"
+      >
         <PhoneStatusBar />
         {props.signedIn ? (
           <Home {...props} screen={screen} />
@@ -69,7 +108,14 @@ export function MobileApp(props: ExperienceProps) {
 
 type Approval = { toolCallId: string; requestId: string };
 
-function Home({ screen, email, chat, thread, chatEnabled, onSignOut }: ExperienceProps & { screen: HTMLDivElement | null }) {
+function Home({
+  screen,
+  email,
+  chat,
+  thread,
+  chatEnabled,
+  onSignOut,
+}: ExperienceProps & { screen: HTMLDivElement | null }) {
   const [cardsOpen, setCardsOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
   const [approval, setApproval] = useState<Approval | null>(null);
@@ -107,19 +153,44 @@ function Home({ screen, email, chat, thread, chatEnabled, onSignOut }: Experienc
         </RoundButton>
       </div>
 
-      <Thread chat={chat} loading={thread.loading} chatEnabled={chatEnabled} onReview={setApproval} onOpenCheckout={openCheckout} />
+      <Thread
+        chat={chat}
+        loading={thread.loading}
+        chatEnabled={chatEnabled}
+        onReview={setApproval}
+        onOpenCheckout={openCheckout}
+      />
       <Composer chat={chat} disabled={!chatEnabled} />
 
       <PhoneSheet open={cardsOpen} onOpenChange={setCardsOpen} container={screen} title="Cards">
         {cardsOpen ? <CardsSheetBody /> : null}
       </PhoneSheet>
 
-      <PhoneSheet open={accountOpen} onOpenChange={setAccountOpen} container={screen} title="Account" height="h-[80%]">
+      <PhoneSheet
+        open={accountOpen}
+        onOpenChange={setAccountOpen}
+        container={screen}
+        title="Account"
+        height="h-[80%]"
+      >
         <AccountSheetBody email={email} onSignOut={onSignOut} />
       </PhoneSheet>
 
-      <PhoneSheet open={approval !== null} onOpenChange={(open) => !open && setApproval(null)} container={screen} title="Approve" hideTitle>
-        {approval ? <ApproveAgentCard requestId={approval.requestId} variant="plain" platformName={PLATFORM_NAME} onDone={onApprovalDone} /> : null}
+      <PhoneSheet
+        open={approval !== null}
+        onOpenChange={(open) => !open && setApproval(null)}
+        container={screen}
+        title="Approve"
+        hideTitle
+      >
+        {approval ? (
+          <ApproveAgentCard
+            requestId={approval.requestId}
+            variant="plain"
+            platformName={PLATFORM_NAME}
+            onDone={onApprovalDone}
+          />
+        ) : null}
       </PhoneSheet>
 
       <PhonePageSheet open={checkoutOpen} ariaLabel="Checkout">
@@ -129,15 +200,30 @@ function Home({ screen, email, chat, thread, chatEnabled, onSignOut }: Experienc
           </RoundButton>
           <h2 className="text-lg font-medium tracking-[-0.02em]">Checkout</h2>
         </div>
-        <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-8 scrollbar-none">{checkoutId ? <CheckoutViewPanel checkoutId={checkoutId} frameHeight={420} /> : null}</div>
+        <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-8 scrollbar-none">
+          {checkoutId ? <CheckoutViewPanel checkoutId={checkoutId} frameHeight={420} /> : null}
+        </div>
       </PhonePageSheet>
     </>
   );
 }
 
-function RoundButton({ label, onClick, children }: { label: string; onClick: () => void; children: ReactNode }) {
+function RoundButton({
+  label,
+  onClick,
+  children,
+}: {
+  label: string;
+  onClick: () => void;
+  children: ReactNode;
+}) {
   return (
-    <button type="button" aria-label={label} onClick={onClick} className="flex size-9 shrink-0 items-center justify-center rounded-full bg-muted text-foreground transition-colors hover:bg-muted-strong">
+    <button
+      type="button"
+      aria-label={label}
+      onClick={onClick}
+      className="flex size-9 shrink-0 items-center justify-center rounded-full bg-muted text-foreground transition-colors hover:bg-muted-strong"
+    >
       {children}
     </button>
   );
@@ -185,13 +271,21 @@ function Thread({
       <div className="flex flex-1 flex-col justify-end gap-6 px-5 pb-4">
         <div className="flex flex-col gap-3">
           <AgentAvatar size={40} />
-          <p className="text-[24px] leading-[1.2] font-medium tracking-[-0.02em] text-balance">Hi, I am {AGENT_NAME}. What should I buy for you?</p>
-          <p className="text-sm text-muted-foreground">I ask for a budget on one of your cards. You approve it here.</p>
+          <p className="text-[24px] leading-[1.2] font-medium tracking-[-0.02em] text-balance">
+            Hi, I am {AGENT_NAME}. What should I buy for you?
+          </p>
+          <p className="text-sm text-muted-foreground">
+            I ask for a budget on one of your cards. You approve it here.
+          </p>
         </div>
         <ul className="flex flex-col gap-2" aria-label="Suggestions">
           {SUGGESTIONS.map((s) => (
             <li key={s}>
-              <button type="button" onClick={() => chat.send(s)} className="flex w-full items-center justify-between gap-3 rounded-2xl bg-muted px-4 py-3 text-left text-sm transition-colors hover:bg-muted-strong">
+              <button
+                type="button"
+                onClick={() => chat.send(s)}
+                className="flex w-full items-center justify-between gap-3 rounded-2xl bg-muted px-4 py-3 text-left text-sm transition-colors hover:bg-muted-strong"
+              >
                 <span className="min-w-0 truncate">{s}</span>
                 <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
               </button>
@@ -207,7 +301,13 @@ function Thread({
       <div ref={containerRef} className="absolute inset-0 overflow-y-auto scrollbar-none">
         <div className="flex flex-col gap-3 px-5 py-4">
           {chat.messages.map((m, i) => (
-            <CompactMessage key={m.id} message={m} streaming={chat.status === "streaming" && i === chat.messages.length - 1} onReview={onReview} onOpenCheckout={onOpenCheckout} />
+            <CompactMessage
+              key={m.id}
+              message={m}
+              streaming={chat.status === "streaming" && i === chat.messages.length - 1}
+              onReview={onReview}
+              onOpenCheckout={onOpenCheckout}
+            />
           ))}
           {waiting ? <ActivityLine busy>Thinking</ActivityLine> : null}
           {chat.error ? (
@@ -221,13 +321,35 @@ function Thread({
   );
 }
 
-function CompactMessage({ message, streaming, onReview, onOpenCheckout }: { message: ChatMessage; streaming: boolean; onReview: (a: Approval) => void; onOpenCheckout: (id: string) => void }) {
+function CompactMessage({
+  message,
+  streaming,
+  onReview,
+  onOpenCheckout,
+}: {
+  message: ChatMessage;
+  streaming: boolean;
+  onReview: (a: Approval) => void;
+  onOpenCheckout: (id: string) => void;
+}) {
   if (message.role === "user") {
     const text = messageText(message);
-    return text ? <div className="ml-auto max-w-[80%] rounded-2xl rounded-br-md bg-primary px-4 py-2.5 text-[15px] leading-snug break-words whitespace-pre-wrap text-primary-foreground">{text}</div> : null;
+    return text ? (
+      <div className="ml-auto max-w-[80%] rounded-2xl rounded-br-md bg-primary px-4 py-2.5 text-[15px] leading-snug break-words whitespace-pre-wrap text-primary-foreground">
+        {text}
+      </div>
+    ) : null;
   }
   if (message.role !== "assistant") return null;
-  const parts = message.parts.map((part, i) => <CompactPart key={`${message.id}-${i}`} part={part} message={message} onReview={onReview} onOpenCheckout={onOpenCheckout} />);
+  const parts = message.parts.map((part, i) => (
+    <CompactPart
+      key={`${message.id}-${i}`}
+      part={part}
+      message={message}
+      onReview={onReview}
+      onOpenCheckout={onOpenCheckout}
+    />
+  ));
   const empty = parts.every((p) => p === null) && streaming;
   return (
     <div className="flex flex-col gap-2">
@@ -237,19 +359,42 @@ function CompactMessage({ message, streaming, onReview, onOpenCheckout }: { mess
   );
 }
 
-function CompactPart({ part, message, onReview, onOpenCheckout }: { part: ChatMessagePart; message: ChatMessage; onReview: (a: Approval) => void; onOpenCheckout: (id: string) => void }) {
+function CompactPart({
+  part,
+  message,
+  onReview,
+  onOpenCheckout,
+}: {
+  part: ChatMessagePart;
+  message: ChatMessage;
+  onReview: (a: Approval) => void;
+  onOpenCheckout: (id: string) => void;
+}) {
   switch (part.type) {
     case "text":
-      return part.text.trim() ? <Text text={part.text} className="max-w-[92%] text-[15px] leading-snug" /> : null;
+      return part.text.trim() ? (
+        <Text text={part.text} className="max-w-[92%] text-[15px] leading-snug" />
+      ) : null;
 
     case "tool-await_agent_card_approval": {
       const request = findRequest(message, part.input?.requestId ?? "");
       if (part.state === "input-available") {
         return (
           <ApprovalCard
-            title={request ? `Your agent wants to spend up to ${formatAmount(request.amount.value, request.amount.currency)} for ${request.description}` : "Your agent is asking for a budget"}
+            title={
+              request
+                ? `Your agent wants to spend up to ${formatAmount(request.amount.value, request.amount.currency)} for ${request.description}`
+                : "Your agent is asking for a budget"
+            }
             action={
-              <Button type="button" size="xl" className="w-full" onClick={() => onReview({ toolCallId: part.toolCallId, requestId: part.input.requestId })}>
+              <Button
+                type="button"
+                size="xl"
+                className="w-full"
+                onClick={() =>
+                  onReview({ toolCallId: part.toolCallId, requestId: part.input.requestId })
+                }
+              >
                 Review
               </Button>
             }
@@ -257,21 +402,45 @@ function CompactPart({ part, message, onReview, onOpenCheckout }: { part: ChatMe
         );
       }
       if (part.state === "output-available") {
-        return <ApprovalCard title={request ? `${formatAmount(request.amount.value, request.amount.currency)} for ${request.description}` : "Budget request"} outcome={part.output} />;
+        return (
+          <ApprovalCard
+            title={
+              request
+                ? `${formatAmount(request.amount.value, request.amount.currency)} for ${request.description}`
+                : "Budget request"
+            }
+            outcome={part.output}
+          />
+        );
       }
-      return <ActivityLine busy={toolBusy(part.state)} failed={part.state === "output-error"}>{toolTitle(part.type)}</ActivityLine>;
+      return (
+        <ActivityLine busy={toolBusy(part.state)} failed={part.state === "output-error"}>
+          {toolTitle(part.type)}
+        </ActivityLine>
+      );
     }
 
     default: {
       if (isCheckoutPart(part)) {
         const view = checkoutOf(part);
         if (view) return <CheckoutCardCompact view={view} onOpen={() => onOpenCheckout(view.id)} />;
-        return <ActivityLine busy={toolBusy(part.state)} failed={part.state === "output-error"}>{toolTitle(part.type)}</ActivityLine>;
+        return (
+          <ActivityLine busy={toolBusy(part.state)} failed={part.state === "output-error"}>
+            {toolTitle(part.type)}
+          </ActivityLine>
+        );
       }
       if (part.type.startsWith("tool-")) {
         const tool = part as { type: string; state: string; output?: unknown };
-        const failed = tool.state === "output-error" || (tool.state === "output-available" && Boolean((tool.output as { error?: unknown } | undefined)?.error));
-        return <ActivityLine busy={toolBusy(tool.state)} failed={failed}>{toolTitle(tool.type)}</ActivityLine>;
+        const failed =
+          tool.state === "output-error" ||
+          (tool.state === "output-available" &&
+            Boolean((tool.output as { error?: unknown } | undefined)?.error));
+        return (
+          <ActivityLine busy={toolBusy(tool.state)} failed={failed}>
+            {toolTitle(tool.type)}
+          </ActivityLine>
+        );
       }
       return null;
     }
@@ -279,21 +448,60 @@ function CompactPart({ part, message, onReview, onOpenCheckout }: { part: ChatMe
 }
 
 /** "Looking at your saved cards", with a spinner while it runs and a check when it is done. */
-function ActivityLine({ busy, failed, children }: { busy?: boolean; failed?: boolean; children: ReactNode }) {
+function ActivityLine({
+  busy,
+  failed,
+  children,
+}: {
+  busy?: boolean;
+  failed?: boolean;
+  children: ReactNode;
+}) {
   return (
-    <div className={cn("flex items-center gap-2 text-xs text-muted-foreground", failed && "text-destructive")}>
-      {busy ? <Spinner className="size-3" /> : failed ? <CircleAlert className="size-3.5" /> : <CircleCheck className="size-3.5 text-success" />}
+    <div
+      className={cn(
+        "flex items-center gap-2 text-xs text-muted-foreground",
+        failed && "text-destructive",
+      )}
+    >
+      {busy ? (
+        <Spinner className="size-3" />
+      ) : failed ? (
+        <CircleAlert className="size-3.5" />
+      ) : (
+        <CircleCheck className="size-3.5 text-success" />
+      )}
       <span className="truncate">{children}</span>
     </div>
   );
 }
 
-function ApprovalCard({ title, action, outcome }: { title: string; action?: ReactNode; outcome?: ApprovalOutcome }) {
+function ApprovalCard({
+  title,
+  action,
+  outcome,
+}: {
+  title: string;
+  action?: ReactNode;
+  outcome?: ApprovalOutcome;
+}) {
   return (
     <div className="flex flex-col gap-3 rounded-2xl bg-card p-4 ring-1 ring-foreground/10">
       <div className="flex items-start justify-between gap-3">
         <p className="text-sm leading-snug font-medium text-balance">{title}</p>
-        {outcome ? <Badge variant={outcome.status === "active" ? "success" : outcome.status === "denied" ? "destructive" : "muted"}>{outcome.status}</Badge> : null}
+        {outcome ? (
+          <Badge
+            variant={
+              outcome.status === "active"
+                ? "success"
+                : outcome.status === "denied"
+                  ? "destructive"
+                  : "muted"
+            }
+          >
+            {outcome.status}
+          </Badge>
+        ) : null}
       </div>
       {outcome ? <p className="text-xs text-muted-foreground">{approvalLabel(outcome)}</p> : null}
       {action}
@@ -318,12 +526,29 @@ function CheckoutCardCompact({ view, onOpen }: { view: CheckoutView; onOpen: () 
   );
 }
 
-function Notice({ tone = "muted", onDismiss, children }: { tone?: "muted" | "error"; onDismiss?: () => void; children: ReactNode }) {
+function Notice({
+  tone = "muted",
+  onDismiss,
+  children,
+}: {
+  tone?: "muted" | "error";
+  onDismiss?: () => void;
+  children: ReactNode;
+}) {
   return (
-    <div className={cn("flex items-start gap-3 rounded-2xl px-4 py-3 text-sm", tone === "error" ? "bg-destructive/10 text-destructive" : "bg-muted text-muted-foreground")}>
+    <div
+      className={cn(
+        "flex items-start gap-3 rounded-2xl px-4 py-3 text-sm",
+        tone === "error" ? "bg-destructive/10 text-destructive" : "bg-muted text-muted-foreground",
+      )}
+    >
       <p className="min-w-0 flex-1">{children}</p>
       {onDismiss ? (
-        <button type="button" onClick={onDismiss} className="shrink-0 text-xs font-medium underline-offset-4 hover:underline">
+        <button
+          type="button"
+          onClick={onDismiss}
+          className="shrink-0 text-xs font-medium underline-offset-4 hover:underline"
+        >
           Dismiss
         </button>
       ) : null}
@@ -374,11 +599,21 @@ function Composer({ chat, disabled }: { chat: AgentChat; disabled: boolean }) {
           className="min-w-0 flex-1 bg-transparent text-base text-foreground outline-none placeholder:text-muted-foreground disabled:opacity-50"
         />
         {chat.busy ? (
-          <button type="button" aria-label="Stop" onClick={chat.stop} className="flex size-9 shrink-0 items-center justify-center rounded-full bg-foreground text-background">
+          <button
+            type="button"
+            aria-label="Stop"
+            onClick={chat.stop}
+            className="flex size-9 shrink-0 items-center justify-center rounded-full bg-foreground text-background"
+          >
             <Square className="size-3.5 fill-current" />
           </button>
         ) : (
-          <button type="submit" aria-label="Send" disabled={!canSend} className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground transition-opacity disabled:opacity-40">
+          <button
+            type="submit"
+            aria-label="Send"
+            disabled={!canSend}
+            className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground transition-opacity disabled:opacity-40"
+          >
             <ArrowUp className="size-4.5" strokeWidth={2.5} />
           </button>
         )}
@@ -391,20 +626,23 @@ function Composer({ chat, disabled }: { chat: AgentChat; disabled: boolean }) {
 // The Cards sheet: two panels, the list and the card form.
 // ---------------------------------------------------------------------------
 
+/** The three piles the desktop Cards section uses, in the same order. */
+const PILES: Array<{ group: AgentCardGroup; title: string }> = [
+  { group: "active", title: "Active" },
+  { group: "needs-verification", title: "Needs verification" },
+  { group: "expired", title: "Expired" },
+];
+
 function CardsSheetBody() {
-  const [panel, setPanel] = useState<"list" | "form">("list");
+  const [panel, setPanel] = useState<"list" | "form" | "detail">("list");
+  const [openId, setOpenId] = useState<string | null>(null);
+  const [revoking, setRevoking] = useState(false);
   const paymentMethods = usePaymentMethods();
   const agentCards = useAgentCards();
 
   if (panel === "form") {
     return (
-      <div className="flex flex-col gap-5 animate-in fade-in slide-in-from-right-4 duration-200">
-        <div className="flex items-center gap-3">
-          <RoundButton label="Back" onClick={() => setPanel("list")}>
-            <ArrowLeft className="size-4.5" />
-          </RoundButton>
-          <p className="text-base font-medium">Add card</p>
-        </div>
+      <Panel title="Add card" onBack={() => setPanel("list")}>
         <SaveCard
           showResult={false}
           onSaved={async () => {
@@ -412,16 +650,58 @@ function CardsSheetBody() {
             setPanel("list");
           }}
         />
-      </div>
+      </Panel>
     );
   }
+
+  if (panel === "detail") {
+    const card = agentCards.data?.find((c) => c.orderIntentId === openId);
+    const pm = paymentMethods.data?.find((p) => p.paymentMethodId === card?.paymentMethodId);
+    return (
+      <Panel title={card?.description ?? "Agent card"} onBack={() => setPanel("list")}>
+        {card ? (
+          <AgentCardDetailBody
+            agentCard={card}
+            paymentMethod={pm}
+            busy={revoking}
+            onRevoke={
+              card.status === "active"
+                ? async () => {
+                    setRevoking(true);
+                    try {
+                      await agentCards.revoke(card.orderIntentId);
+                      setPanel("list");
+                    } finally {
+                      setRevoking(false);
+                    }
+                  }
+                : undefined
+            }
+          />
+        ) : null}
+      </Panel>
+    );
+  }
+
+  const all = agentCards.data;
+  const piles = PILES.map((pile) => ({
+    ...pile,
+    cards: all?.filter((c) => agentCardGroup(c) === pile.group),
+  }));
+  // Nothing to count while the list is on its way, so the first pile carries
+  // the skeleton and the others stay out of the way.
+  const shown = all ? piles.filter((p) => p.cards!.length > 0) : piles.slice(0, 1);
 
   return (
     <div className="flex flex-col gap-8 pt-2 animate-in fade-in duration-200">
       <section className="flex flex-col gap-1">
         <p className="pb-1 text-sm text-muted-foreground">Saved cards</p>
         <SavedCardRows cards={paymentMethods} />
-        <button type="button" onClick={() => setPanel("form")} className="flex w-full items-center gap-3 py-3.5 text-left">
+        <button
+          type="button"
+          onClick={() => setPanel("form")}
+          className="flex w-full items-center gap-3 py-3.5 text-left"
+        >
           <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-muted">
             <Plus className="size-4.5" />
           </span>
@@ -433,12 +713,58 @@ function CardsSheetBody() {
         </button>
       </section>
 
-      <section className="flex flex-col gap-3">
-        <p className="text-sm text-muted-foreground">Agent cards</p>
-        <AgentCardList agentCards={agentCards.data} loading={agentCards.loading} onRevoke={(id) => agentCards.revoke(id)} onVerified={async () => {
-            await agentCards.refetch();
-          }} />
-      </section>
+      {/* One table per pile, as the desktop Cards section has. */}
+      {all && shown.length === 0 ? (
+        <section className="flex flex-col gap-3">
+          <p className="text-sm text-muted-foreground">Agent cards</p>
+          <AgentCardTable compact agentCards={[]} paymentMethods={paymentMethods.data} />
+        </section>
+      ) : (
+        shown.map((pile, i) => (
+          <section key={pile.group} className="flex flex-col gap-3">
+            <p className="text-sm text-muted-foreground">
+              {i === 0 ? `Agent cards · ${pile.title}` : pile.title}
+            </p>
+            <AgentCardTable
+              compact
+              agentCards={pile.cards}
+              paymentMethods={paymentMethods.data}
+              loading={agentCards.loading}
+              onRevoke={(id) => agentCards.revoke(id)}
+              onVerified={async () => {
+                await agentCards.refetch();
+              }}
+              onSelect={(card) => {
+                setOpenId(card.orderIntentId);
+                setPanel("detail");
+              }}
+            />
+          </section>
+        ))
+      )}
+    </div>
+  );
+}
+
+/** A panel of the Cards sheet behind a back button, in the sheet's own frame. */
+function Panel({
+  title,
+  onBack,
+  children,
+}: {
+  title: string;
+  onBack: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <div className="flex flex-col gap-5 animate-in fade-in slide-in-from-right-4 duration-200">
+      <div className="flex items-center gap-3">
+        <RoundButton label="Back" onClick={onBack}>
+          <ArrowLeft className="size-4.5" />
+        </RoundButton>
+        <p className="min-w-0 flex-1 truncate text-base font-medium">{title}</p>
+      </div>
+      {children}
     </div>
   );
 }
@@ -456,12 +782,16 @@ function SavedCardRows({ cards }: { cards: ReturnType<typeof usePaymentMethods> 
     );
   }
   if (error && !data) return <p className="py-2 text-sm text-destructive">{errorMessage(error)}</p>;
-  if (!data?.length) return <p className="py-2 text-sm text-muted-foreground">No cards yet. Add one below.</p>;
+  if (!data?.length)
+    return <p className="py-2 text-sm text-muted-foreground">No cards yet. Add one below.</p>;
 
   return (
     <ul className="flex flex-col">
       {data.map((pm) => (
-        <li key={pm.paymentMethodId} className="flex items-center gap-3 border-b border-border/60 py-3.5">
+        <li
+          key={pm.paymentMethodId}
+          className="flex items-center gap-3 border-b border-border/60 py-3.5"
+        >
           <span className="flex w-9 shrink-0 justify-center">
             <CardMark paymentMethod={pm} size="md" />
           </span>
@@ -504,7 +834,9 @@ function AccountSheetBody({ email, onSignOut }: Pick<ExperienceProps, "email" | 
   return (
     <div className="flex min-h-full flex-col gap-8 pt-2">
       <div className="flex flex-col items-center gap-3 pt-4">
-        <span className="flex size-16 items-center justify-center rounded-full bg-muted text-2xl font-semibold text-primary">{initialOf(email)}</span>
+        <span className="flex size-16 items-center justify-center rounded-full bg-muted text-2xl font-semibold text-primary">
+          {initialOf(email)}
+        </span>
         <p className="text-sm font-medium">{email ?? "Signed in"}</p>
       </div>
       <Button

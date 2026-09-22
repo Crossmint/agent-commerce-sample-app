@@ -5,11 +5,14 @@ import { pendingVerificationRails, type AgentCard, type PaymentMethod } from "@a
 import { MoreHorizontal } from "lucide-react";
 import { VerifyAgentCard } from "./verify-agent-card.js";
 import { cn } from "../lib/utils.js";
-import { formatAmount, formatDateTime, formatRelativeTime, paymentMethodLabel } from "../lib/format.js";
+import {
+  formatAmount,
+  formatDateTime,
+  formatRelativeTime,
+  paymentMethodLabel,
+} from "../lib/format.js";
 import { useMediaQuery } from "../hooks/use-media-query.js";
-import { agentCardStatusBadge } from "./agent-card-list.js";
 import { CardMark } from "./card-mark.js";
-import { Badge } from "./primitives/badge.js";
 import { Button } from "./primitives/button.js";
 import {
   DropdownMenu,
@@ -20,7 +23,14 @@ import {
 } from "./primitives/dropdown-menu.js";
 import { Skeleton } from "./primitives/skeleton.js";
 import { Spinner } from "./primitives/spinner.js";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./primitives/table.js";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "./primitives/table.js";
 import { EmptyState } from "./mascot.js";
 
 export interface AgentCardTableProps {
@@ -35,6 +45,14 @@ export interface AgentCardTableProps {
   onSelect?: (agentCard: AgentCard) => void;
   /** Hide cancelled and expired cards. Default false. */
   activeOnly?: boolean;
+  /**
+   * Keep the narrow column set whatever the viewport is, for a table inside a
+   * narrow container on a wide screen — the phone frame on /app. The
+   * step-back queries read the viewport, which knows nothing about the column
+   * the table was put in. Budget, Card and Available stay; only Expires goes,
+   * which the row's own panel still gives.
+   */
+  compact?: boolean;
   className?: string;
   mascotSrc?: string;
   emptyAction?: React.ReactNode;
@@ -42,8 +60,8 @@ export interface AgentCardTableProps {
 
 /*
  * The two columns that step back when the table cannot hold them all, and the
- * queries that say when. Budget, Available and Status carry the point without
- * either of them.
+ * queries that say when. Budget and Available carry the point without either
+ * of them.
  *
  * The breakpoints sit a step higher than the content needs on its own, because
  * the wallet puts this table beside a 16rem sidebar: what the viewport is wide
@@ -61,19 +79,22 @@ const COLUMNS = [
   { className: "", query: undefined },
   { className: "hidden xl:table-cell", query: "(min-width: 1280px)" },
   { className: "", query: undefined },
-  { className: "", query: undefined },
 ] as const;
 
-const [BUDGET, CARD, AVAILABLE, EXPIRES, STATUS, ACTIONS] = COLUMNS;
+const [BUDGET, CARD, AVAILABLE, EXPIRES, ACTIONS] = COLUMNS;
+
+/** Budget, Available and the menu: what a row keeps when both others step back. */
+const BASE_COLUMNS = 3;
 
 /**
  * Every budget the user approved, newest first: what it is for, the card
  * behind it, what is left of it, when it lapses, and one menu for the two
  * things they can do about it.
  *
- * The same data as `AgentCardList`, which stays for narrow columns and for
- * anywhere a list reads better. A table is what the wallet wants: budgets are
- * one shape repeated, and a column of amounts is read down.
+ * The same data as `AgentCardList`, which stays for anywhere a list reads
+ * better. Both the wallet and the phone show the table: budgets are one shape
+ * repeated, and a column of amounts is read down. The phone passes `compact`
+ * rather than taking the list, so the two surfaces stay one design.
  *
  * Verifying opens under its own row rather than in a dialog, so the row it
  * belongs to stays in sight.
@@ -86,6 +107,7 @@ export function AgentCardTable({
   onVerified,
   onSelect,
   activeOnly = false,
+  compact = false,
   className,
   mascotSrc,
   emptyAction,
@@ -97,7 +119,11 @@ export function AgentCardTable({
   // open the panel, which is the only thing that reads them.
   const wideEnoughForCard = useMediaQuery(CARD.query!);
   const wideEnoughForExpires = useMediaQuery(EXPIRES.query!);
-  const visibleColumns = 4 + Number(wideEnoughForCard) + Number(wideEnoughForExpires);
+  const cardClass = compact ? "" : CARD.className;
+  const expiresClass = compact ? "hidden" : EXPIRES.className;
+  const visibleColumns = compact
+    ? BASE_COLUMNS + 1
+    : BASE_COLUMNS + Number(wideEnoughForCard) + Number(wideEnoughForExpires);
 
   const byId = React.useMemo(() => {
     const map = new Map<string, PaymentMethod>();
@@ -149,10 +175,9 @@ export function AgentCardTable({
       <TableHeader>
         <TableRow>
           <TableHead className={BUDGET.className}>Budget</TableHead>
-          <TableHead className={CARD.className}>Card</TableHead>
+          <TableHead className={cardClass}>Card</TableHead>
           <TableHead className={cn(AVAILABLE.className, "text-right")}>Available</TableHead>
-          <TableHead className={EXPIRES.className}>Expires</TableHead>
-          <TableHead className={STATUS.className}>Status</TableHead>
+          <TableHead className={expiresClass}>Expires</TableHead>
           <TableHead className={cn(ACTIONS.className, "w-0 text-right")}>
             <span className="sr-only">Actions</span>
           </TableHead>
@@ -160,9 +185,9 @@ export function AgentCardTable({
       </TableHeader>
       <TableBody>
         {cards.map((card) => {
-          const status = agentCardStatusBadge(card);
           const revocable = card.status === "active" && Boolean(onRevoke);
-          const needsVerification = card.status === "active" && pendingVerificationRails(card).length > 0;
+          const needsVerification =
+            card.status === "active" && pendingVerificationRails(card).length > 0;
           const isVerifying = verifying === card.orderIntentId;
           const spent = card.amount.available !== card.amount.total;
           const pm = byId.get(card.paymentMethodId);
@@ -188,20 +213,31 @@ export function AgentCardTable({
                   : {})}
                 className={cn(
                   isVerifying && "border-b-0",
-                  onSelect && "cursor-pointer outline-none focus-visible:bg-accent focus-visible:inset-ring-2 focus-visible:inset-ring-ring/60",
+                  onSelect &&
+                    "cursor-pointer outline-none focus-visible:bg-accent focus-visible:inset-ring-2 focus-visible:inset-ring-ring/60",
                 )}
               >
                 {/* The description gives way first: it truncates, and the columns
                     beside it do not. */}
-                <TableCell className={cn(BUDGET.className, "max-w-[10rem] lg:max-w-[14rem] xl:max-w-[18rem]")}>
+                <TableCell
+                  className={cn(
+                    BUDGET.className,
+                    "max-w-[10rem] lg:max-w-[14rem] xl:max-w-[18rem]",
+                  )}
+                >
                   <span className="block truncate font-medium">{card.description}</span>
                   {card.merchant ? (
-                    <span className="block truncate text-xs text-muted-foreground">{card.merchant.name}</span>
+                    <span className="block truncate text-xs text-muted-foreground">
+                      {card.merchant.name}
+                    </span>
                   ) : null}
                 </TableCell>
-                <TableCell className={CARD.className}>
+                <TableCell className={cardClass}>
                   {pm ? (
-                    <span className="flex items-center gap-2 whitespace-nowrap" title={paymentMethodLabel(pm)}>
+                    <span
+                      className="flex items-center gap-2 whitespace-nowrap"
+                      title={paymentMethodLabel(pm)}
+                    >
                       <CardMark paymentMethod={pm} />
                       <span className="text-xs text-muted-foreground">•••• {pm.card?.last4}</span>
                     </span>
@@ -209,8 +245,12 @@ export function AgentCardTable({
                     <span className="text-xs text-muted-foreground">—</span>
                   )}
                 </TableCell>
-                <TableCell className={cn(AVAILABLE.className, "text-right whitespace-nowrap tabular-nums")}>
-                  <span className="font-semibold">{formatAmount(card.amount.available, card.amount.currency)}</span>
+                <TableCell
+                  className={cn(AVAILABLE.className, "text-right whitespace-nowrap tabular-nums")}
+                >
+                  <span className="font-semibold">
+                    {formatAmount(card.amount.available, card.amount.currency)}
+                  </span>
                   {/* Only worth the second line once some of it is gone. */}
                   {spent ? (
                     <span className="block text-xs text-muted-foreground">
@@ -218,11 +258,10 @@ export function AgentCardTable({
                     </span>
                   ) : null}
                 </TableCell>
-                <TableCell className={cn(EXPIRES.className, "whitespace-nowrap text-muted-foreground")}>
-                  <span title={formatDateTime(card.expiresAt)}>{formatRelativeTime(card.expiresAt)}</span>
-                </TableCell>
-                <TableCell className={STATUS.className}>
-                  <Badge variant={status.variant}>{status.label}</Badge>
+                <TableCell className={cn(expiresClass, "whitespace-nowrap text-muted-foreground")}>
+                  <span title={formatDateTime(card.expiresAt)}>
+                    {formatRelativeTime(card.expiresAt)}
+                  </span>
                 </TableCell>
                 <TableCell
                   className={cn(ACTIONS.className, "text-right")}
@@ -231,13 +270,21 @@ export function AgentCardTable({
                   {needsVerification || revocable ? (
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button type="button" variant="ghost" size="icon" disabled={working} aria-label={`Actions for ${card.description}`}>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          disabled={working}
+                          aria-label={`Actions for ${card.description}`}
+                        >
                           {working ? <Spinner /> : <MoreHorizontal />}
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
                         {needsVerification ? (
-                          <DropdownMenuItem onSelect={() => setVerifying(card.orderIntentId)}>Verify with the network</DropdownMenuItem>
+                          <DropdownMenuItem onSelect={() => setVerifying(card.orderIntentId)}>
+                            Verify with the network
+                          </DropdownMenuItem>
                         ) : null}
                         {needsVerification && revocable ? <DropdownMenuSeparator /> : null}
                         {revocable ? (

@@ -23,10 +23,15 @@ const BRAND_CODE: Record<string, string> = {
 
 export type CardMarkSize = "sm" | "md";
 
-/** Both boxes keep a card's proportions; the code inside scales with them. */
+/**
+ * Both boxes are a card: 1.586, the ID-1 ratio every payment card is cut to
+ * (85.6 x 53.98mm). The width sets the size and the height follows, so the
+ * two sizes cannot drift out of shape. The code inside scales with them.
+ */
+const CARD_RATIO = "aspect-[1.586]";
 const SIZE: Record<CardMarkSize, { box: string; code: string; icon: string }> = {
-  sm: { box: "h-6 w-9 rounded-[3px]", code: "text-[8px]", icon: "size-3.5" },
-  md: { box: "h-10 w-16 rounded-sm", code: "text-[11px]", icon: "size-5" },
+  sm: { box: "w-9 rounded-[3px]", code: "text-[8px]", icon: "size-3.5" },
+  md: { box: "w-16 rounded-sm", code: "text-[11px]", icon: "size-5" },
 };
 
 export interface CardMarkProps {
@@ -48,19 +53,33 @@ export interface CardMarkProps {
 export function CardMark({ paymentMethod, size = "sm", className }: CardMarkProps) {
   const brand = paymentMethod.card?.brand;
   const src = paymentMethod.display?.imageUrl;
-  const code = brand ? (BRAND_CODE[brand.toLowerCase()] ?? cardBrandLabel(brand).slice(0, 4).toUpperCase()) : undefined;
+  const code = brand
+    ? (BRAND_CODE[brand.toLowerCase()] ?? cardBrandLabel(brand).slice(0, 4).toUpperCase())
+    : undefined;
   const s = SIZE[size];
-  const box = cn("shrink-0 border border-border", s.box, className);
+  const box = cn("shrink-0 border border-border", CARD_RATIO, s.box, className);
   if (src) {
     // A plain img: this package has no framework image component, and the
     // file is a small SVG on Crossmint's CDN.
     // eslint-disable-next-line @next/next/no-img-element
-    return <img aria-hidden alt="" src={src} loading="lazy" className={cn(box, "bg-white object-cover")} />;
+    return (
+      <img
+        aria-hidden
+        alt=""
+        src={src}
+        loading="lazy"
+        className={cn(box, "bg-white object-cover")}
+      />
+    );
   }
   return (
     <span
       aria-hidden
-      className={cn(box, "inline-flex items-center justify-center bg-background leading-none font-black tracking-tight text-foreground", s.code)}
+      className={cn(
+        box,
+        "inline-flex items-center justify-center bg-background leading-none font-black tracking-tight text-foreground",
+        s.code,
+      )}
     >
       {code ?? <CreditCard className={cn(s.icon, "text-muted-foreground")} />}
     </span>
