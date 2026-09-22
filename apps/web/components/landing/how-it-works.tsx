@@ -38,7 +38,7 @@ const STEPS: Step[] = [
   {
     title: "Save your users' cards in a PCI vault",
     summary: "The card goes to Crossmint, never to your servers.",
-    body: "Crossmint's payment method component saves the card straight into Crossmint's PCI vault. Your app only ever holds a token and the last four digits.",
+    body: "Crossmint's payment method component saves the card straight into Crossmint's PCI vault.",
     facts: [
       "The card number never touches your servers.",
       "One component, dropped into your own page.",
@@ -47,18 +47,19 @@ const STEPS: Step[] = [
   {
     title: "Create secure spending limits",
     summary: "The agent asks for a budget. The user approves it once.",
-    body: "Allow agents to ask for permissions to use your card. Set an amount, expiry date, merchant and more.",
+    body: "Allow agents to ask for permissions to use your card. Set the amount, expiry date, merchant and more.",
     facts: [
       "Powered by Visa Intelligent Commerce and Mastercard Agent Pay, with Union Pay and AMEX coming soon.",
-      "This is not a new one time use card like Stripe Link. Users keep their points and see regular charges on file.",
+      "Users keep their points and see regular charges on file.",
     ],
   },
   {
     title: "Check out at any store with one API call",
     summary: "A product URL and the agent card. Crossmint does the rest.",
-    body: "Crossmint's Agent Checkouts API figures out the best way to purchase from a website. Supports UCP and any browser checkout.",
+    body: "Crossmint's Agent Checkouts API figures out the best way to purchase from a website.",
     facts: [
-      "Works with any payment method, from agent cards to saved cards on the merchant.",
+      "Supports UCP and any browser checkout.",
+      "Works with any payment method, from agent cards to saved cards on the merchant to Shop Pay.",
       "Bring your own browser sessions and re-use them across Agent Checkouts.",
       "Fastest and cheapest way to check out in the market.",
     ],
