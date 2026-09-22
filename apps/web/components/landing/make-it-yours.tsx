@@ -1,7 +1,6 @@
 "use client";
 
-import { type ReactNode, useState } from "react";
-import { Blocks, Component, Palette } from "lucide-react";
+import { useState } from "react";
 import { BRAND_THEME_META, type BrandTheme, DEFAULT_BRAND_THEME } from "@/components/brand-themes";
 import { BrandPicker } from "@/components/frame/brand-picker";
 import { BRAND_LAYOUT_NOTE, BrandAppScreen } from "./brand-app";
@@ -20,26 +19,6 @@ import { useStepLoop } from "./use-step-loop";
  * three palettes. The story is keyed on the brand, so a switch restarts it.
  */
 
-const POINTS: Array<{ Icon: typeof Blocks; text: ReactNode }> = [
-  {
-    Icon: Blocks,
-    text: (
-      <>
-        shadcn components on theme tokens, in <Code>@agent-commerce/ui</Code>.
-      </>
-    ),
-  },
-  {
-    Icon: Palette,
-    text: (
-      <>
-        One <Code>data-brand</Code> attribute re-themes every screen.
-      </>
-    ),
-  },
-  { Icon: Component, text: "Ship your own components and keep the same hooks." },
-];
-
 export function MakeItYours() {
   const [brand, setBrand] = useState<BrandTheme>(DEFAULT_BRAND_THEME);
   return (
@@ -54,19 +33,6 @@ export function MakeItYours() {
               Crossmint gives you the APIs. You design your own flow and experience.
             </p>
           </div>
-          <ul className="flex flex-col gap-3">
-            {POINTS.map(({ Icon, text }, i) => (
-              <li
-                key={i}
-                className="flex items-start gap-3 text-[15px] leading-snug text-foreground"
-              >
-                <span className="mt-px inline-flex size-6 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
-                  <Icon className="size-3.5" strokeWidth={2} />
-                </span>
-                <span>{text}</span>
-              </li>
-            ))}
-          </ul>
           <div className="flex flex-col items-start gap-2.5">
             <span className="text-[13px] font-medium tracking-wide text-muted-foreground uppercase">
               See examples
@@ -100,13 +66,5 @@ function BrandPhone({ brand }: { brand: BrandTheme }) {
         <BrandAppScreen key={`${brand}-${cycle}`} brand={brand} />
       </LandingPhone>
     </div>
-  );
-}
-
-function Code({ children }: { children: ReactNode }) {
-  return (
-    <code className="rounded-md bg-muted px-1.5 py-0.5 font-mono text-[13px] text-foreground">
-      {children}
-    </code>
   );
 }

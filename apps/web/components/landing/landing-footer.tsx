@@ -3,14 +3,19 @@ import { CONTACT_SALES_URL, DOCS_URL, GITHUB_URL, X_URL } from "./links";
 import { Container } from "./section";
 import { GitHubMark, XMark } from "./social-marks";
 
+/*
+ * `iconOnly` keeps X to its glyph. The X mark reads as the letter, so a mark
+ * and the label "X" beside it looked like the link was there twice; the label
+ * stays for screen readers.
+ */
 const LINKS = [
   { href: GITHUB_URL, label: "GitHub", Icon: GitHubMark },
   { href: DOCS_URL, label: "Docs" },
-  { href: X_URL, label: "X", Icon: XMark },
+  { href: X_URL, label: "X", Icon: XMark, iconOnly: true },
   { href: CONTACT_SALES_URL, label: "Contact sales" },
 ] as const;
 
-/** The Crossmint logo and the app name, the links, one line about who built it. */
+/** The Crossmint logo and the app name, and the links. */
 export function LandingFooter() {
   return (
     <footer className="py-12 sm:py-16">
@@ -31,12 +36,11 @@ export function LandingFooter() {
                 className="inline-flex h-9 items-center gap-1.5 rounded-full px-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
               >
                 {"Icon" in l ? <l.Icon className="size-4" /> : null}
-                {l.label}
+                {"iconOnly" in l ? <span className="sr-only">{l.label}</span> : l.label}
               </a>
             ))}
           </nav>
         </div>
-        <p className="text-sm text-muted-foreground">Built by Crossmint. MIT licensed.</p>
       </Container>
     </footer>
   );
