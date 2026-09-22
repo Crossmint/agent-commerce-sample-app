@@ -1,7 +1,7 @@
 {
   "mcpServers": {
     "agent-commerce": {
-      "url": "https://agent-commerce-sample-app.vercel.app/api/mcp"
+      "url": "https://agent-commerce.demos-crossmint.com/api/mcp"
     }
   }
 }

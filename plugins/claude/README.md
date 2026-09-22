@@ -4,7 +4,7 @@ Gives Claude Code a way to pay with the user's own card, with the user's approva
 
 What it installs:
 
-- **MCP server** `agent-commerce` at `https://agent-commerce-sample-app.vercel.app/api/mcp`. Claude Code signs the user in through OAuth on first use (`/mcp`, then Authenticate). The user sees Agent Commerce's consent screen, then approves each budget on the wallet.
+- **MCP server** `agent-commerce` at `https://agent-commerce.demos-crossmint.com/api/mcp`. Claude Code signs the user in through OAuth on first use (`/mcp`, then Authenticate). The user sees Agent Commerce's consent screen, then approves each budget on the wallet.
 - **Skill** `agent-commerce`: when to request an agent card, how to show the approval link, why checkouts beat raw card numbers.
 
 ## Install

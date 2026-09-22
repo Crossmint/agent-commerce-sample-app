@@ -8,7 +8,7 @@ export const CONTACT_SALES_URL = "https://www.crossmint.com/contact/sales";
 export const X_URL = "https://x.com/crossmint_ai";
 
 /** The hosted deployment. Change it when you deploy your own copy. */
-export const HOSTED_ORIGIN = "https://agent-commerce-sample-app.vercel.app";
+export const HOSTED_ORIGIN = "https://agent-commerce.demos-crossmint.com";
 /** The hosted MCP endpoint agents connect to. */
 export const MCP_URL = `${HOSTED_ORIGIN}/api/mcp`;
 /** One line to paste into any agent: it fetches the CLI install steps and the skill. */
