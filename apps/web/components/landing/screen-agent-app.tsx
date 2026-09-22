@@ -117,8 +117,8 @@ function Composer() {
 
 /**
  * The app's bottom sheet, the shell `PhoneSheet` gives the real approval: a
- * 2rem top corner, the sheet's name at 19px and a round close button. Driven
- * by `data-open`, so it can come and go over a thread that stays put.
+ * 2rem top corner and a round close button. Driven by `data-open`, so it can
+ * come and go over a thread that stays put.
  */
 export function AppSheet({
   open,
@@ -126,6 +126,7 @@ export function AppSheet({
   children,
 }: {
   open: boolean;
+  /** The sheet's name, for assistive tech. The body carries the heading. */
   title: string;
   children: ReactNode;
 }) {
@@ -141,10 +142,13 @@ export function AppSheet({
         aria-hidden={!open}
         className="landing-sheet-toggle absolute inset-x-0 bottom-0 z-40 flex flex-col rounded-t-[2rem] bg-popover text-popover-foreground shadow-[0_-8px_40px_-12px_rgba(0,0,0,0.15)]"
       >
-        <div className="flex shrink-0 items-start justify-between px-4 pt-4 pb-1">
-          <p className="mt-0.5 text-[19px] leading-[1.2] font-semibold tracking-[-0.02em]">
-            {title}
-          </p>
+        {/*
+          No visible title: the body opens with its own heading, and once the
+          request is allowed the sheet read "Approve", a tick, then
+          "Approved." — three headings for one outcome.
+        */}
+        <div className="flex shrink-0 items-start justify-end px-4 pt-4 pb-1">
+          <span className="sr-only">{title}</span>
           <span
             aria-hidden
             className="flex size-7 shrink-0 items-center justify-center rounded-full bg-muted"
