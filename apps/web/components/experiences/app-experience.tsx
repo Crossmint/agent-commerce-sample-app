@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { useStytch, useStytchSession, useStytchUser } from "@stytch/nextjs";
 import { nanoid } from "nanoid";
 import type { ConnectedAgentSession } from "@agent-commerce/ui";
-import { CrossmintLogo } from "@/components/brand";
+import { AgentsLockup } from "@/components/brand";
 import type { BrandTheme } from "@/components/brand-themes";
 import { useAgentChat } from "@/components/chat/use-agent-chat";
 import { FrameControls } from "@/components/frame/frame-selects";
@@ -290,10 +290,10 @@ export function AppExperience({
       <div className="flex w-full shrink-0 items-center justify-between gap-3 border-b border-border bg-background px-4 py-2.5 md:hidden">
         <Link
           href="/"
-          aria-label="Agent Commerce Sample App home page"
+          aria-label="Agents by Crossmint home page"
           className="flex min-w-0 items-center outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
-          <CrossmintLogo height={18} />
+          <AgentsLockup size={20} />
         </Link>
         <span className="shrink-0 text-[11px] font-medium text-muted-foreground">
           All purchases are real

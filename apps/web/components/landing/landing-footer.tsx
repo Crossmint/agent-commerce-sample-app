@@ -15,18 +15,18 @@ const LINKS = [
   { href: CONTACT_SALES_URL, label: "Contact sales" },
 ] as const;
 
-/** The Crossmint logo and the app name, and the links. */
+/** The Crossmint logo and the app name, and the links. Both rows centre on a phone. */
 export function LandingFooter() {
   return (
     <footer className="py-12 sm:py-16">
       <Container className="flex flex-col gap-8">
-        <div className="flex flex-col items-start gap-6 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col items-center gap-6 sm:flex-row sm:justify-between">
           <div className="flex items-center gap-3">
             <CrossmintLogo height={20} />
             <span aria-hidden className="h-4 w-px bg-border" />
             <span className="text-sm font-medium text-foreground">Agent Commerce Sample App</span>
           </div>
-          <nav aria-label="Footer" className="flex flex-wrap items-center gap-1">
+          <nav aria-label="Footer" className="flex flex-wrap items-center justify-center gap-1">
             {LINKS.map((l) => (
               <a
                 key={l.label}

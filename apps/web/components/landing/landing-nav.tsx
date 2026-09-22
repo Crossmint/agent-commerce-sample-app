@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Button } from "@agent-commerce/ui";
-import { CrossmintLogo } from "@/components/brand";
+import { AgentsLockup } from "@/components/brand";
 import { SiteHeader } from "@/components/frame/site-header";
 import { AnchorLink } from "./anchor-link";
 
@@ -22,12 +22,20 @@ export function LandingNav() {
         <div className="hidden sm:block">
           <SiteHeader animate={false} />
         </div>
-        <Link href="/" aria-label="Agent Commerce Sample App home" className="flex h-[52px] items-center rounded-[10px] border border-border bg-background/80 px-3.5 backdrop-blur sm:hidden">
-          <CrossmintLogo height={20} />
+        <Link
+          href="/"
+          aria-label="Agents by Crossmint home"
+          className="flex h-[52px] items-center rounded-[10px] border border-border bg-background/80 px-3.5 backdrop-blur sm:hidden"
+        >
+          <AgentsLockup />
         </Link>
         <nav aria-label="Primary" className="flex items-center gap-1 sm:gap-2">
           {LINKS.map((l) => (
-            <AnchorLink key={l.href} href={l.href} className="hidden h-9 items-center rounded-full px-3.5 text-[14px] font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground sm:inline-flex">
+            <AnchorLink
+              key={l.href}
+              href={l.href}
+              className="hidden h-9 items-center rounded-full px-3.5 text-[14px] font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground sm:inline-flex"
+            >
               {l.label}
             </AnchorLink>
           ))}
