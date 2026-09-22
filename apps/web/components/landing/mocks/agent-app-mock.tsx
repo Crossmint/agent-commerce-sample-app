@@ -1,4 +1,4 @@
-import { ChevronsUpDown, CreditCard, Lock, MessageSquare, Plus, WalletCards } from "lucide-react";
+import { ChevronsUpDown, Lock, MessageSquare, Plus, WalletCards } from "lucide-react";
 import { AgentAvatar } from "@/components/brand";
 import { cn } from "@/lib/cn";
 import { CardBadge, delay } from "../bits";
@@ -27,7 +27,6 @@ export function AgentAppMock({ className }: { className?: string }) {
             primary
           />
           <SideItem icon={<WalletCards className="size-3.5" />} label="Saved cards" />
-          <SideItem icon={<CreditCard className="size-3.5" />} label="Agent cards" />
           <p className="mt-3 px-2 text-[10px] font-medium tracking-wide text-muted-foreground uppercase">
             Recent
           </p>

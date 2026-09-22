@@ -96,12 +96,6 @@ export function TerminalMock({ className }: { className?: string }) {
           </Out>
         </pre>
       </WindowMock>
-      <p className="text-[13px] text-muted-foreground">
-        Your CLI, built on{" "}
-        <code className="rounded-md bg-muted px-1.5 py-0.5 font-mono text-[12px] text-foreground">
-          @agent-commerce/cli
-        </code>
-      </p>
     </div>
   );
 }
