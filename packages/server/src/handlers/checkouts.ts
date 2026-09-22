@@ -1,4 +1,4 @@
-import type { AuthenticatedUser } from "@goat-wallet/auth";
+import type { AuthenticatedUser } from "@agent-commerce/auth";
 import {
   alternativeResponse,
   declineResponse,
@@ -22,7 +22,7 @@ import {
   type OutboundMessagePart,
   type PendingUserAction,
   type RenderedAction,
-} from "@goat-wallet/core";
+} from "@agent-commerce/core";
 import { parseBody, requireUser, type Ctx } from "../context.js";
 import { mintFromAgentCard } from "../credentials.js";
 import { forbidden, HttpError, json } from "../errors.js";
@@ -36,7 +36,7 @@ const SETTLE_POLLS = 2;
 const SETTLE_WAIT_MS = 1200;
 
 /**
- * What GOAT returns for a checkout. A flat view of Crossmint's run: the open
+ * What Agent Commerce returns for a checkout. A flat view of Crossmint's run: the open
  * question (never a payment one), the live browser, and the outcome.
  */
 export interface CheckoutView {
@@ -170,7 +170,7 @@ async function answer(
       throw new HttpError(
         409,
         "payment_handled_by_server",
-        "This request asks for card details. GOAT answers it from the agent card; do not send card fields.",
+        "This request asks for card details. Agent Commerce answers it from the agent card; do not send card fields.",
         { checkoutId: runId, requestId },
       );
     }
@@ -189,7 +189,7 @@ async function ownedAgentCardId(ctx: Ctx, user: AuthenticatedUser, runId: string
 }
 
 /**
- * Payment requests GOAT already answered, by run. A poll right after an
+ * Payment requests Agent Commerce already answered, by run. A poll right after an
  * answer can still show the same request open; this stops a second card
  * from being minted for it. Per process; bounded.
  */
@@ -220,7 +220,7 @@ async function settlePayment(
     throw new HttpError(
       409,
       "no_usable_rail",
-      "This checkout needs a payment but GOAT does not know its agent card",
+      "This checkout needs a payment but Agent Commerce does not know its agent card",
       { checkoutId: checkout.runId },
     );
   }
@@ -237,7 +237,7 @@ async function settlePayment(
   }
 
   const values = fillPaymentAction(action, card);
-  console.info("[goat] answering checkout payment request", {
+  console.info("[agent-commerce] answering checkout payment request", {
     checkoutId: checkout.runId,
     requestId: action.id,
     agentCardId,

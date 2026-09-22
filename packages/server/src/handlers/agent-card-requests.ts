@@ -1,5 +1,5 @@
-import type { AuthenticatedUser } from "@goat-wallet/auth";
-import { expiresInHours, isReadyForAgent, pendingVerificationRails, withAgentRails } from "@goat-wallet/core";
+import type { AuthenticatedUser } from "@agent-commerce/auth";
+import { expiresInHours, isReadyForAgent, pendingVerificationRails, withAgentRails } from "@agent-commerce/core";
 import { parseBody, requireUser, type Ctx, resolveEmail } from "../context.js";
 import { forbidden, HttpError, invalidRequest, json, notFound } from "../errors.js";
 import { agentCardRequestId } from "../ids.js";
@@ -44,7 +44,7 @@ export async function getRequest(req: Request, ctx: Ctx, params: Params): Promis
         request = await ctx.store.update(request.id, { status: "active" });
       }
     } catch (e) {
-      console.warn("[goat] could not reconcile request", request.id, e instanceof Error ? e.message : e);
+      console.warn("[agent-commerce] could not reconcile request", request.id, e instanceof Error ? e.message : e);
     }
   }
   return json(request);
@@ -171,6 +171,6 @@ async function revokePreviousCard(ctx: Ctx, jwt: { jwt: string }, request: Agent
   try {
     await ctx.crossmint.orderIntents.revoke(jwt, request.agentCardId);
   } catch (e) {
-    console.warn("[goat] could not revoke the previous agent card", request.agentCardId, e instanceof Error ? e.message : e);
+    console.warn("[agent-commerce] could not revoke the previous agent card", request.agentCardId, e instanceof Error ? e.message : e);
   }
 }

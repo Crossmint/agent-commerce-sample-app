@@ -1,4 +1,4 @@
-import { CrossmintApiError, GoatError } from "@goat-wallet/core";
+import { CrossmintApiError, AgentCommerceError } from "@agent-commerce/core";
 import type { ErrorBody } from "./types.js";
 
 export type ErrorCode =
@@ -70,7 +70,7 @@ export function toErrorResponse(err: unknown): Response {
     const details = { status: err.status, body: err.body };
     // Always log Crossmint failures server side. Bodies carry no card data.
     console.warn(
-      `[goat] crossmint ${err.status} ${err.url}:`,
+      `[agent-commerce] crossmint ${err.status} ${err.url}:`,
       typeof err.body === "string" ? err.body.slice(0, 500) : JSON.stringify(err.body)?.slice(0, 500),
     );
     if (err.isUnauthorized) {
@@ -82,9 +82,9 @@ export function toErrorResponse(err: unknown): Response {
     const status = err.status >= 400 && err.status < 500 ? err.status : 502;
     return errorResponse(status, "crossmint_error", err.message, details);
   }
-  if (err instanceof GoatError) {
+  if (err instanceof AgentCommerceError) {
     return errorResponse(400, err.code, err.message);
   }
-  console.error("[goat] unhandled error", err);
+  console.error("[agent-commerce] unhandled error", err);
   return errorResponse(500, "internal", "Internal error");
 }

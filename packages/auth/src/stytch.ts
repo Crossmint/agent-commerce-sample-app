@@ -50,7 +50,7 @@ function normalizeDomain(d: string): string {
 }
 
 /**
- * Endpoints GOAT needs from a Stytch project.
+ * Endpoints Agent Commerce needs from a Stytch project.
  *
  * Connected Apps (OAuth) token and JWKS endpoints live under the project's public base,
  * `https://test.stytch.com/v1/public/<projectId>` by default. The authorize endpoint is

@@ -1,24 +1,30 @@
 "use client";
 
 import { useState } from "react";
-import { Alert, AlertDescription, AlertTitle, Button } from "@goat-wallet/ui";
+import { AlertCircle } from "lucide-react";
+import { Button } from "@agent-commerce/ui";
+import { ScreenHeading } from "@/components/focus-screen";
 
 /**
- * The landing page for `goat login --code`, on the same ground as sign in:
- * the heading names the step, the code sits in one block to select or copy,
- * and nothing else competes with it.
+ * The landing page for `agent-commerce login --code`, on the same ground as
+ * sign in: the heading names the step, the code sits in one grey block to
+ * select or copy, and nothing else competes with it.
  */
 export function CliCallback({ code, state, error }: { code?: string; state?: string; error?: string }) {
   const [copied, setCopied] = useState(false);
 
   if (error || !code) {
     return (
-      <Step title="Login did not finish" sub="Nothing was granted.">
-        <Alert variant="destructive">
-          <AlertTitle>No code came back</AlertTitle>
-          <AlertDescription>{error ?? "Run `goat login --code` again."}</AlertDescription>
-        </Alert>
-      </Step>
+      <div className="flex flex-1 flex-col gap-6">
+        <ScreenHeading title="Login did not finish" sub="Nothing was granted." />
+        <div role="alert" className="flex items-start gap-3">
+          <AlertCircle aria-hidden className="mt-0.5 size-5 shrink-0 text-destructive" />
+          <div className="min-w-0">
+            <p className="text-sm font-medium text-foreground">No code came back</p>
+            <p className="text-sm text-muted-foreground">{error ?? "Run agent-commerce login --code again."}</p>
+          </div>
+        </div>
+      </div>
     );
   }
 
@@ -34,27 +40,15 @@ export function CliCallback({ code, state, error }: { code?: string; state?: str
   }
 
   return (
-    <Step title="Almost there" sub="Paste this into your terminal.">
-      <code className="block rounded-md border border-border bg-card px-3 py-2.5 font-mono text-sm break-all select-all">{value}</code>
-      <div className="flex flex-col gap-2">
-        <Button size="lg" className="w-full" onClick={copy}>
+    <div className="flex flex-1 flex-col gap-6">
+      <ScreenHeading title="Almost there" sub="Paste this into your terminal." />
+      <code className="block rounded-2xl bg-muted px-4 py-3 font-mono text-sm break-all select-all">{value}</code>
+      <div className="flex flex-col gap-3">
+        <Button size="xl" className="w-full" onClick={copy}>
           {copied ? "Copied" : "Copy"}
         </Button>
-        <p className="text-center text-xs text-muted-foreground">You can close this window after pasting.</p>
+        <p className="text-center text-sm text-muted-foreground">You can close this window after pasting.</p>
       </div>
-    </Step>
-  );
-}
-
-/** The step's name and one line under it, as on sign in. */
-function Step({ title, sub, children }: { title: string; sub: string; children: React.ReactNode }) {
-  return (
-    <div className="flex flex-col gap-7">
-      <div className="flex flex-col items-start gap-2">
-        <h1 className="font-display text-3xl leading-[1.1] font-semibold tracking-[-0.03em] text-balance text-foreground sm:text-4xl">{title}</h1>
-        <p className="max-w-prose text-muted-foreground">{sub}</p>
-      </div>
-      {children}
     </div>
   );
 }

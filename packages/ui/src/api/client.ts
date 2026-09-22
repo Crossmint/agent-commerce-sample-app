@@ -1,4 +1,4 @@
-import type { AgentCard, BuyerProfileInput, PaymentMethod, RegisterCardInput, RegisterCardResult } from "@goat-wallet/core";
+import type { AgentCard, BuyerProfileInput, PaymentMethod, RegisterCardInput, RegisterCardResult } from "@agent-commerce/core";
 import type {
   AgentCardRequest,
   ApproveAgentCardRequestInput,
@@ -7,23 +7,24 @@ import type {
   CheckoutView,
   CreateAgentCardRequestInput,
   CreateCheckoutInput,
-  GoatConfig,
-  GoatErrorCode,
-  GoatErrorEnvelope,
+  AgentCommerceConfig,
+  AgentCommerceErrorCode,
+  AgentCommerceErrorEnvelope,
   Me,
   MintCredentialsInput,
   MintCredentialsResult,
+  Reveal,
   VerifiedAgentCardRequestResult,
 } from "./types.js";
 
-export class GoatApiError extends Error {
+export class AgentCommerceApiError extends Error {
   readonly status: number;
-  readonly code: GoatErrorCode;
+  readonly code: AgentCommerceErrorCode;
   readonly details: Record<string, unknown> | undefined;
 
-  constructor(status: number, envelope: GoatErrorEnvelope["error"]) {
+  constructor(status: number, envelope: AgentCommerceErrorEnvelope["error"]) {
     super(envelope.message);
-    this.name = "GoatApiError";
+    this.name = "AgentCommerceApiError";
     this.status = status;
     this.code = envelope.code;
     this.details = envelope.details;
@@ -36,8 +37,8 @@ export class GoatApiError extends Error {
 
 export type GetJwt = () => string | null | undefined | Promise<string | null | undefined>;
 
-export interface GoatApiOptions {
-  /** Where the GOAT server is mounted. Default "/api/goat". */
+export interface AgentCommerceApiOptions {
+  /** Where the Agent Commerce server is mounted. Default "/api/agent-commerce". */
   baseUrl?: string;
   /** Returns the user's JWT. Called on every request so it is always fresh. */
   getJwt: GetJwt;
@@ -45,14 +46,14 @@ export interface GoatApiOptions {
   fetch?: typeof fetch;
 }
 
-export type GoatApi = ReturnType<typeof createGoatApi>;
+export type AgentCommerceApi = ReturnType<typeof createAgentCommerceApi>;
 
 /**
  * Typed functions for every route in docs/API.md.
- * Throws `GoatApiError` with the server's error envelope on any non-2xx.
+ * Throws `AgentCommerceApiError` with the server's error envelope on any non-2xx.
  */
-export function createGoatApi(opts: GoatApiOptions) {
-  const baseUrl = (opts.baseUrl ?? "/api/goat").replace(/\/+$/, "");
+export function createAgentCommerceApi(opts: AgentCommerceApiOptions) {
+  const baseUrl = (opts.baseUrl ?? "/api/agent-commerce").replace(/\/+$/, "");
   const doFetch = opts.fetch ?? ((input, init) => fetch(input, init));
 
   async function request<T>(
@@ -65,7 +66,7 @@ export function createGoatApi(opts: GoatApiOptions) {
     if (body !== undefined) headers["Content-Type"] = "application/json";
     if (auth) {
       const jwt = await opts.getJwt();
-      if (!jwt) throw new GoatApiError(401, { code: "unauthorized", message: "Not signed in." });
+      if (!jwt) throw new AgentCommerceApiError(401, { code: "unauthorized", message: "Not signed in." });
       headers.Authorization = `Bearer ${jwt}`;
     }
     const res = await doFetch(`${baseUrl}/v1${path}`, {
@@ -88,7 +89,7 @@ export function createGoatApi(opts: GoatApiOptions) {
       const envelope = isEnvelope(json)
         ? json.error
         : { code: res.status === 401 ? "unauthorized" : "internal", message: text || `Request failed with ${res.status}` };
-      throw new GoatApiError(res.status, envelope);
+      throw new AgentCommerceApiError(res.status, envelope);
     }
     return json as T;
   }
@@ -99,7 +100,7 @@ export function createGoatApi(opts: GoatApiOptions) {
     baseUrl,
 
     // Public config and identity
-    getConfig: () => request<GoatConfig>("GET", "/config", undefined, { auth: false }),
+    getConfig: () => request<AgentCommerceConfig>("GET", "/config", undefined, { auth: false }),
     me: () => request<Me>("GET", "/me"),
 
     // Payment methods (saved cards)
@@ -121,6 +122,13 @@ export function createGoatApi(opts: GoatApiOptions) {
 
     // Agent cards (order intents)
     listAgentCards: async () => (await request<{ agentCards: AgentCard[] }>("GET", "/agent-cards")).agentCards,
+    listReveals: async (options: { limit?: number; agentCardId?: string } = {}) => {
+      const q = new URLSearchParams();
+      if (options.limit) q.set("limit", String(options.limit));
+      if (options.agentCardId) q.set("agentCardId", options.agentCardId);
+      const query = q.toString();
+      return (await request<{ reveals: Reveal[] }>("GET", `/reveals${query ? `?${query}` : ""}`)).reveals;
+    },
     getAgentCard: (id: string) => request<AgentCard>("GET", `/agent-cards/${enc(id)}`),
     revokeAgentCard: (id: string) => request<void>("DELETE", `/agent-cards/${enc(id)}`),
     mintCredentials: (id: string, input: MintCredentialsInput = {}) =>
@@ -135,7 +143,7 @@ export function createGoatApi(opts: GoatApiOptions) {
   };
 }
 
-function isEnvelope(x: unknown): x is GoatErrorEnvelope {
+function isEnvelope(x: unknown): x is AgentCommerceErrorEnvelope {
   return (
     typeof x === "object" &&
     x !== null &&
@@ -148,7 +156,7 @@ function isEnvelope(x: unknown): x is GoatErrorEnvelope {
 
 /** Human-readable message for any thrown value. */
 export function errorMessage(err: unknown, fallback = "Something went wrong."): string {
-  if (err instanceof GoatApiError) return err.message || fallback;
+  if (err instanceof AgentCommerceApiError) return err.message || fallback;
   if (err instanceof Error) return err.message || fallback;
   if (typeof err === "string") return err;
   return fallback;

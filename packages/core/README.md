@@ -1,9 +1,9 @@
-# @goat-wallet/core
+# @agent-commerce/core
 
-Typed client for the Crossmint Agents APIs, plus the domain rules GOAT adds on top.
+Typed client for the Crossmint Agents APIs, plus the domain rules Agent Commerce adds on top.
 
 ```ts
-import { CrossmintClient, selectRail, expiresInHours } from "@goat-wallet/core";
+import { CrossmintClient, selectRail, expiresInHours } from "@agent-commerce/core";
 
 const crossmint = new CrossmintClient({
   clientApiKey: process.env.CROSSMINT_CLIENT_API_KEY,

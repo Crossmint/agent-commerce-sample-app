@@ -1,6 +1,6 @@
 {
   "mcpServers": {
-    "goat": {
+    "agent-commerce": {
       "url": "https://goat-jade.vercel.app/api/mcp"
     }
   }

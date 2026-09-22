@@ -1,11 +1,12 @@
 "use client";
 
 import * as React from "react";
-import type { PaymentMethod } from "@goat-wallet/core";
+import type { PaymentMethod } from "@agent-commerce/core";
 import { CreditCard, Plus } from "lucide-react";
-import { cardBrandLabel, paymentMethodLabel } from "../lib/format.js";
+import { paymentMethodLabel } from "../lib/format.js";
 import { cn } from "../lib/utils.js";
 import { AddCardDialog } from "./add-card-dialog.js";
+import { CardMark } from "./card-mark.js";
 import { Select, SelectContent, SelectItem, SelectSeparator, SelectTrigger, SelectValue } from "./primitives/select.js";
 import { Skeleton } from "./primitives/skeleton.js";
 import { SaveCard, type SaveCardProps, type SaveCardResult } from "./save-card.js";
@@ -34,8 +35,8 @@ export interface CardPickerProps {
  *
  * With cards saved this is only a dropdown: brand and last four per row, the
  * default marked, and "Add a new card" under a rule at the foot. That row
- * opens the card form on its own surface — a bottom sheet on a phone, a modal
- * on a wider screen — so the approval screen stays a single decision.
+ * opens the card form on its own surface, a bottom sheet on a phone and a
+ * modal on a wider screen, so the approval screen stays a single decision.
  *
  * With nothing saved there is nothing to pick from, so the form takes the
  * dropdown's place and the screen asks for a card directly. That is the one
@@ -64,7 +65,7 @@ export function CardPicker({
   // The list is still on its way: hold the field's place rather than flashing
   // the form at someone who already has cards.
   if (loading && !paymentMethods) {
-    return <Skeleton className={cn("h-11 w-full", className)} />;
+    return <Skeleton className={cn("h-12 w-full", className)} />;
   }
 
   if (cards.length === 0 && allowAdd) {
@@ -89,7 +90,8 @@ export function CardPicker({
           setTimeout(() => setAdding(true), 0);
         }}
       >
-        <SelectTrigger id={id} className="bg-card">
+        {/* The phone-screen field: tall, 12px corners, on the grey fill, no border. */}
+        <SelectTrigger id={id} className="h-12 rounded-xl border-0 bg-muted px-4 data-[size=default]:h-12">
           {value ? null : <CreditCard aria-hidden className="size-4 shrink-0 text-muted-foreground" />}
           <SelectValue placeholder={cards.length ? "Choose a card" : "No saved cards"} />
         </SelectTrigger>
@@ -115,50 +117,5 @@ export function CardPicker({
 
       {allowAdd ? <AddCardDialog open={adding} onOpenChange={setAdding} onSaved={saved} saveCardProps={saveCardProps} /> : null}
     </div>
-  );
-}
-
-/** Card network short codes. Anything unknown falls back to the brand's first letters. */
-const BRAND_CODE: Record<string, string> = {
-  visa: "VISA",
-  mastercard: "MC",
-  master: "MC",
-  amex: "AMEX",
-  "american-express": "AMEX",
-  american_express: "AMEX",
-  discover: "DISC",
-  diners: "DINE",
-  jcb: "JCB",
-  unionpay: "UP",
-  maestro: "MAES",
-};
-
-/**
- * The card's own artwork, which Crossmint sends on `display.imageUrl`. Each
- * file is a white rounded card with the network on it, and the files do not
- * share an aspect ratio — Visa's is square, Mastercard's is a card shape — so
- * the artwork covers the box and the box crops it, rather than being fitted
- * inside with white bars beside it. Both marks sit well clear of the edges,
- * so nothing that matters is cropped. Without artwork, the network's short
- * code stands in; without that, a card icon.
- */
-function CardMark({ paymentMethod }: { paymentMethod: PaymentMethod }) {
-  const brand = paymentMethod.card?.brand;
-  const src = paymentMethod.display?.imageUrl;
-  const code = brand ? (BRAND_CODE[brand.toLowerCase()] ?? cardBrandLabel(brand).slice(0, 4).toUpperCase()) : undefined;
-  const box = "h-6 w-9 shrink-0 rounded-[3px] border border-border";
-  if (src) {
-    // A plain img: this package has no framework image component, and the
-    // file is a small SVG on Crossmint's CDN.
-    // eslint-disable-next-line @next/next/no-img-element
-    return <img aria-hidden alt="" src={src} loading="lazy" className={cn(box, "bg-white object-cover")} />;
-  }
-  return (
-    <span
-      aria-hidden
-      className={cn(box, "inline-flex items-center justify-center bg-background text-[8px] leading-none font-black tracking-tight text-foreground")}
-    >
-      {code ?? <CreditCard className="size-3.5 text-muted-foreground" />}
-    </span>
   );
 }

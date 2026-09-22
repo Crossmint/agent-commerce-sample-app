@@ -1,17 +1,16 @@
 "use client";
 
 import * as React from "react";
-import type { AgentCard, PaymentMethod } from "@goat-wallet/core";
-import { pendingVerificationRails } from "@goat-wallet/core";
-import { Check, Clock, Lock, TriangleAlert, X } from "lucide-react";
+import type { AgentCard, PaymentMethod } from "@agent-commerce/core";
+import { pendingVerificationRails } from "@agent-commerce/core";
+import { AlertCircle, Clock, Lock } from "lucide-react";
 import { errorMessage } from "../api/client.js";
 import type { AgentCardRequest } from "../api/types.js";
 import { isRequestPastDeadline, useAgentCardRequest } from "../hooks/use-agent-card-request.js";
 import { usePaymentMethods } from "../hooks/use-payment-methods.js";
 import { formatAmount, formatDate, formatDateTime } from "../lib/format.js";
 import { cn } from "../lib/utils.js";
-import { useGoat } from "../provider.js";
-import { Alert, AlertDescription, AlertTitle } from "./primitives/alert.js";
+import { useAgentCommerce } from "../provider.js";
 import { Button } from "./primitives/button.js";
 import { Label } from "./primitives/label.js";
 import { Skeleton } from "./primitives/skeleton.js";
@@ -35,14 +34,14 @@ export interface ApproveAgentCardProps {
   countryCode?: string;
   /**
    * The name the card network shows in its confirmation window. It is the
-   * platform the card is being saved with, not the agent asking. Default "GOAT".
+   * platform the card is being saved with, not the agent asking. Default "Agent Commerce".
    */
   platformName?: string;
   verificationAppearance?: VerificationAppearance;
   /**
    * "card" stands the screen on its own white panel, which is what a host
-   * page usually wants. "plain" drops the panel so the page's own frame — a
-   * grid cell, a phone shell — can hold it. Default "card".
+   * page usually wants. "plain" drops the panel so the page's own frame, a
+   * phone screen, can hold it. Default "card".
    */
   variant?: "card" | "plain";
   className?: string;
@@ -62,19 +61,21 @@ type Phase =
  * 3. The card: a dropdown of saved cards, "Add a new card" at the foot of it.
  *    With nothing saved the card form stands in for the dropdown.
  * 4. One reassurance line with a lock.
- * 5. Full-width Allow. Quiet Deny under it.
- * Verification replaces the button area. Every ending replaces the screen.
+ * 5. Full-width Allow. A grey full-width Deny under it.
+ * Verification replaces the button area. Every ending replaces the screen,
+ * in the onramp sample app's vocabulary: the approved limit as a big blue
+ * figure, the rest as a heading and one line.
  */
 export function ApproveAgentCard({
   requestId,
   onDone,
   countryCode = "US",
-  platformName = "GOAT",
+  platformName = "Agent Commerce",
   verificationAppearance,
   variant = "card",
   className,
 }: ApproveAgentCardProps) {
-  const { api } = useGoat();
+  const { api } = useAgentCommerce();
   const request = useAgentCardRequest(requestId);
   const req = request.data;
   const isPending = req?.status === "pending" && !isRequestPastDeadline(req);
@@ -227,12 +228,12 @@ export function ApproveAgentCard({
     return (
       <Shell {...shell}>
         <div className="flex flex-col gap-3">
-          <Skeleton className="h-10 w-full" />
-          <Skeleton className="h-10 w-2/3" />
+          <Skeleton className="h-9 w-full" />
+          <Skeleton className="h-9 w-2/3" />
         </div>
-        <Skeleton className="h-28 w-full" />
-        <Skeleton className="h-11 w-full" />
-        <Skeleton className="h-13 w-full" />
+        <Skeleton className="h-40 w-full" />
+        <Skeleton className="h-12 w-full" />
+        <Skeleton className="h-14 w-full" />
       </Shell>
     );
   }
@@ -248,7 +249,7 @@ export function ApproveAgentCard({
           title="We could not open this request."
           sub="The link may be old, or the request may be gone. Nothing was charged."
         />
-        <Button type="button" size="lg" className="w-full" onClick={() => void request.refetch()}>
+        <Button type="button" size="xl" className="w-full" onClick={() => void request.refetch()}>
           Try again
         </Button>
       </Shell>
@@ -281,29 +282,29 @@ export function ApproveAgentCard({
     );
   }
 
+  // The ending the onramp sample app gives a finished deposit: the figure is
+  // the news, so it is the big blue thing, with a small word above it.
   if (req.status === "active") {
     return (
       <Shell {...shell}>
-        <Disc tone="primary">
-          <Check className="size-7" strokeWidth={3} />
-        </Disc>
-        <Header
-          scale={scale}
-          title="Approved."
-          sub={`Your agent can spend up to ${limit}${until ? ` until ${until}` : ""}.`}
-        />
-        <p className="text-sm text-muted-foreground">You can close this tab. Revoke it any time from your wallet.</p>
+        <div className="flex flex-col gap-2">
+          <p className="text-sm font-medium text-foreground">Approved</p>
+          <p className={cn("font-display font-semibold tracking-tight text-primary tabular-nums", scale === "page" ? "text-5xl" : "text-4xl")}>{limit}</p>
+          <p className="text-base text-muted-foreground">
+            Your agent can spend up to {limit}
+            {until ? ` until ${until}` : ""}.
+          </p>
+        </div>
+        <p className="text-sm text-muted-foreground">You can close this tab. Revoke it any time from the app.</p>
       </Shell>
     );
   }
 
+  // A denial is a choice, not a fault, so it is not painted in the error colour.
   if (req.status === "denied") {
     return (
       <Shell {...shell}>
-        <Disc tone="muted">
-          <X className="size-7" strokeWidth={3} />
-        </Disc>
-        <Header scale={scale} title="Denied." sub="Your agent cannot use your card." />
+        <Header scale={scale} title="Denied" sub="Your agent cannot use your card." />
         <p className="text-sm text-muted-foreground">You can close this tab.</p>
       </Shell>
     );
@@ -312,8 +313,8 @@ export function ApproveAgentCard({
   if (req.status === "expired" || isRequestPastDeadline(req)) {
     return (
       <Shell {...shell}>
-        <Clock className="size-10 text-muted-foreground" />
-        <Header scale={scale} title="This request expired." sub={`Ask ${req.requester} to send a new one.`} />
+        <Clock aria-hidden className="size-12 text-muted-foreground" />
+        <Header scale={scale} title="This request expired" sub={`Ask ${req.requester} to send a new one.`} />
       </Shell>
     );
   }
@@ -321,8 +322,8 @@ export function ApproveAgentCard({
   if (req.status === "failed") {
     return (
       <Shell {...shell}>
-        <TriangleAlert className="size-10 text-destructive" />
-        <Header scale={scale} title="Something went wrong." sub={req.failureReason ?? "The card could not be set up."} />
+        <AlertCircle aria-hidden className="size-12 text-destructive" />
+        <Header scale={scale} title="Something went wrong" sub={req.failureReason ?? "The card could not be set up."} />
       </Shell>
     );
   }
@@ -341,7 +342,7 @@ export function ApproveAgentCard({
     <Shell {...shell}>
       <Header scale={scale} title="Your agent is requesting to use your card" sub="Approve it once, for this budget only." />
 
-      <dl className="flex flex-col divide-y divide-border rounded-md border border-border bg-card">
+      <dl className="flex flex-col rounded-2xl border border-border px-5">
         <Row label="Purpose">{req.description}</Row>
         <Row label="Limit" strong>
           {limit}
@@ -362,7 +363,9 @@ export function ApproveAgentCard({
 
       {canChooseCard ? (
         <div className="flex flex-col gap-2">
-          <Label htmlFor="approve-card">{hasCards ? "Choose card" : "Add a card"}</Label>
+          <Label htmlFor="approve-card" className="text-sm font-medium">
+            {hasCards ? "Choose card" : "Add a card"}
+          </Label>
           <CardPicker
             id="approve-card"
             paymentMethods={paymentMethods.data}
@@ -383,13 +386,7 @@ export function ApproveAgentCard({
         Your card is never shared with the agent.
       </p>
 
-      {actionError ? (
-        <Alert variant="destructive">
-          <TriangleAlert />
-          <AlertTitle>That did not work</AlertTitle>
-          <AlertDescription>{errorMessage(actionError)}</AlertDescription>
-        </Alert>
-      ) : null}
+      {actionError ? <Problem title="That did not work" message={errorMessage(actionError)} /> : null}
 
       {phase.kind === "verifying" ? (
         <VerifyAgentCard
@@ -401,17 +398,17 @@ export function ApproveAgentCard({
           onComplete={() => void verified(phase.agentCard)}
         />
       ) : phase.kind === "confirming" || resuming ? (
-        <div className="flex items-center gap-3 rounded-md border border-border bg-card p-4 text-sm">
+        <div className="flex items-center gap-3 rounded-2xl bg-muted p-4 text-sm">
           <Spinner className="text-primary" />
           <span>Almost there. Waiting for the card network to confirm.</span>
         </div>
       ) : (
-        <div className="flex flex-col items-center gap-2">
-          <Button type="button" size="lg" className="w-full" disabled={busy || !selected} onClick={() => void allow()}>
+        <div className="flex flex-col gap-2">
+          <Button type="button" size="xl" className="w-full" disabled={busy || !selected} onClick={() => void allow()}>
             {phase.kind === "approving" ? <Spinner /> : null}
             Allow
           </Button>
-          <Button type="button" variant="link" size="sm" disabled={busy} onClick={() => void deny()}>
+          <Button type="button" variant="secondary" size="xl" className="w-full" disabled={busy} onClick={() => void deny()}>
             {phase.kind === "denying" ? <Spinner /> : null}
             Deny
           </Button>
@@ -423,15 +420,15 @@ export function ApproveAgentCard({
 
 /**
  * The column the screen lives in. `card` gives it its own panel; `plain`
- * leaves it to the page, which is what the GOAT pages do — their grid cell is
- * the frame.
+ * leaves it to the page, which is what the sample app's pages do: the phone
+ * screen is the frame.
  */
 function Shell({ variant = "card", className, children }: { variant?: "card" | "plain"; className?: string; children: React.ReactNode }) {
   return (
     <div
       className={cn(
         "mx-auto flex w-full flex-col gap-6",
-        variant === "card" && "max-w-md rounded-md border border-border bg-card p-6 text-card-foreground shadow-sm sm:p-8",
+        variant === "card" && "max-w-md rounded-2xl bg-card p-6 text-card-foreground ring-1 ring-foreground/10",
         className,
       )}
     >
@@ -440,45 +437,31 @@ function Shell({ variant = "card", className, children }: { variant?: "card" | "
   );
 }
 
-/**
- * The mark an ending carries: green for the budget that is live, quiet grey
- * for the one the user turned down. A denial is a choice, not a fault, so it
- * is not painted in the error colour.
- */
-function Disc({ tone, children }: { tone: "primary" | "muted"; children: React.ReactNode }) {
-  return (
-    <span
-      aria-hidden
-      className={cn(
-        "inline-flex size-14 shrink-0 items-center justify-center self-start rounded-full",
-        tone === "primary" ? "bg-primary text-primary-foreground" : "bg-foreground/10 text-muted-foreground",
-      )}
-    >
-      {children}
-    </span>
-  );
-}
-
 type HeaderScale = "page" | "panel";
 
 /**
- * The headline and the line under it, set like the sign-in step: display
- * face, tight tracking, left-aligned. `--font-heading` swaps the face for a
- * host that has one.
+ * The headline and the line under it, set like the onramp sample app's
+ * screens: on a page the step's name is 28px medium; inside a host panel it
+ * steps down so it can sit among other type.
  */
 function Header({ title, sub, scale = "panel" }: { title: string; sub?: string; scale?: HeaderScale }) {
   return (
     <div className="flex flex-col gap-2">
-      <h1
-        className={cn(
-          "max-w-2xl leading-[1.1] font-semibold tracking-[-0.03em] text-balance text-foreground",
-          scale === "page" ? "text-3xl sm:text-4xl" : "text-2xl sm:text-3xl",
-        )}
-        style={{ fontFamily: "var(--font-heading, inherit)" }}
-      >
-        {title}
-      </h1>
-      {sub ? <p className={cn("max-w-prose text-muted-foreground", scale === "panel" && "text-sm")}>{sub}</p> : null}
+      <h1 className={cn("text-balance text-foreground", scale === "page" ? "text-[28px] leading-[1.2] font-medium tracking-[-0.02em]" : "text-xl font-medium")}>{title}</h1>
+      {sub ? <p className={cn("text-muted-foreground", scale === "page" ? "text-base" : "text-sm")}>{sub}</p> : null}
+    </div>
+  );
+}
+
+/** A fault, said plainly: the icon, a title, one line. */
+function Problem({ title, message }: { title: string; message: string }) {
+  return (
+    <div role="alert" className="flex items-start gap-3">
+      <AlertCircle aria-hidden className="mt-0.5 size-5 shrink-0 text-destructive" />
+      <div className="min-w-0">
+        <p className="text-sm font-medium text-foreground">{title}</p>
+        <p className="text-sm text-muted-foreground">{message}</p>
+      </div>
     </div>
   );
 }
@@ -486,9 +469,9 @@ function Header({ title, sub, scale = "panel" }: { title: string; sub?: string; 
 /** One line of the request: what it is on the left, what it says on the right. */
 function Row({ label, strong = false, children }: { label: string; strong?: boolean; children: React.ReactNode }) {
   return (
-    <div className="flex items-baseline justify-between gap-6 px-4 py-3">
-      <dt className="shrink-0 text-sm text-muted-foreground">{label}</dt>
-      <dd className={cn("min-w-0 text-right text-sm font-medium", strong && "text-base font-semibold tabular-nums")}>{children}</dd>
+    <div className="flex items-center justify-between gap-6 border-b border-border/60 py-4 last:border-0">
+      <dt className={cn("shrink-0 text-sm", strong ? "font-medium text-foreground" : "text-muted-foreground")}>{label}</dt>
+      <dd className={cn("min-w-0 text-right text-sm", strong ? "font-semibold tabular-nums" : "font-medium")}>{children}</dd>
     </div>
   );
 }

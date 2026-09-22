@@ -24,7 +24,7 @@ jobs:
       - run: pnpm turbo run build --filter='./packages/*'
       - run: pnpm turbo run typecheck
       - run: pnpm turbo run test
-      - run: pnpm turbo run build --filter=@goat-wallet/web
+      - run: pnpm turbo run build --filter=@agent-commerce/web
         env:
           NEXT_PUBLIC_STYTCH_PUBLIC_TOKEN: public-token-test-placeholder
           NEXT_PUBLIC_CROSSMINT_CLIENT_API_KEY: ck_staging_placeholder
@@ -32,4 +32,4 @@ jobs:
           STYTCH_SECRET: secret-test-placeholder
           CROSSMINT_CLIENT_API_KEY: ck_staging_placeholder
           CROSSMINT_ENV: staging
-          GOAT_WEB_BASE_URL: http://localhost:3000
+          AGENT_COMMERCE_WEB_BASE_URL: http://localhost:3000

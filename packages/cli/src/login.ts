@@ -7,10 +7,10 @@ import {
   exchangeCode,
   type PkcePair,
   type TokenResponse,
-} from "@goat-wallet/auth";
-import { randomState } from "@goat-wallet/auth";
-import { fetchPublicConfig, GoatApi, withFetch } from "./api.js";
-import { type GoatConfig, normalizeBaseUrl } from "./config.js";
+} from "@agent-commerce/auth";
+import { randomState } from "@agent-commerce/auth";
+import { fetchPublicConfig, AgentCommerceApi, withFetch } from "./api.js";
+import { type AgentCommerceConfig, normalizeBaseUrl } from "./config.js";
 import type { CliContext } from "./context.js";
 import { fail, toJson } from "./output.js";
 import type { PublicConfig } from "./types.js";
@@ -36,13 +36,13 @@ const DEFAULT_LOGIN_TIMEOUT_MS = 5 * 60_000;
  * a page the wallet website renders that shows the code. The user pastes the
  * code, or the whole redirect URL, back into the terminal.
  */
-export async function login(ctx: CliContext, opts: LoginOptions): Promise<GoatConfig> {
+export async function login(ctx: CliContext, opts: LoginOptions): Promise<AgentCommerceConfig> {
   const apiBaseUrl = normalizeBaseUrl(
-    opts.api ?? ctx.env.GOAT_API_URL ?? ctx.config.read()?.apiBaseUrl,
+    opts.api ?? ctx.env.AGENT_COMMERCE_API_URL ?? ctx.config.read()?.apiBaseUrl,
   );
   if (!apiBaseUrl)
     throw fail(
-      "No API URL. Pass --api <url>, e.g. `goat login --api https://wallet.example.com/api/goat`.",
+      "No API URL. Pass --api <url>, e.g. `agent-commerce login --api https://wallet.example.com/api/agent-commerce`.",
     );
 
   let publicConfig: PublicConfig;
@@ -55,7 +55,7 @@ export async function login(ctx: CliContext, opts: LoginOptions): Promise<GoatCo
   const clientId = oauth?.cliClientId;
   if (!oauth?.authorizationEndpoint || !oauth.tokenEndpoint || !clientId) {
     throw fail(
-      "This GOAT server is not set up for CLI login. It needs STYTCH_PROJECT_DOMAIN and STYTCH_CLI_CLIENT_ID " +
+      "This Agent Commerce server is not set up for CLI login. It needs STYTCH_PROJECT_DOMAIN and STYTCH_CLI_CLIENT_ID " +
         "(auth.oauth.authorizationEndpoint, tokenEndpoint, or cliClientId is missing in /v1/config).",
     );
   }
@@ -92,7 +92,7 @@ export async function login(ctx: CliContext, opts: LoginOptions): Promise<GoatCo
     throw fail(`Login failed: ${(e as Error).message}`);
   }
 
-  const config: GoatConfig = {
+  const config: AgentCommerceConfig = {
     apiBaseUrl: normalizeBaseUrl(publicConfig.apiBaseUrl) ?? apiBaseUrl,
     accessToken: token.access_token,
     refreshToken: token.refresh_token,
@@ -102,7 +102,7 @@ export async function login(ctx: CliContext, opts: LoginOptions): Promise<GoatCo
   };
   ctx.config.write(config);
 
-  const api = new GoatApi({
+  const api = new AgentCommerceApi({
     config: { ...config, tokenFromEnv: false },
     fetch: ctx.fetch,
     store: ctx.config,
@@ -157,7 +157,7 @@ async function loopbackFlow(
       () =>
         reject(
           fail(
-            "Timed out waiting for the browser. Run `goat login` again, or use `goat login --code`.",
+            "Timed out waiting for the browser. Run `agent-commerce login` again, or use `agent-commerce login --code`.",
           ),
         ),
       input.timeoutMs,
@@ -190,7 +190,7 @@ async function loopbackFlow(
           res,
           400,
           "Login failed",
-          "State mismatch. Go back to the terminal and run `goat login` again.",
+          "State mismatch. Go back to the terminal and run `agent-commerce login` again.",
         );
         return;
       }
@@ -205,10 +205,10 @@ async function loopbackFlow(
     });
   });
 
-  ctx.err(`Opening your browser to log in to ${pc.bold(input.publicConfig.name ?? "GOAT")}.`);
+  ctx.err(`Opening your browser to log in to ${pc.bold(input.publicConfig.name ?? "Agent Commerce")}.`);
   ctx.err(`If it does not open, visit:\n\n  ${pc.cyan(url)}\n`);
   ctx.openBrowser(url).catch(() => {
-    ctx.err(pc.yellow("Could not open a browser. Use the URL above, or run `goat login --code`."));
+    ctx.err(pc.yellow("Could not open a browser. Use the URL above, or run `agent-commerce login --code`."));
   });
 
   try {
@@ -222,7 +222,7 @@ async function loopbackFlow(
 
 async function pasteFlow(ctx: CliContext, input: FlowInput): Promise<Grant> {
   const webBaseUrl = normalizeBaseUrl(input.publicConfig.webBaseUrl);
-  if (!webBaseUrl) throw fail("This GOAT server does not publish webBaseUrl, which --code needs.");
+  if (!webBaseUrl) throw fail("This Agent Commerce server does not publish webBaseUrl, which --code needs.");
   const redirectUri = `${webBaseUrl}/cli-callback`;
   const url = buildAuthorizeUrl({
     authorizeEndpoint: input.publicConfig.auth.oauth.authorizationEndpoint,
@@ -238,7 +238,7 @@ async function pasteFlow(ctx: CliContext, input: FlowInput): Promise<Grant> {
   const parsed = parsePastedCode(answer);
   if (!parsed.code) throw fail("No code found in what you pasted.");
   if (parsed.state && parsed.state !== input.state)
-    throw fail("State mismatch. Start `goat login --code` again and use the new URL.");
+    throw fail("State mismatch. Start `agent-commerce login --code` again and use the new URL.");
   return { code: parsed.code, redirectUri };
 }
 
@@ -267,24 +267,17 @@ export function parsePastedCode(raw: string): { code?: string; state?: string } 
 /*
  * The callback page. It is served by this local server, from a browser tab
  * the user did not ask for, so it has to look like the sign-in screen it
- * just came from: the off-white ground with its dotted grid, the content in
- * one cell of hairlines with a green diamond at each corner, the wordmark
- * above it, and a disc that says how it went.
+ * just came from, which follows the Crossmint onramp sample app: the white
+ * ground with its dot grid, one white card with a hairline ring, the
+ * Crossmint logotype, a 28px heading, one grey line, and a disc that says
+ * how it went.
  *
- * Everything is inline. There is no asset server here, so the wordmark is
- * the outline copy of `apps/web/public/brand/goat-wordmark.svg` and the
- * diamond is the same path as `GridNode` in the web app. Type falls back to
- * the system stack: a page shown once, for a few seconds, is not worth a
- * font download.
+ * Everything is inline. There is no asset server here, so the logotype is a
+ * copy of `apps/web/public/crossmint.svg`, dark type with the gradient mark.
+ * Type falls back to the system stack: a page shown once, for a few seconds,
+ * is not worth a font download.
  */
-const NODE =
-  "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 13.81 13.81'%3E%3Cpath fill='%2305B959' d='M4.99 1.09C5.85-.36 7.96-.36 8.83 1.09l1.17 1.96c.19.31.45.58.77.77l1.96 1.17c1.45.87 1.45 2.97 0 3.84l-1.96 1.17c-.32.19-.58.45-.77.77l-1.17 1.96c-.87 1.45-2.97 1.45-3.84 0l-1.17-1.96a2.2 2.2 0 0 0-.77-.77L1.09 8.83c-1.45-.87-1.45-2.97 0-3.84l1.96-1.17c.32-.19.58-.45.77-.77L4.99 1.09Z'/%3E%3C/svg%3E\")";
-
-/* The Crossmint logotype, from `apps/web/public/logos/crossmint-gray.svg`.
-   Its paths fill with `currentColor`, so the lockup colours it like the site. */
-const CROSSMINT = `<svg viewBox="0 0 127 24" height="13" aria-hidden="true"><g clip-path="url(#clip0_4914_597)"><mask id="mask0_4914_597" style="mask-type:luminance" maskUnits="userSpaceOnUse" x="0" y="0" width="127" height="24"><path d="M126.9 0H0V23.4H126.9V0Z" fill="white"/></mask><g mask="url(#mask0_4914_597)"><path d="M102.636 2.58819C102.636 1.66266 103.394 0.914062 104.307 0.914062C105.221 0.914062 106.002 1.66266 106.002 2.58819C106.002 3.51371 105.244 4.24053 104.307 4.24053C103.372 4.24053 102.636 3.51371 102.636 2.58819Z" fill="currentColor"/><path d="M124.071 3.09985V6.55688H126.442V8.94684H124.071V14.1895C124.071 15.1885 124.517 15.605 125.528 15.605C125.903 15.605 126.348 15.5343 126.467 15.5124V17.7391C126.302 17.8099 125.787 17.995 124.8 17.995C122.688 17.995 121.375 16.7428 121.375 14.6305V8.94684H119.263V6.55688H119.851H121.608V4.85286C121.608 4.83381 121.608 4.81203 121.608 4.79298V3.09985H124.073H124.071Z" fill="currentColor"/><path d="M30.9951 15.1915C31.5183 16.087 32.2316 16.8003 33.1377 17.331C34.0576 17.8482 35.0904 18.1068 36.2361 18.1068C37.0705 18.1068 37.8417 17.968 38.5495 17.6876C39.2573 17.3937 39.866 16.9962 40.3754 16.4927C40.885 15.9754 41.2512 15.3957 41.4798 14.7532L39.0397 13.6616C38.8277 14.2497 38.4752 14.7179 37.9794 15.0663C37.4836 15.4147 36.9053 15.5917 36.2388 15.5917C35.6302 15.5917 35.085 15.4446 34.6056 15.1507C34.1402 14.8567 33.7711 14.4511 33.5013 13.934C33.2314 13.4167 33.0992 12.8233 33.0992 12.1509C33.0992 11.4786 33.2341 10.8851 33.5013 10.368C33.7711 9.85076 34.1374 9.44522 34.6056 9.15119C35.0877 8.85721 35.6302 8.7103 36.2388 8.7103C36.8888 8.7103 37.4617 8.88447 37.9574 9.23561C38.4669 9.584 38.8277 10.0468 39.0397 10.6184L41.4798 9.57041C41.254 8.88446 40.8795 8.29923 40.3562 7.80925C39.8467 7.30567 39.238 6.9137 38.5302 6.63605C37.8224 6.34206 37.0596 6.19507 36.2388 6.19507C35.0931 6.19507 34.0603 6.45367 33.1405 6.97086C32.2344 7.48805 31.521 8.19307 30.9978 9.08864C30.4745 9.98414 30.2129 10.9968 30.2129 12.1292C30.2129 13.2615 30.4745 14.2824 30.9978 15.1915H30.9951Z" fill="currentColor"/><path d="M45.5944 6.44826H42.9834V17.8564H45.7623V11.5031C45.7623 10.6375 46.002 9.96519 46.4839 9.48882C46.9659 8.99883 47.6021 8.75389 48.3925 8.75389H49.3894V6.32031H48.7092C47.9023 6.32031 47.211 6.48909 46.6298 6.8239C46.1947 7.0825 45.8504 7.49081 45.5916 8.05156V6.44553L45.5944 6.44826Z" fill="currentColor"/><path fill-rule="evenodd" clip-rule="evenodd" d="M55.8845 6.20874C59.3107 6.20874 61.8252 8.73756 61.8252 12.1946C61.8252 15.6516 59.3134 18.2048 55.8845 18.2048C52.4557 18.2048 49.9688 15.6761 49.9688 12.1946C49.9688 8.71307 52.4805 6.20874 55.8845 6.20874ZM55.8845 15.7904C57.5755 15.7904 59.0765 14.56 59.0765 12.1946C59.0765 9.82908 57.5728 8.64496 55.8845 8.64496C54.1962 8.64496 52.6926 9.85086 52.6926 12.1946C52.6926 14.5382 54.2183 15.7904 55.8845 15.7904Z" fill="currentColor"/><path d="M65.1076 14.1434L62.7363 14.794C62.8769 16.0705 64.1437 18.2047 67.4541 18.2047C70.3653 18.2047 71.7726 16.302 71.7726 14.5843C71.7726 12.8667 70.6462 11.6145 68.487 11.1491L66.7491 10.8007C66.044 10.6618 65.5979 10.2209 65.5979 9.61661C65.5979 8.91968 66.2781 8.31814 67.2421 8.31814C68.7679 8.31814 69.2609 9.36344 69.3545 10.0113L71.6542 9.36065C71.4668 8.24736 70.4341 6.20581 67.2421 6.20581C64.8708 6.20581 63.0393 7.87716 63.0393 9.84791C63.0393 11.4022 64.0969 12.7007 66.1157 13.1416L67.8067 13.5118C68.7211 13.6969 69.1451 14.1624 69.1451 14.764C69.1451 15.4609 68.5585 16.0624 67.4322 16.0624C65.9779 16.0624 65.2013 15.1587 65.1076 14.1379V14.1434Z" fill="currentColor"/><path d="M72.6865 14.7939L75.0578 14.1433C75.1514 15.164 75.9253 16.0678 77.3823 16.0678C78.5086 16.0678 79.0952 15.4635 79.0952 14.7694C79.0952 14.165 78.674 13.7024 77.7568 13.5172L76.0658 13.147C74.047 12.7061 72.9895 11.4076 72.9895 9.85324C72.9895 7.87982 74.8209 6.21118 77.1922 6.21118C80.3842 6.21118 81.417 8.25273 81.6043 9.36607L79.3046 10.0167C79.211 9.36607 78.718 8.32351 77.1922 8.32351C76.231 8.32351 75.5481 8.9278 75.5481 9.62194C75.5481 10.2263 75.9941 10.6672 76.6992 10.8061L78.4371 11.1545C80.5963 11.6172 81.7227 12.9184 81.7227 14.5897C81.7227 16.2611 80.3154 18.2101 77.4042 18.2101C74.0939 18.2101 72.827 16.0759 72.6865 14.7993V14.7939Z" fill="currentColor"/><path d="M86.1044 6.44839H83.4932V17.8565H86.2719V11.1657C86.2719 10.6621 86.3634 10.2293 86.5478 9.86462C86.7322 9.49976 86.9936 9.2222 87.332 9.02618C87.6712 8.81661 88.0621 8.71038 88.5003 8.71038C88.9377 8.71038 89.3429 8.81661 89.6678 9.02618C90.0066 9.2222 90.2685 9.50255 90.453 9.86462C90.6375 10.2293 90.7275 10.6621 90.7275 11.1657V17.8565H93.5067V11.1657C93.5067 10.6621 93.5985 10.2293 93.783 9.86462C93.9675 9.49976 94.2285 9.2222 94.5669 9.02618C94.9062 8.81661 95.2968 8.71038 95.7351 8.71038C96.2004 8.71038 96.5973 8.81661 96.9222 9.02618C97.2471 9.2222 97.5036 9.50255 97.6854 9.86462C97.8699 10.2293 97.9599 10.6621 97.9599 11.1657V17.8565H100.739V10.5178C100.739 9.6659 100.555 8.91731 100.188 8.2749C99.822 7.61888 99.3135 7.10713 98.6601 6.74509C98.0238 6.38033 97.2939 6.20068 96.4731 6.20068C95.5533 6.20068 94.7415 6.43206 94.0332 6.89208C93.5787 7.18062 93.1953 7.56444 92.8875 8.04351C92.6337 7.61343 92.2809 7.24323 91.8264 6.93563C91.1055 6.44566 90.2712 6.20068 89.3235 6.20068C88.4614 6.20068 87.7127 6.40211 87.0731 6.80771C86.6577 7.07174 86.3328 7.42833 86.0985 7.87203V6.45111L86.1044 6.44839Z" fill="currentColor"/><path d="M105.669 17.8564H102.97V6.55713H105.669V17.8564Z" fill="currentColor"/><path d="M108.112 6.55463V17.8539H110.866V11.2284C110.866 10.7303 110.966 10.3002 111.162 9.94088C111.357 9.5816 111.63 9.30395 111.982 9.11063C112.332 8.9038 112.731 8.80035 113.18 8.80035C113.629 8.80035 114.042 8.9038 114.378 9.11063C114.727 9.30395 115.001 9.5816 115.199 9.94088C115.394 10.3002 115.494 10.7303 115.494 11.2284V17.8539H118.248V10.5833C118.248 9.73946 118.066 8.99632 117.702 8.35934C117.339 7.70878 116.826 7.20248 116.168 6.84317C115.524 6.48386 114.78 6.3042 113.94 6.3042C113.101 6.3042 112.413 6.48386 111.798 6.84317C111.335 7.10993 110.969 7.47469 110.704 7.94017V6.55463H108.118H108.112Z" fill="currentColor"/><path fill-rule="evenodd" clip-rule="evenodd" d="M19.2823 13.1552C17.2966 12.1508 14.6472 11.8132 13.0911 11.6989C15.209 11.5438 19.354 10.9749 21.089 8.87336C23.8045 6.86452 23.675 0.0675202 23.675 0.0675202C23.675 0.0675202 17.1589 -0.642939 14.314 2.56365C12.5458 4.30305 11.9978 7.32455 11.838 9.42867C11.6783 7.32727 11.1302 4.30305 9.36207 2.56365C6.51712 -0.645661 0.000952895 0.0675202 0.000952895 0.0675202C0.000952895 0.0675202 -0.0789157 4.30577 1.22377 7.07956C1.86547 8.44606 3.03871 9.55944 4.39373 10.2453C6.37942 11.2498 9.02889 11.5872 10.5849 11.7016C9.02889 11.816 6.37942 12.1534 4.39373 13.1579C3.03871 13.8439 1.86547 14.9572 1.22377 16.3237C-0.0789157 19.0948 0.000952895 23.333 0.000952895 23.333C0.000952895 23.333 6.51712 24.0435 9.36207 20.8369C11.1302 19.0975 11.6783 16.0733 11.838 13.9718C11.9978 16.0733 12.5458 19.0975 14.314 20.8369C17.1589 24.0435 23.675 23.333 23.675 23.333C23.675 23.333 23.7577 19.0948 22.4522 16.321C21.8106 14.9545 20.6374 13.8412 19.2823 13.1552ZM19.4998 19.1002C19.4669 19.0921 16.0655 18.1338 11.7004 12.3712C10.4197 13.3594 7.2029 15.9726 4.14035 19.5412L4.00264 19.7018L4.05773 19.4976C4.06598 19.4622 5.06297 15.9998 11.1357 11.59C10.5491 10.7298 9.16929 8.75093 3.8429 4.08802L3.72448 3.98457L3.88147 4.00635C3.99438 4.02269 6.73195 4.44732 11.7333 10.817C11.7333 10.817 11.7968 10.904 11.9124 11.0565C12.6174 10.5747 14.6582 9.14292 19.2465 4.01996L19.3512 3.90291L19.3291 4.05807C19.3127 4.16967 18.883 6.8618 12.4798 11.786C13.6888 13.2941 16.1895 16.2067 19.5439 19.0158L19.7092 19.1546L19.5026 19.1002H19.4998Z" fill="currentColor"/></g></g><defs><clipPath id="clip0_4914_597"><rect width="126.9" height="23.4" fill="white"/></clipPath></defs></svg>`;
-
-const WORDMARK = `<svg viewBox="5.77 -150.48 457.22 144.72" height="26" aria-hidden="true"><title>GOAT</title><path fill="#32d55d" d="M97.66-136.72L97.66-126.95L107.42-126.95L107.42-107.42L87.89-107.42L87.89-117.19L78.13-117.19L78.13-126.95L39.06-126.95L39.06-117.19L29.30-117.19L29.30-39.06L39.06-39.06L39.06-29.30L78.13-29.30L78.13-39.06L87.89-39.06L87.89-68.36L58.59-68.36L58.59-87.89L107.42-87.89L107.42-29.30L97.66-29.30L97.66-19.53L87.89-19.53L87.89-9.77L29.30-9.77L29.30-19.53L19.53-19.53L19.53-29.30L9.77-29.30L9.77-126.95L19.53-126.95L19.53-136.72L29.30-136.72L29.30-146.48L87.89-146.48L87.89-136.72L97.66-136.72M195.31-117.19L195.31-126.95L156.25-126.95L156.25-117.19L146.48-117.19L146.48-39.06L156.25-39.06L156.25-29.30L195.31-29.30L195.31-39.06L205.08-39.06L205.08-117.19L195.31-117.19M136.72-136.72L146.48-136.72L146.48-146.48L205.08-146.48L205.08-136.72L214.84-136.72L214.84-126.95L224.61-126.95L224.61-29.30L214.84-29.30L214.84-19.53L205.08-19.53L205.08-9.77L146.48-9.77L146.48-19.53L136.72-19.53L136.72-29.30L126.95-29.30L126.95-126.95L136.72-126.95L136.72-136.72M263.67-97.66L263.67-68.36L322.27-68.36L322.27-97.66L312.50-97.66L312.50-107.42L302.73-107.42L302.73-117.19L283.20-117.19L283.20-107.42L273.44-107.42L273.44-97.66L263.67-97.66M263.67-48.83L263.67-9.77L244.14-9.77L244.14-107.42L253.91-107.42L253.91-117.19L263.67-117.19L263.67-126.95L273.44-126.95L273.44-136.72L283.20-136.72L283.20-146.48L302.73-146.48L302.73-136.72L312.50-136.72L312.50-126.95L322.27-126.95L322.27-117.19L332.03-117.19L332.03-107.42L341.80-107.42L341.80-9.77L322.27-9.77L322.27-48.83L263.67-48.83M400.39-9.77L400.39-126.95L361.33-126.95L361.33-146.48L458.98-146.48L458.98-126.95L419.92-126.95L419.92-9.77"/></svg>`;
+const CROSSMINT = `<svg viewBox="0 0 459.17 85.97" width="117" height="22" aria-hidden="true"><defs><linearGradient id="xm-mark" x1=".12" y1=".13" x2="85.84" y2="85.84" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#5edd4d"/><stop offset="1" stop-color="#05ce6c"/></linearGradient></defs><g fill="#222"><path d="M372.65,9.51c0-3.4,2.75-6.15,6.07-6.15s6.15,2.75,6.15,6.15-2.75,6.07-6.15,6.07-6.07-2.67-6.07-6.07Z"/><path d="M450.48,11.39v12.7h8.61v8.78h-8.61v19.26c0,3.67,1.62,5.2,5.29,5.2,1.36,0,2.98-.26,3.41-.34v8.18c-.6.26-2.47.94-6.05.94-7.67,0-12.44-4.6-12.44-12.36v-20.88h-7.67v-8.78h2.14s6.38,0,6.38,0v-6.26c0-.07,0-.15,0-.22v-6.22h8.95Z"/><path d="M112.53,55.81c1.9,3.29,4.49,5.91,7.78,7.86,3.34,1.9,7.09,2.85,11.25,2.85,3.03,0,5.83-.51,8.4-1.54,2.57-1.08,4.78-2.54,6.63-4.39,1.85-1.9,3.18-4.03,4.01-6.39l-8.86-4.01c-.77,2.16-2.05,3.88-3.85,5.16-1.8,1.28-3.9,1.93-6.32,1.93-2.21,0-4.19-.54-5.93-1.62-1.69-1.08-3.03-2.57-4.01-4.47-.98-1.9-1.46-4.08-1.46-6.55s.49-4.65,1.46-6.55c.98-1.9,2.31-3.39,4.01-4.47,1.75-1.08,3.72-1.62,5.93-1.62,2.36,0,4.44.64,6.24,1.93,1.85,1.28,3.16,2.98,3.93,5.08l8.86-3.85c-.82-2.52-2.18-4.67-4.08-6.47-1.85-1.85-4.06-3.29-6.63-4.31-2.57-1.08-5.34-1.62-8.32-1.62-4.16,0-7.91.95-11.25,2.85-3.29,1.9-5.88,4.49-7.78,7.78-1.9,3.29-2.85,7.01-2.85,11.17s.95,7.91,2.85,11.25Z"/><path d="M165.54,23.69h-9.48v41.91h10.09v-23.34c0-3.18.87-5.65,2.62-7.4,1.75-1.8,4.06-2.7,6.93-2.7h3.62v-8.94h-2.47c-2.93,0-5.44.62-7.55,1.85-1.58.95-2.83,2.45-3.77,4.51v-5.9Z"/><path fill-rule="evenodd" d="M202.9,22.81c12.44,0,21.57,9.29,21.57,21.99s-9.12,22.08-21.57,22.08-21.48-9.29-21.48-22.08,9.12-21.99,21.48-21.99ZM202.9,58.01c6.14,0,11.59-4.52,11.59-13.21s-5.46-13.04-11.59-13.04-11.59,4.43-11.59,13.04,5.54,13.21,11.59,13.21Z"/><path d="M236.39,51.96l-8.61,2.39c.51,4.69,5.11,12.53,17.13,12.53,10.57,0,15.68-6.99,15.68-13.3s-4.09-10.91-11.93-12.62l-6.31-1.28c-2.56-.51-4.18-2.13-4.18-4.35,0-2.56,2.47-4.77,5.97-4.77,5.54,0,7.33,3.84,7.67,6.22l8.35-2.39c-.68-4.09-4.43-11.59-16.02-11.59-8.61,0-15.26,6.14-15.26,13.38,0,5.71,3.84,10.48,11.17,12.1l6.14,1.36c3.32.68,4.86,2.39,4.86,4.6,0,2.56-2.13,4.77-6.22,4.77-5.28,0-8.1-3.32-8.44-7.07Z"/><path d="M263.91,54.35l8.61-2.39c.34,3.75,3.15,7.07,8.44,7.07,4.09,0,6.22-2.22,6.22-4.77,0-2.22-1.53-3.92-4.86-4.6l-6.14-1.36c-7.33-1.62-11.17-6.39-11.17-12.1,0-7.25,6.65-13.38,15.26-13.38,11.59,0,15.34,7.5,16.02,11.59l-8.35,2.39c-.34-2.39-2.13-6.22-7.67-6.22-3.49,0-5.97,2.22-5.97,4.77,0,2.22,1.62,3.84,4.18,4.35l6.31,1.28c7.84,1.7,11.93,6.48,11.93,12.62s-5.11,13.3-15.68,13.3c-12.02,0-16.62-7.84-17.13-12.53Z"/><path d="M312.63,23.69h-9.48v41.91h10.09v-24.58c0-1.85.33-3.44,1-4.78.67-1.34,1.62-2.36,2.85-3.08,1.23-.77,2.65-1.16,4.24-1.16s3.06.39,4.24,1.16c1.23.72,2.18,1.75,2.85,3.08.67,1.34,1,2.93,1,4.78v24.58h10.09v-24.58c0-1.85.33-3.44,1-4.78.67-1.34,1.62-2.36,2.85-3.08,1.23-.77,2.65-1.16,4.24-1.16,1.69,0,3.13.39,4.31,1.16,1.18.72,2.11,1.75,2.77,3.08.67,1.34,1,2.93,1,4.78v24.58h10.09v-26.96c0-3.13-.67-5.88-2-8.24-1.33-2.41-3.18-4.29-5.55-5.62-2.31-1.34-4.96-2-7.94-2-3.34,0-6.29.85-8.86,2.54-1.65,1.06-3.04,2.47-4.16,4.23-.92-1.58-2.2-2.94-3.85-4.07-2.62-1.8-5.65-2.7-9.09-2.7-3.13,0-5.85.74-8.17,2.23-1.51.97-2.69,2.28-3.54,3.91v-5.22Z"/><path d="M383.67,65.6h-9.8V24.09h9.8v41.51Z"/><path d="M392.54,24.08v41.51h10v-24.34c0-1.83.36-3.41,1.07-4.73.71-1.32,1.7-2.34,2.98-3.05,1.27-.76,2.72-1.14,4.35-1.14s3.13.38,4.35,1.14c1.27.71,2.26,1.73,2.98,3.05.71,1.32,1.07,2.9,1.07,4.73v24.34h10v-26.71c0-3.1-.66-5.83-1.98-8.17-1.32-2.39-3.18-4.25-5.57-5.57-2.34-1.32-5.04-1.98-8.09-1.98s-5.55.66-7.78,1.98c-1.68.98-3.01,2.32-3.97,4.03v-5.09h-9.39Z"/></g><path fill="url(#xm-mark)" fill-rule="evenodd" d="M70.01,48.33c-7.21-3.69-16.83-4.93-22.48-5.35,7.69-.57,22.74-2.66,29.04-10.38C86.43,25.22,85.96.25,85.96.25c0,0-23.66-2.61-33.99,9.17-6.42,6.39-8.41,17.49-8.99,25.22-.58-7.72-2.57-18.83-8.99-25.22C23.66-2.37,0,.25,0,.25,0,.25-.29,15.82,4.44,26.01c2.33,5.02,6.59,9.11,11.51,11.63,7.21,3.69,16.83,4.93,22.48,5.35-5.65.42-15.27,1.66-22.48,5.35-4.92,2.52-9.18,6.61-11.51,11.63C-.29,70.15,0,85.72,0,85.72c0,0,23.66,2.61,33.99-9.17,6.42-6.39,8.41-17.5,8.99-25.22.58,7.72,2.57,18.83,8.99,25.22,10.33,11.78,33.99,9.17,33.99,9.17,0,0,.3-15.57-4.44-25.76-2.33-5.02-6.59-9.11-11.51-11.63ZM70.8,70.17c-.12-.03-12.47-3.55-28.32-24.72-4.65,3.63-16.33,13.23-27.45,26.34l-.5.59.2-.75c.03-.13,3.65-12.85,25.7-29.05-2.13-3.16-7.14-10.43-26.48-27.56l-.43-.38.57.08c.41.06,10.35,1.62,28.51,25.02,0,0,.23.32.65.88,2.56-1.77,9.97-7.03,26.63-25.85l.38-.43-.08.57c-.06.41-1.62,10.3-24.87,28.39,4.39,5.54,13.47,16.24,25.65,26.56l.6.51-.75-.2Z"/></svg>`;
 
 type CallbackTone = "ok" | "denied" | "error";
 
@@ -296,53 +289,42 @@ function html(res: ServerResponse, status: number, title: string, body: string, 
 /** Exported for the test: the page above, as a string. */
 export function renderCallbackPage(status: number, title: string, body: string, tone: CallbackTone = status < 400 ? "ok" : "error"): string {
   const ok = tone === "ok";
+  // Success is the brand blue disc with a white check; anything else is a
+  // quiet grey disc with a cross. A denial is an answer, not a fault, so it
+  // is not painted red.
   const mark = ok
     ? `<span class="disc ok"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg></span>`
     : `<span class="disc no"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg></span>`;
   return (
     `<!doctype html><html lang="en"><head><meta charset="utf-8">` +
       `<meta name="viewport" content="width=device-width,initial-scale=1">` +
-      `<title>GOAT: ${escapeHtml(title)}</title><style>
+      `<title>Agent Commerce Sample App: ${escapeHtml(title)}</title><style>
   :root { color-scheme: light; }
   body {
     margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center;
-    padding: 4rem 1rem; background-color: #f2f3ef; color: #0a1825;
-    background-image: radial-gradient(rgba(10,24,37,.10) 1px, transparent 1px); background-size: 22px 22px;
+    padding: 4rem 1rem; background-color: #fff; color: #171717;
+    background-image: radial-gradient(rgba(200,195,189,0.4) 1px, transparent 1px); background-size: 28px 28px;
     font-family: system-ui, -apple-system, "Segoe UI", sans-serif; -webkit-font-smoothing: antialiased;
   }
-  .cell { position: relative; width: 100%; max-width: 28rem; padding: 2.75rem 2.25rem; }
-  /* The rules bleed past the cell, as the grid does on the site. */
-  .cell::before, .cell::after {
-    content: ""; position: absolute; left: 50%; transform: translateX(-50%);
-    width: 100vw; height: 1px; background: rgba(0,0,0,.2);
+  .card {
+    width: 100%; max-width: 26rem; padding: 2rem 1.75rem 2.25rem; background: #fff;
+    border-radius: 18px; box-shadow: 0 0 0 1px rgba(23,23,23,0.1);
   }
-  .cell::before { top: 0; } .cell::after { bottom: 0; }
-  .v { position: absolute; top: 0; bottom: 0; width: 1px; background: rgba(0,0,0,.2); }
-  .v.l { left: 0; } .v.r { right: 0; }
-  .n { position: absolute; width: 14px; height: 14px; background-image: ${NODE}; background-size: contain; }
-  .n.tl { top: -7px; left: -7px; } .n.tr { top: -7px; right: -7px; }
-  .n.bl { bottom: -7px; left: -7px; } .n.br { bottom: -7px; right: -7px; }
-  /* The lockup: the pixel wordmark, then "by" and the logotype in small, all
-     sitting on one line, as in the app. */
-  .lockup { display: flex; width: fit-content; align-items: flex-end; gap: 5px; color: #0a1825; }
-  .lockup .by { font-size: 12px; line-height: 1; color: #5b6670; transform: translateY(-2px); }
-  .lockup svg:last-child { transform: translateY(1px); }
-  .disc { display: inline-flex; width: 56px; height: 56px; margin-top: 1.75rem; align-items: center; justify-content: center; border-radius: 9999px; }
-  .disc.ok { background: #11ba4b; color: #fff; }
-  .disc.no { background: rgba(10,24,37,.10); color: #5b6670; }
-  h1 { margin: 1.5rem 0 .5rem; font-size: 2rem; line-height: 1.1; letter-spacing: -.03em; font-weight: 600; }
-  p { margin: 0; color: #5b6670; line-height: 1.5; }
-  p.hint { margin-top: 1.25rem; font-size: .875rem; }
+  .disc { display: inline-flex; width: 56px; height: 56px; margin-top: 2rem; align-items: center; justify-content: center; border-radius: 9999px; }
+  .disc.ok { background: #4564FF; color: #fff; }
+  .disc.no { background: #f2f2f2; color: #737373; }
+  h1 { margin: 1.25rem 0 .5rem; font-size: 28px; line-height: 1.2; letter-spacing: -.02em; font-weight: 500; }
+  p { margin: 0; color: #737373; font-size: 16px; line-height: 1.5; }
+  p.hint { margin-top: 1.25rem; font-size: 14px; }
+  code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; color: #171717; }
   svg { display: block; }
-</style></head><body><main class="cell">` +
-      `<span class="v l"></span><span class="v r"></span>` +
-      `<span class="n tl"></span><span class="n tr"></span><span class="n bl"></span><span class="n br"></span>` +
-      `<span class="lockup" role="img" aria-label="GOAT by Crossmint">${WORDMARK}<span class="by">by</span>${CROSSMINT}</span>${mark}<h1>${escapeHtml(title)}</h1><p>${escapeHtml(body)}</p>` +
+</style></head><body><main class="card">` +
+      `<span role="img" aria-label="Crossmint">${CROSSMINT}</span>${mark}<h1>${escapeHtml(title)}</h1><p>${escapeHtml(body)}</p>` +
       `${
         tone === "error"
-          ? `<p class="hint">Go back to the terminal and run <code>goat login</code> again.</p>`
+          ? `<p class="hint">Go back to the terminal and run <code>agent-commerce login</code> again.</p>`
           : tone === "denied"
-            ? `<p class="hint">You can close this tab. Run <code>goat login</code> again if you change your mind.</p>`
+            ? `<p class="hint">You can close this tab. Run <code>agent-commerce login</code> again if you change your mind.</p>`
             : ""
       }` +
       `</main></body></html>`

@@ -7,7 +7,7 @@ export const metadata: Metadata = { title: "Authorize an agent" };
 
 /**
  * The "Authorization URL" registered in Stytch → Connected Apps. OAuth clients
- * (the goat CLI, MCP hosts) send the user here with the standard query params.
+ * (the agent-commerce CLI, MCP hosts) send the user here with the standard query params.
  * The proxy redirects signed-out users to /login first and brings them back
  * with the query intact, so this page lands on the same ground they just left.
  */

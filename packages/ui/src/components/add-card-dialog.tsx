@@ -17,7 +17,7 @@ export interface AddCardDialogProps {
 }
 
 const TITLE = "Add a card";
-const DESCRIPTION = "Your card details go straight to Crossmint's vault. This site never sees the number.";
+const DESCRIPTION = "Your card goes straight to Crossmint's vault. This site never sees the number.";
 
 /**
  * The card form on its own surface: a bottom sheet on a phone, a centered
@@ -58,7 +58,7 @@ export function AddCardDialog({ open, onOpenChange, onSaved, saveCardProps, titl
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[88svh] overflow-y-auto sm:max-w-md">
+      <DialogContent className="max-h-[88svh] overflow-y-auto rounded-2xl sm:max-w-md">
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
           <DialogDescription>{description}</DialogDescription>

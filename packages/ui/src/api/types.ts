@@ -1,6 +1,6 @@
 /**
- * Shapes the GOAT HTTP API returns. They follow docs/API.md line by line.
- * Crossmint shapes come from @goat-wallet/core.
+ * Shapes the Agent Commerce HTTP API returns. They follow docs/API.md line by line.
+ * Crossmint shapes come from @agent-commerce/core.
  */
 import type {
   AgentCard,
@@ -17,13 +17,13 @@ import type {
   RegisterCardInput,
   RegisterCardResult,
   RenderedAction,
-} from "@goat-wallet/core";
+} from "@agent-commerce/core";
 
-export interface GoatErrorEnvelope {
+export interface AgentCommerceErrorEnvelope {
   error: { code: string; message: string; details?: Record<string, unknown> };
 }
 
-export type GoatErrorCode =
+export type AgentCommerceErrorCode =
   | "unauthorized"
   | "forbidden"
   | "not_found"
@@ -34,7 +34,29 @@ export type GoatErrorCode =
   | "internal"
   | (string & {});
 
-export interface GoatConfig {
+/**
+ * One credential an agent minted from an agent card: a line in Transactions.
+ * What was asked for, never what came back — the server does not store the
+ * card number, the token or the cryptogram, so none of it is here.
+ */
+export interface Reveal {
+  id: string;
+  userId: string;
+  agentCardId: string;
+  /** The saved card the budget draws on. */
+  paymentMethodId?: string;
+  description?: string;
+  amount: Amount;
+  merchant?: Merchant;
+  rail: string;
+  provider?: string;
+  /** False when the rail cannot hold the agent to the amount. */
+  enforced?: boolean;
+  requester?: string;
+  createdAt: string;
+}
+
+export interface AgentCommerceConfig {
   name: string;
   apiBaseUrl: string;
   webBaseUrl: string;

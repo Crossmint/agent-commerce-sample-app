@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { CircleCheck, CircleX, TriangleAlert } from "lucide-react";
+import { AlertCircle } from "lucide-react";
 import { errorMessage } from "../api/client.js";
 import type { CheckoutView as CheckoutViewData } from "../api/types.js";
 import { isTerminalCheckoutView, useCheckout } from "../hooks/use-checkout.js";
@@ -12,7 +12,6 @@ import { Button } from "./primitives/button.js";
 import { Skeleton } from "./primitives/skeleton.js";
 import { Spinner } from "./primitives/spinner.js";
 import { PendingActionForm } from "./pending-action-form.js";
-import { Mascot } from "./mascot.js";
 
 export interface CheckoutViewProps {
   checkoutId: string;
@@ -70,7 +69,7 @@ export function CheckoutView({ checkoutId, poll = true, onDone, className, frame
   if (loading && !data) {
     return (
       <div className={cn("flex flex-col gap-4", className)}>
-        <Skeleton className="h-8 w-48" />
+        <Skeleton className="h-9 w-48" />
         <Skeleton className="h-[320px]" />
       </div>
     );
@@ -78,16 +77,12 @@ export function CheckoutView({ checkoutId, poll = true, onDone, className, frame
 
   if (!data) {
     return (
-      <Alert variant="destructive" className={className}>
-        <TriangleAlert />
-        <AlertTitle>Could not load this checkout</AlertTitle>
-        <AlertDescription>
-          <p>{errorMessage(error)}</p>
-          <Button type="button" size="sm" variant="outline" onClick={() => void refetch()}>
-            Try again
-          </Button>
-        </AlertDescription>
-      </Alert>
+      <div className={cn("flex flex-col gap-4", className)}>
+        <Problem title="Could not load this checkout" message={errorMessage(error)} />
+        <Button type="button" size="xl" variant="secondary" className="w-full sm:w-auto" onClick={() => void refetch()}>
+          Try again
+        </Button>
+      </div>
     );
   }
 
@@ -96,11 +91,12 @@ export function CheckoutView({ checkoutId, poll = true, onDone, className, frame
   const total = receiptTotal(data.receipt);
   const merchantOrderId = data.receipt?.merchantOrderId;
   const summary = data.result?.summary;
+  const stopped = data.status === "failed" || data.status === "blocked" || data.status === "cancelled";
 
   return (
-    <div className={cn("flex flex-col gap-5", className)}>
+    <div className={cn("flex flex-col gap-6", className)}>
       <div className="flex flex-wrap items-center gap-3">
-        <h2 className="text-2xl font-semibold tracking-tight">Checkout</h2>
+        <h2 className="text-[28px] leading-[1.2] font-medium tracking-[-0.02em] text-foreground">Checkout</h2>
         <Badge variant={badge.variant}>{badge.label}</Badge>
         {!terminal ? <Spinner className="text-muted-foreground" /> : null}
         <span className="ml-auto font-mono text-xs text-muted-foreground">{data.id}</span>
@@ -108,44 +104,33 @@ export function CheckoutView({ checkoutId, poll = true, onDone, className, frame
 
       {error ? (
         <Alert variant="warning">
-          <TriangleAlert />
+          <AlertCircle />
           <AlertTitle>Lost contact for a moment</AlertTitle>
           <AlertDescription>{errorMessage(error)} Still trying.</AlertDescription>
         </Alert>
       ) : null}
 
+      {/* The ending the onramp sample app gives a finished deposit: the
+          figure is the news, so it is the big blue thing. */}
       {data.status === "succeeded" ? (
-        <div className="goat-backdrop flex flex-col items-center gap-4 rounded-md border border-border bg-card px-6 py-10 text-center">
-          <Mascot size={88} />
-          <div className="space-y-1">
-            <p className="flex items-center justify-center gap-2 text-2xl font-semibold tracking-tight">
-              <CircleCheck className="size-6 text-success" /> Bought.
-            </p>
-            {total ? <p className="text-muted-foreground">Total {total}</p> : summary ? <p className="text-muted-foreground">{summary}</p> : null}
-            {merchantOrderId ? <p className="font-mono text-xs text-muted-foreground">Order {merchantOrderId}</p> : null}
-          </div>
+        <div className="flex flex-col gap-2 rounded-2xl bg-card p-6 ring-1 ring-foreground/10">
+          <p className="text-[28px] leading-[1.2] font-medium tracking-[-0.02em]">Bought.</p>
+          {total ? <p className="font-display text-4xl font-semibold tracking-tight text-primary tabular-nums">{total}</p> : null}
+          {summary ? <p className="text-base text-muted-foreground">{summary}</p> : null}
+          {merchantOrderId ? <p className="font-mono text-xs text-muted-foreground">Order {merchantOrderId}</p> : null}
         </div>
       ) : null}
 
-      {data.status === "failed" || data.status === "blocked" || data.status === "cancelled" ? (
-        <Alert variant="destructive">
-          <CircleX />
-          <AlertTitle>{data.status === "cancelled" ? "Cancelled" : data.status === "blocked" ? "Stopped before buying" : "Did not go through"}</AlertTitle>
-          <AlertDescription>
-            {data.failure?.message ?? summary ?? data.failure?.reason?.replace(/[_.]/g, " ") ?? "The store did not complete the order."}
-          </AlertDescription>
-        </Alert>
+      {stopped ? (
+        <Problem
+          title={data.status === "cancelled" ? "Cancelled" : data.status === "blocked" ? "Stopped before buying" : "Did not go through"}
+          message={data.failure?.message ?? summary ?? data.failure?.reason?.replace(/[_.]/g, " ") ?? "The store did not complete the order."}
+        />
       ) : null}
 
       {!terminal && data.rendered ? (
-        <div className="rounded-md border border-border bg-card p-6">
-          {actionError ? (
-            <Alert variant="destructive" className="mb-4">
-              <TriangleAlert />
-              <AlertTitle>Could not send your answer</AlertTitle>
-              <AlertDescription>{errorMessage(actionError)}</AlertDescription>
-            </Alert>
-          ) : null}
+        <div className="rounded-2xl bg-card p-6 ring-1 ring-foreground/10">
+          {actionError ? <Problem className="mb-4" title="Could not send your answer" message={errorMessage(actionError)} /> : null}
           <PendingActionForm
             action={data.rendered}
             submitting={submitting}
@@ -179,7 +164,7 @@ export function CheckoutView({ checkoutId, poll = true, onDone, className, frame
       ) : null}
 
       {!terminal && data.embedUrl ? (
-        <div className="goat-window">
+        <div className="ac-window">
           <iframe
             title="Checkout browser"
             src={data.embedUrl}
@@ -197,7 +182,7 @@ export function CheckoutView({ checkoutId, poll = true, onDone, className, frame
       {!terminal ? (
         <Button
           type="button"
-          variant="outline"
+          variant="secondary"
           size="sm"
           disabled={submitting}
           className="self-start"
@@ -213,6 +198,19 @@ export function CheckoutView({ checkoutId, poll = true, onDone, className, frame
           Cancel checkout
         </Button>
       ) : null}
+    </div>
+  );
+}
+
+/** A fault, said plainly: the icon, a title, one line. */
+function Problem({ title, message, className }: { title: string; message: string; className?: string }) {
+  return (
+    <div role="alert" className={cn("flex items-start gap-3", className)}>
+      <AlertCircle aria-hidden className="mt-0.5 size-5 shrink-0 text-destructive" />
+      <div className="min-w-0">
+        <p className="text-sm font-medium text-foreground">{title}</p>
+        <p className="text-sm text-muted-foreground">{message}</p>
+      </div>
     </div>
   );
 }

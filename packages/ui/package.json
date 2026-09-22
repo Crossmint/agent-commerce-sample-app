@@ -1,7 +1,7 @@
 {
-  "name": "@goat-wallet/ui",
+  "name": "@agent-commerce/ui",
   "version": "0.1.0",
-  "description": "React components for GOAT: save card, approve agent card, verify, list, checkout. shadcn/ui on Tailwind.",
+  "description": "React components for Agent Commerce: save card, approve agent card, verify, list, checkout. shadcn/ui on Tailwind.",
   "license": "MIT",
   "type": "module",
   "main": "./dist/index.js",
@@ -27,7 +27,7 @@
   },
   "dependencies": {
     "@crossmint/client-sdk-react-ui": "^4.6.0",
-    "@goat-wallet/core": "workspace:*",
+    "@agent-commerce/core": "workspace:*",
     "@radix-ui/react-slot": "^1.2.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
@@ -40,7 +40,7 @@
     "react-dom": "^19.0.0"
   },
   "devDependencies": {
-    "@goat-wallet/tsconfig": "workspace:*",
+    "@agent-commerce/tsconfig": "workspace:*",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "react": "^19.2.0",

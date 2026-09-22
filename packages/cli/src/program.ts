@@ -11,7 +11,7 @@ import { CliExit, EXIT, toJson } from "./output.js";
 export const VERSION = "2.0.0-alpha.0";
 
 export function createProgram(ctx: CliContext): Command {
-  const program = new Command("goat")
+  const program = new Command("agent-commerce")
     .description(
       "Agentic commerce wallet CLI. Request a bounded agent card, reveal it, or run a checkout.",
     )
@@ -28,12 +28,12 @@ Exit codes:
   0  ok
   1  error
   2  needs the user: an approval URL or a checkout question
-  3  not logged in; run \`goat login --api <url>\`
+  3  not logged in; run \`agent-commerce login --api <url>\`
 
 Environment:
-  GOAT_API_URL     API base URL (overrides the saved config)
-  GOAT_TOKEN       bearer token for CI and agents (no refresh)
-  GOAT_CONFIG_DIR  where config.json lives (default ~/.config/goat)`,
+  AGENT_COMMERCE_API_URL     API base URL (overrides the saved config)
+  AGENT_COMMERCE_TOKEN       bearer token for CI and agents (no refresh)
+  AGENT_COMMERCE_CONFIG_DIR  where config.json lives (default ~/.config/agent-commerce)`,
     );
 
   registerAuthCommands(program, ctx);
@@ -69,7 +69,7 @@ function reportError(ctx: CliContext, e: unknown, json: boolean): number {
     return e.exitCode;
   }
   if (e instanceof ApiError) {
-    const suffix = e.code === "unauthorized" ? " Run `goat login` again." : "";
+    const suffix = e.code === "unauthorized" ? " Run `agent-commerce login` again." : "";
     emit(ctx, json, e.code, `${e.message}${suffix}`, e.details);
     return e.exitCode;
   }

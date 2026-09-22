@@ -55,7 +55,7 @@ export class Router<Ctx> {
   }
 }
 
-/** "/api/goat/v1/me" → "/v1/me". Null when "/v1/" is absent. */
+/** "/api/agent-commerce/v1/me" → "/v1/me". Null when "/v1/" is absent. */
 export function routePath(pathname: string): string | null {
   const idx = pathname.indexOf("/v1/");
   if (idx === -1) return pathname.endsWith("/v1") ? "/v1" : null;

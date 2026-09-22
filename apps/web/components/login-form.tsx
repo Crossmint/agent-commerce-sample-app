@@ -1,14 +1,14 @@
 "use client";
 
 import { useEffect, useRef, useState, useSyncExternalStore, type ClipboardEvent, type FormEvent, type KeyboardEvent, type ReactNode } from "react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useStytch, useStytchSession } from "@stytch/nextjs";
-import { Alert, AlertDescription, AlertTitle, Button, Input, Label, Spinner } from "@goat-wallet/ui";
+import { Alert, AlertDescription, AlertTitle, Button, Input, Spinner } from "@agent-commerce/ui";
 import { cn } from "@/lib/cn";
-import { GoogleMark } from "@/components/landing/social-marks";
 import { authenticateWithSessionFallback, stytchMessage } from "@/lib/stytch-client";
 
-export const NEXT_COOKIE = "goat_next";
+export const NEXT_COOKIE = "ac_next";
 
 /** How long a passcode stays valid. Stytch allows 1 to 10 minutes. */
 const CODE_MINUTES = 10;
@@ -30,21 +30,31 @@ function useOrigin(): string | null {
 
 type Status = "idle" | "sending" | "verifying" | "leaving";
 
+/** The phone-screen field: tall, 12px corners, on the grey fill, no border. */
+const FIELD = "h-12 rounded-xl border-0 bg-muted px-4 text-base shadow-none focus-visible:ring-[3px] focus-visible:ring-ring/40";
+
+export interface LoginFormProps {
+  /** Where to go once signed in. Same-origin path. */
+  next: string;
+  /** One line under the heading. */
+  sub?: string;
+  /** Called instead of navigating, for a login that lives inside another screen. */
+  onSignedIn?: () => void;
+  className?: string;
+}
+
 /**
- * Sign in with an emailed passcode or with Google, on GOAT's own components:
- * the Stytch headless methods do the work, so the form is ours to style.
+ * Sign in with Google or an emailed passcode, laid out like the onramp
+ * sample app's login screen: the step's name in 28px, one line under it,
+ * then tall pill buttons.
  *
- * The passcode never leaves this page. `otps.email.loginOrCreate` returns a
+ * The Stytch headless methods do the work, so the form is ours to style. The
+ * passcode never leaves this screen: `otps.email.loginOrCreate` returns a
  * `method_id`, the user types the code beside it, and `otps.authenticate`
- * opens the session here — no round trip through /authenticate, which only
- * Google's callback still needs. The page the user wanted travels in a
- * short-lived cookie for that trip, since redirect URLs must match the
- * dashboard exactly.
- *
- * The heading belongs to the form rather than the page because it names the
- * step, and the step changes once a code is on its way.
+ * opens the session here. Google's callback goes through /authenticate; the
+ * page the user wanted travels in a short-lived cookie for that trip.
  */
-export function LoginForm({ next }: { next: string }) {
+export function LoginForm({ next, sub = "Log in to save cards and approve what your agents spend.", onSignedIn, className }: LoginFormProps) {
   const stytch = useStytch();
   const router = useRouter();
   const { session, isInitialized } = useStytchSession();
@@ -58,14 +68,25 @@ export function LoginForm({ next }: { next: string }) {
   const [cooldown, setCooldown] = useState(0);
   const [status, setStatus] = useState<Status>("idle");
   const [error, setError] = useState<string | null>(null);
+  const [emailOpen, setEmailOpen] = useState(false);
 
   useEffect(() => {
     document.cookie = `${NEXT_COOKIE}=${encodeURIComponent(next)}; Path=/; Max-Age=900; SameSite=Lax`;
   }, [next]);
 
+  function finish() {
+    if (onSignedIn) {
+      onSignedIn();
+      router.refresh();
+      return;
+    }
+    router.replace(next);
+    router.refresh();
+  }
+
   useEffect(() => {
-    if (isInitialized && session) router.replace(next);
-  }, [isInitialized, session, next, router]);
+    if (isInitialized && session && !onSignedIn) router.replace(next);
+  }, [isInitialized, session, next, router, onSignedIn]);
 
   // One timeout per second, so the resend line counts down on its own.
   useEffect(() => {
@@ -74,9 +95,9 @@ export function LoginForm({ next }: { next: string }) {
     return () => clearTimeout(id);
   }, [cooldown]);
 
-  if (!origin || !isInitialized || session) {
+  if (!origin || !isInitialized || (session && !onSignedIn)) {
     return (
-      <Step title="Sign in" sub="Your cards. Your agents. You approve every budget.">
+      <Step title="Log in" sub={sub} className={className}>
         <p className="flex items-center gap-2 text-sm text-muted-foreground">
           <Spinner /> Loading…
         </p>
@@ -108,8 +129,7 @@ export function LoginForm({ next }: { next: string }) {
     setError(null);
     try {
       await authenticateWithSessionFallback((minutes) => stytch.otps.authenticate(entered, methodId, { session_duration_minutes: minutes }));
-      router.replace(next);
-      router.refresh();
+      finish();
     } catch (e: unknown) {
       setError(stytchMessage(e, "That code did not work. Ask for a new one."));
       setCode("");
@@ -141,7 +161,7 @@ export function LoginForm({ next }: { next: string }) {
   if (methodId) {
     const complete = code.length === CODE_LENGTH;
     return (
-      <Step title={`Enter ${CODE_LENGTH} digit code`} sub={`We sent a ${CODE_LENGTH}-digit code to ${sentTo}.`}>
+      <Step title="Enter the code" sub={`We sent a ${CODE_LENGTH}-digit code to ${sentTo}.`} className={className}>
         <div className="flex flex-col gap-5">
           {alert}
 
@@ -153,7 +173,7 @@ export function LoginForm({ next }: { next: string }) {
             }}
           >
             <CodeBoxes key={attempt} onChange={setCode} onComplete={(entered) => void verify(entered)} disabled={status === "verifying"} />
-            <Button type="submit" disabled={busy || !complete}>
+            <Button type="submit" size="xl" className="w-full" disabled={busy || !complete}>
               {status === "verifying" ? (
                 <>
                   <Spinner /> Signing you in…
@@ -164,10 +184,7 @@ export function LoginForm({ next }: { next: string }) {
             </Button>
           </form>
 
-          <div className="flex flex-col gap-1 text-center text-sm text-muted-foreground">
-            <p>Can&rsquo;t find the email? Check your spam folder.</p>
-            <p>Some emails take a few minutes to arrive.</p>
-          </div>
+          <p className="text-center text-sm text-muted-foreground">Can&rsquo;t find the email? Check your spam folder.</p>
 
           <p className="flex flex-col items-center gap-1 text-sm text-muted-foreground">
             {cooldown > 0 ? (
@@ -195,65 +212,65 @@ export function LoginForm({ next }: { next: string }) {
   }
 
   return (
-    <Step title="Sign in" sub="Your cards. Your agents. You approve every budget.">
-      <div className="flex flex-col gap-5">
+    <Step title="Log in" sub={sub} className={className}>
+      <div className="flex flex-col gap-3">
         {alert}
 
-        <form
-          className="flex flex-col gap-3"
-          onSubmit={(event: FormEvent<HTMLFormElement>) => {
-            event.preventDefault();
-            const address = email.trim();
-            if (address && !busy) void sendCode(address);
-          }}
-        >
-          <Label htmlFor="email" className="text-foreground">
-            Email
-          </Label>
-          <Input
-            id="email"
-            name="email"
-            type="email"
-            required
-            autoComplete="email"
-            placeholder="you@company.com"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            disabled={busy}
-          />
-          <Button type="submit" disabled={busy || !email.trim()}>
-            {status === "sending" ? (
-              <>
-                <Spinner /> Sending…
-              </>
-            ) : (
-              "Email me a code"
-            )}
-          </Button>
-        </form>
-
-        <div className="flex items-center gap-3" aria-hidden>
-          <span className="h-px flex-1 bg-hairline" />
-          <span className="text-xs font-medium tracking-[0.18em] text-muted-foreground uppercase">or</span>
-          <span className="h-px flex-1 bg-hairline" />
-        </div>
-
-        <Button variant="outline" onClick={continueWithGoogle} disabled={busy}>
-          {status === "leaving" ? <Spinner /> : <GoogleMark className="size-4" />}
+        <Button variant="secondary" size="xl" className="w-full" onClick={continueWithGoogle} disabled={busy}>
+          {status === "leaving" ? <Spinner /> : <Image src="/icons/google.svg" alt="" width={18} height={18} />}
           Continue with Google
         </Button>
+
+        {emailOpen ? (
+          <form
+            className="enter-up flex flex-col gap-3 pt-2"
+            onSubmit={(event: FormEvent<HTMLFormElement>) => {
+              event.preventDefault();
+              const address = email.trim();
+              if (address && !busy) void sendCode(address);
+            }}
+          >
+            <Input
+              id="email"
+              name="email"
+              type="email"
+              required
+              autoFocus
+              autoComplete="email"
+              aria-label="Email"
+              placeholder="you@company.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              disabled={busy}
+              className={FIELD}
+            />
+            <Button type="submit" size="xl" className="w-full" disabled={busy || !email.trim()}>
+              {status === "sending" ? (
+                <>
+                  <Spinner /> Sending…
+                </>
+              ) : (
+                "Email me a code"
+              )}
+            </Button>
+          </form>
+        ) : (
+          <Button variant="secondary" size="xl" className="w-full" onClick={() => setEmailOpen(true)} disabled={busy}>
+            Continue with email
+          </Button>
+        )}
       </div>
     </Step>
   );
 }
 
 /** The step's name and one line under it, then the step itself. */
-function Step({ title, sub, children }: { title: string; sub: string; children: ReactNode }) {
+function Step({ title, sub, className, children }: { title: string; sub: string; className?: string; children: ReactNode }) {
   return (
-    <div className="flex flex-col gap-7">
-      <div className="flex flex-col items-start gap-2">
-        <h1 className="font-display text-3xl font-semibold tracking-[-0.03em] text-foreground sm:text-4xl">{title}</h1>
-        <p className="text-muted-foreground">{sub}</p>
+    <div className={cn("flex flex-col gap-6", className)}>
+      <div className="flex flex-col gap-2">
+        <h1 className="text-[28px] leading-[1.2] font-medium tracking-[-0.02em] text-foreground">{title}</h1>
+        <p className="text-base text-muted-foreground">{sub}</p>
       </div>
       {children}
     </div>
@@ -262,13 +279,8 @@ function Step({ title, sub, children }: { title: string; sub: string; children: 
 
 /**
  * One box per digit. Typing moves forward, backspace moves back, and a pasted
- * code fills every box from the first — a paste has to be caught explicitly,
- * because `maxLength` would otherwise trim it to a single character.
- *
- * `live` mirrors the digits synchronously. Typing fast enough sends several
- * keys before React re-renders, and each handler would otherwise read the
- * same stale state and overwrite the digit before it. The parent clears the
- * boxes by remounting them with a new `key`.
+ * code fills every box from the first. `live` mirrors the digits
+ * synchronously so fast typing never reads stale state.
  */
 function CodeBoxes({ onChange, onComplete, disabled }: { onChange: (code: string) => void; onComplete: (code: string) => void; disabled?: boolean }) {
   const [digits, setDigits] = useState<string[]>(EMPTY_CODE);
@@ -283,7 +295,6 @@ function CodeBoxes({ onChange, onComplete, disabled }: { onChange: (code: string
     return code.length === CODE_LENGTH;
   }
 
-  /** Write `raw`'s digits from `index` on, then focus and submit as it fits. */
   function write(index: number, raw: string) {
     const chars = raw.replace(/\D/g, "").split("");
     if (chars.length === 0) return;
@@ -332,7 +343,7 @@ function CodeBoxes({ onChange, onComplete, disabled }: { onChange: (code: string
   }
 
   return (
-    <div role="group" aria-label={`${CODE_LENGTH} digit code`} className="flex gap-2 sm:gap-3">
+    <div role="group" aria-label={`${CODE_LENGTH} digit code`} className="flex gap-2">
       {digits.map((digit, index) => (
         <Input
           key={index}
@@ -341,8 +352,6 @@ function CodeBoxes({ onChange, onComplete, disabled }: { onChange: (code: string
           }}
           type="text"
           inputMode="numeric"
-          // Only the first box claims the autofill, so the browser hands the
-          // whole code to one place; `write` spreads it across the rest.
           autoComplete={index === 0 ? "one-time-code" : "off"}
           autoFocus={index === 0}
           aria-label={`Digit ${index + 1}`}
@@ -353,7 +362,7 @@ function CodeBoxes({ onChange, onComplete, disabled }: { onChange: (code: string
           onKeyDown={(e) => onKeyDown(index, e)}
           onPaste={onPaste}
           onFocus={(e) => e.currentTarget.select()}
-          className={cn("h-12 min-w-0 flex-1 px-0 text-center font-mono text-xl sm:h-14 sm:text-2xl")}
+          className={cn(FIELD, "min-w-0 flex-1 px-0 text-center font-display text-xl tabular-nums")}
         />
       ))}
     </div>
@@ -363,12 +372,7 @@ function CodeBoxes({ onChange, onComplete, disabled }: { onChange: (code: string
 /** An understated text action, for the ways out of the code step. */
 function SubtleButton({ onClick, disabled, children }: { onClick: () => void; disabled?: boolean; children: ReactNode }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      className="underline-offset-4 transition-colors hover:text-foreground hover:underline disabled:opacity-50 disabled:hover:no-underline"
-    >
+    <button type="button" onClick={onClick} disabled={disabled} className="font-medium text-primary underline-offset-4 hover:underline disabled:opacity-50 disabled:hover:no-underline">
       {children}
     </button>
   );

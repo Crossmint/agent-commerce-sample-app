@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { cn } from "@goat-wallet/ui";
+import { cn } from "@agent-commerce/ui";
 
 /**
  * Renders assistant text without a markdown library. Handles what the model

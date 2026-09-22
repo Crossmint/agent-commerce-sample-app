@@ -29,11 +29,11 @@ export class CrossmintApiError extends Error {
   }
 }
 
-export class GoatError extends Error {
+export class AgentCommerceError extends Error {
   readonly code: string;
   constructor(code: string, message: string) {
     super(message);
-    this.name = "GoatError";
+    this.name = "AgentCommerceError";
     this.code = code;
   }
 }

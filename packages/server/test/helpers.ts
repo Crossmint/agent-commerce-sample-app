@@ -1,7 +1,7 @@
-import type { UserAuth } from "@goat-wallet/auth";
-import { createGoatHandlers, memoryRequestStore, type GoatServerConfig } from "../src/index.js";
+import type { UserAuth } from "@agent-commerce/auth";
+import { createAgentCommerceHandlers, memoryRequestStore, type AgentCommerceServerConfig } from "../src/index.js";
 
-export const BASE = "https://wallet.test/api/goat";
+export const BASE = "https://wallet.test/api/agent-commerce";
 
 export const fakeUserAuth: UserAuth = {
   async verify(jwt) {
@@ -67,10 +67,10 @@ export function fakeCrossmint(routes: FakeRoute[]) {
   return { fetch: fetchImpl, calls };
 }
 
-export function makeServer(routes: FakeRoute[] = [], overrides: Partial<GoatServerConfig> = {}) {
+export function makeServer(routes: FakeRoute[] = [], overrides: Partial<AgentCommerceServerConfig> = {}) {
   const crossmint = fakeCrossmint(routes);
   const store = memoryRequestStore();
-  const handlers = createGoatHandlers({
+  const handlers = createAgentCommerceHandlers({
     crossmint: {
       clientApiKey: "ck_test",
       serverApiKey: "sk_test",
@@ -93,7 +93,7 @@ export function makeServer(routes: FakeRoute[] = [], overrides: Partial<GoatServ
 }
 
 export function call(
-  handlers: ReturnType<typeof createGoatHandlers>,
+  handlers: ReturnType<typeof createAgentCommerceHandlers>,
   method: string,
   path: string,
   opts: { body?: unknown; auth?: string | null } = {},

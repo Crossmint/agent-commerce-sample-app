@@ -5,9 +5,9 @@ import {
   isTerminalCheckout,
   pollUntil,
   toDecimalString,
-} from "@goat-wallet/core";
+} from "@agent-commerce/core";
 import pc from "picocolors";
-import type { GoatApi } from "../api.js";
+import type { AgentCommerceApi } from "../api.js";
 import type { CliContext } from "../context.js";
 import { CliExit, EXIT, fail, statusColor, toJson } from "../output.js";
 import type { CheckoutMessageBody, CheckoutView, CreateCheckoutBody } from "../types.js";
@@ -153,7 +153,7 @@ export function registerCheckoutCommands(program: Command, ctx: CliContext): voi
     if (opts.json) ctx.out(toJson(view));
     else {
       for (const line of checkoutSummary(view)) ctx.out(line);
-      ctx.out(pc.dim("Cancel requested. The checkout reaches cancelled on a later `goat checkout get`."));
+      ctx.out(pc.dim("Cancel requested. The checkout reaches cancelled on a later `agent-commerce checkout get`."));
     }
   });
 
@@ -182,7 +182,7 @@ export function registerCheckoutCommands(program: Command, ctx: CliContext): voi
 /** Poll until terminal or a question appears. Payment questions never reach the CLI. */
 async function waitForCheckout(
   ctx: CliContext,
-  api: GoatApi,
+  api: AgentCommerceApi,
   initial: CheckoutView,
   timeoutS: number | undefined,
 ): Promise<CheckoutView> {
@@ -202,7 +202,7 @@ async function waitForCheckout(
     if ((e as Error).message === "Polling timed out") {
       throw new CliExit(
         EXIT.ERROR,
-        `Timed out while ${last.status}. Check later with \`goat checkout get ${last.id} --wait\`.`,
+        `Timed out while ${last.status}. Check later with \`agent-commerce checkout get ${last.id} --wait\`.`,
         "timeout",
       );
     }

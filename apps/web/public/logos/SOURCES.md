@@ -1,7 +1,7 @@
 # Logo sources
 
 Files in this folder are served from `/logos/...`. Nothing here is hotlinked.
-Agent marks for the "Try a live implementation" tiles fill with `currentColor` on transparent and render as CSS masks (`components/landing/mask-logo.tsx`), so they take the page's navy text color on the white tiles. The three example agents in the brand switcher (Impulse, Lumen, BotBot) are not real companies: their marks are original GOAT art, drawn here, and keep their own colors.
+Agent marks for the "Try a live implementation" tiles fill with `currentColor` on transparent and render as CSS masks (`components/landing/mask-logo.tsx`), so they take the page's navy text color on the white tiles. The three example agents in the brand switcher (Impulse, Lumen, BotBot) are not real companies: their marks are original Agent Commerce art, drawn here, and keep their own colors.
 
 | File | Brand | Source | Notes |
 | --- | --- | --- | --- |
@@ -11,13 +11,14 @@ Agent marks for the "Try a live implementation" tiles fill with `currentColor` o
 | `openai.svg` | ChatGPT (OpenAI) | `https://raw.githubusercontent.com/openai/openai-realtime-console/main/client/assets/openai-logomark.svg` | Official OpenAI logomark from an OpenAI GitHub repo. `openai.com/brand` returns 403 to non-browser clients and Simple Icons no longer ships `openai`. Fill set to `currentColor`. |
 | `grok.svg` | Grok (xAI) | `https://grok.com/images/favicon.svg` | Official Grok favicon. Only the two glyph paths were kept; the rounded tile, blur filter and outline stroke were removed and the viewBox was fit to the glyph. `x.ai` returns 403 to non-browser clients and Simple Icons has no `grok` or `xai` slug. |
 | `openclaw.svg` | OpenClaw | `https://raw.githubusercontent.com/openclaw/openclaw/main/apps/linux/src-tauri/icons/tray-template.svg` | Official monochrome tray icon from the OpenClaw repo. Fill changed from black to `currentColor`, comments stripped. |
-| `impulse.svg` | Impulse (example agent) | Drawn here. **Original GOAT mark.** | A dark (#141414) rounded tile with a white bolt. Full app icon, so avatars show it edge to edge. Not a real company. |
-| `lumen.svg` | Lumen (example agent) | Drawn here. **Original GOAT mark.** | A blue-to-violet gradient circle (#38bdf8 → #4f7cf5 → #8b5cf6) with a white four-point spark. Used for the avatar, the selector pill, and the approval header. Not a real company. |
-| `botbot.svg` | BotBot (example agent) | Drawn here. **Original GOAT mark.** | A black (#0a0a0a) rounded square with two round white eyes and a small antenna. Full app icon. Used for the avatar, the selector pill, and the approval header wordmark. Not a real company. |
+| `impulse.svg` | Impulse (example agent) | Drawn here. **Original Agent Commerce mark.** | A dark (#141414) rounded tile with a white bolt. Full app icon, so avatars show it edge to edge. Not a real company. |
+| `lumen.svg` | Lumen (example agent) | Drawn here. **Original Agent Commerce mark.** | A blue-to-violet gradient circle (#38bdf8 → #4f7cf5 → #8b5cf6) with a white four-point spark. Used for the avatar, the selector pill, and the approval header. Not a real company. |
+| `botbot.svg` | BotBot (example agent) | Drawn here. **Original Agent Commerce mark.** | A black (#0a0a0a) rounded square with two round white eyes and a small antenna. Full app icon. Used for the avatar, the selector pill, and the approval header wordmark. Not a real company. |
+| `acme.svg` | Acme Agent (the template's own stand-in) | Drawn here. **Original Agent Commerce mark.** | An indigo (#2f3a8f) rounded tile with a white geometric A. Full app icon. It stands in for whoever builds on the template, so the hero flow reads as someone else's product rather than as Crossmint's. Not a real company. |
 | `starbucks.svg` | Starbucks | `https://raw.githubusercontent.com/simple-icons/simple-icons/develop/icons/starbucks.svg` (the file behind `https://cdn.simpleicons.org/starbucks/ffffff`) | Simple Icons siren glyph, fill set to white. Only in the receipt card's merchant tile, white on Starbucks green #00704A. |
 | `hermes.svg` | Hermes (Nous Research) | Drawn here. **Placeholder.** | No official vector mark was obtainable: `nousresearch.com` has no logo image, its `safari-pinned-tab.svg` is a traced mascot illustration, the `hermes-agent` favicon is a text glyph, and Simple Icons has no `nousresearch` slug. Replace with an official mark when available. |
 
-The GOAT example agent tile uses the Crossmint Agents mark, `/brand/agents/crossmint-agents-mark.svg` (gradient fill, shown as is). The GOAT pixel wordmark as outlines is `/brand/goat-wordmark.svg`; see `app/fonts/SOURCES.md`.
+The three example agents in the brand switcher show what a customer's own brand looks like; `acme.svg` does the same job for the hero and the core-piece mocks, which have no switcher to make the point for them. The site's own identity is Crossmint's: the logotype at `/crossmint.svg` and the mark at `/crossmint-mark.svg`, both from the Crossmint brand kit.
 
 ## Powered-by strip
 All six fill with `currentColor` and render as CSS masks (`components/landing/mask-logo.tsx`), so the page colors them with its `--muted-foreground` token.

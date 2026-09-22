@@ -1,8 +1,8 @@
 "use client";
 
 import * as React from "react";
-import type { AgentCard } from "@goat-wallet/core";
-import { useGoat } from "../provider.js";
+import type { AgentCard } from "@agent-commerce/core";
+import { useAgentCommerce } from "../provider.js";
 import { useResource, type Resource } from "./use-resource.js";
 
 export interface UseAgentCardsResult extends Resource<AgentCard[]> {
@@ -10,7 +10,7 @@ export interface UseAgentCardsResult extends Resource<AgentCard[]> {
 }
 
 export function useAgentCards({ enabled = true }: { enabled?: boolean } = {}): UseAgentCardsResult {
-  const { api } = useGoat();
+  const { api } = useAgentCommerce();
   const fetcher = React.useCallback(() => api.listAgentCards(), [api]);
   const resource = useResource(fetcher, [], { enabled });
 

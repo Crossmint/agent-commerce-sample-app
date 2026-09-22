@@ -7,6 +7,6 @@ describe("detectRequester", () => {
     expect(detectRequester({ CODEX: "1" }, "h")).toBe("Codex");
   });
   it("falls back to the hostname", () => {
-    expect(detectRequester({}, "laptop")).toBe("goat CLI on laptop");
+    expect(detectRequester({}, "laptop")).toBe("agent-commerce CLI on laptop");
   });
 });

@@ -1,4 +1,4 @@
 {
-  "extends": "@goat-wallet/tsconfig/library.json",
+  "extends": "@agent-commerce/tsconfig/library.json",
   "include": ["src", "test"]
 }

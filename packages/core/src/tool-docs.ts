@@ -1,5 +1,5 @@
 /*
- * One source for what each GOAT tool does. The MCP server and the chat agent
+ * One source for what each Agent Commerce tool does. The MCP server and the chat agent
  * both build their tool descriptions from here: the shared facts live in
  * `summary` and `params`, and each surface appends one short addendum about
  * how the result reaches the user (a link to approve, an inline component,
@@ -8,7 +8,7 @@
  * When you change a tool, also touch:
  * - packages/mcp/src/tools.ts and apps/web/lib/chat/tools.ts (the addenda and the zod shapes)
  * - apps/web/lib/chat/prompt.ts (the flow the chat model follows)
- * - packages/cli/src/commands/* help text, and skills/goat/SKILL.md (then `pnpm plugin:sync`)
+ * - packages/cli/src/commands/* help text, and skills/agent-commerce/SKILL.md (then `pnpm plugin:sync`)
  * - docs/ARCHITECTURE.md section 3.5
  */
 
@@ -152,26 +152,26 @@ export const TOOL_DOCS = {
   },
 } as const satisfies Record<string, ToolDoc>;
 
-export type GoatToolName = keyof typeof TOOL_DOCS;
+export type AgentCommerceToolName = keyof typeof TOOL_DOCS;
 
 /** The tool names offered on one surface, as a type. */
 export type ToolNameFor<S extends ToolSurface> = {
-  [K in GoatToolName]: S extends (typeof TOOL_DOCS)[K]["surfaces"][number] ? K : never;
-}[GoatToolName];
+  [K in AgentCommerceToolName]: S extends (typeof TOOL_DOCS)[K]["surfaces"][number] ? K : never;
+}[AgentCommerceToolName];
 
-export const GOAT_TOOL_NAMES = Object.keys(TOOL_DOCS) as GoatToolName[];
+export const AGENT_COMMERCE_TOOL_NAMES = Object.keys(TOOL_DOCS) as AgentCommerceToolName[];
 
 export function toolNamesFor<S extends ToolSurface>(surface: S): ToolNameFor<S>[] {
-  return GOAT_TOOL_NAMES.filter((name) => (TOOL_DOCS[name].surfaces as readonly ToolSurface[]).includes(surface)) as ToolNameFor<S>[];
+  return AGENT_COMMERCE_TOOL_NAMES.filter((name) => (TOOL_DOCS[name].surfaces as readonly ToolSurface[]).includes(surface)) as ToolNameFor<S>[];
 }
 
 /** The shared summary, plus one surface-specific sentence when given. */
-export function describeTool(name: GoatToolName, addendum?: string): string {
+export function describeTool(name: AgentCommerceToolName, addendum?: string): string {
   const summary = TOOL_DOCS[name].summary;
   return addendum ? `${summary} ${addendum}` : summary;
 }
 
 /** A parameter's shared description. Typed to the tool's own parameter names. */
-export function paramDoc<N extends GoatToolName>(name: N, param: keyof (typeof TOOL_DOCS)[N]["params"] & string): string {
+export function paramDoc<N extends AgentCommerceToolName>(name: N, param: keyof (typeof TOOL_DOCS)[N]["params"] & string): string {
   return (TOOL_DOCS[name].params as Record<string, string>)[param] ?? param;
 }

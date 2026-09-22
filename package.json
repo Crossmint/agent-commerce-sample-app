@@ -1,5 +1,5 @@
 {
-  "name": "goat-monorepo",
+  "name": "agent-commerce-sample-app",
   "private": true,
   "packageManager": "pnpm@10.33.0",
   "engines": {
@@ -16,7 +16,7 @@
     "changeset": "changeset",
     "release": "turbo run build && changeset publish",
     "plugin:validate": "node scripts/validate-cursor-plugin.mjs && claude plugin validate plugins/claude && claude plugin validate .claude-plugin/marketplace.json",
-    "plugin:sync": "cp skills/goat/SKILL.md plugins/cursor/skills/goat/SKILL.md && cp skills/goat/SKILL.md plugins/claude/skills/goat/SKILL.md && cp skills/goat/SKILL.md apps/web/public/skill.md"
+    "plugin:sync": "cp skills/agent-commerce/SKILL.md plugins/cursor/skills/agent-commerce/SKILL.md && cp skills/agent-commerce/SKILL.md plugins/claude/skills/agent-commerce/SKILL.md && cp skills/agent-commerce/SKILL.md apps/web/public/skill.md"
   },
   "devDependencies": {
     "@changesets/cli": "^2.29.0",

@@ -9,7 +9,7 @@ function one(v: string | string[] | undefined): string | undefined {
 }
 
 /**
- * Landing page for `goat login --code`. Stytch redirects here with `code` and
+ * Landing page for `agent-commerce login --code`. Stytch redirects here with `code` and
  * `state`. The user pastes them back into the terminal. No login needed here.
  */
 export default async function CliCallbackPage({

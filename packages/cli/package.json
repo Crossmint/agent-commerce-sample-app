@@ -1,11 +1,11 @@
 {
-  "name": "goat",
+  "name": "@agent-commerce/cli",
   "version": "2.0.0-alpha.0",
-  "description": "GOAT CLI: let an agent request a bounded agent card, reveal it, or run a checkout, with the user's approval.",
+  "description": "Agent Commerce CLI: let an agent request a bounded agent card, reveal it, or run a checkout, with the user's approval.",
   "license": "MIT",
   "type": "module",
   "bin": {
-    "goat": "./dist/bin.js"
+    "agent-commerce": "./dist/bin.js"
   },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -21,14 +21,14 @@
     "clean": "rm -rf dist .turbo"
   },
   "dependencies": {
-    "@goat-wallet/auth": "workspace:*",
-    "@goat-wallet/core": "workspace:*",
+    "@agent-commerce/auth": "workspace:*",
+    "@agent-commerce/core": "workspace:*",
     "commander": "^15.0.0",
     "open": "^11.0.0",
     "picocolors": "^1.1.1"
   },
   "devDependencies": {
-    "@goat-wallet/tsconfig": "workspace:*",
+    "@agent-commerce/tsconfig": "workspace:*",
     "@types/node": "^22",
     "tsup": "^8.5.0",
     "typescript": "^5.9.0",

@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import type { AgentCardRequest } from "../api/types.js";
-import { useGoat } from "../provider.js";
+import { useAgentCommerce } from "../provider.js";
 import { useResource, type Resource } from "./use-resource.js";
 
 export interface UseAgentCardRequestOptions {
@@ -25,7 +25,7 @@ export function useAgentCardRequest(
   requestId: string | undefined,
   { pollMs = 2000 }: UseAgentCardRequestOptions = {},
 ): Resource<AgentCardRequest> {
-  const { api } = useGoat();
+  const { api } = useAgentCommerce();
   const fetcher = React.useCallback(() => api.getAgentCardRequest(requestId as string), [api, requestId]);
   return useResource(fetcher, [requestId], {
     enabled: Boolean(requestId),

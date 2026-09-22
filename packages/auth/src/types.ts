@@ -26,7 +26,7 @@ export interface ExchangedSession {
 /**
  * The whole bring-your-own-auth contract.
  *
- * Every GOAT caller (browser, CLI, MCP host) sends `Authorization: Bearer <jwt>`.
+ * Every Agent Commerce caller (browser, CLI, MCP host) sends `Authorization: Bearer <jwt>`.
  * `verify` says who that is. The server then forwards the same JWT to Crossmint,
  * which verifies it against the same provider's JWKS.
  */

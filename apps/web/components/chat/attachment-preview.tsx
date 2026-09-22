@@ -1,7 +1,7 @@
 "use client";
 
 import { FileText, X } from "lucide-react";
-import { Spinner, cn } from "@goat-wallet/ui";
+import { Spinner, cn } from "@agent-commerce/ui";
 import type { Attachment } from "@/lib/chat/types";
 
 export function AttachmentPreview({
@@ -18,7 +18,7 @@ export function AttachmentPreview({
   const isImage = attachment.contentType.startsWith("image/");
   return (
     <div
-      className={cn("group relative size-20 shrink-0 overflow-hidden rounded-md border border-border bg-muted", className)}
+      className={cn("group relative size-20 shrink-0 overflow-hidden rounded-xl bg-muted ring-1 ring-foreground/10", className)}
       title={attachment.name}
     >
       {isImage && attachment.url ? (

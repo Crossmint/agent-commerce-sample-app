@@ -31,8 +31,8 @@ describe("GET /v1/config", () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body).toMatchObject({
-      name: "GOAT",
-      apiBaseUrl: "https://wallet.test/api/goat",
+      name: "Agent Commerce",
+      apiBaseUrl: "https://wallet.test/api/agent-commerce",
       webBaseUrl: "https://wallet.test",
       crossmintEnvironment: "staging",
       auth: {
@@ -55,7 +55,7 @@ describe("router", () => {
     const { handlers } = makeServer();
     const a = await call(handlers, "GET", "/v1/nope");
     expect(a.status).toBe(404);
-    const b = await handlers.GET(new Request("https://wallet.test/api/goat/health"));
+    const b = await handlers.GET(new Request("https://wallet.test/api/agent-commerce/health"));
     expect(b.status).toBe(404);
   });
 
@@ -720,5 +720,52 @@ describe("checkouts", () => {
     const body = await res.json();
     expect(body.status).toBe("blocked");
     expect(body.failure).toEqual({ reason: "policy.max_cost_exceeded", message: "The total was 31.00, above the 30.00 cap." });
+  });
+});
+
+describe("GET /v1/reveals", () => {
+  it("records a line when a credential is minted, and never the card details", async () => {
+    vi.spyOn(console, "info").mockImplementation(() => {});
+    const { handlers } = makeServer([
+      { method: "GET", path: "/unstable/order-intents/oi_1", reply: { body: activeOrderIntent() } },
+      {
+        method: "POST",
+        path: "/unstable/order-intents/oi_1/credentials",
+        reply: { status: 201, body: cardCredential },
+      },
+    ]);
+    const merchant = { name: "Shop", url: "https://shop.example", countryCode: "US" };
+    await call(handlers, "POST", "/v1/agent-cards/oi_1/credentials", { body: { merchant } });
+
+    const res = await call(handlers, "GET", "/v1/reveals");
+    expect(res.status).toBe(200);
+    const { reveals } = await res.json();
+    expect(reveals).toHaveLength(1);
+    expect(reveals[0]).toMatchObject({
+      userId: "user-test-1",
+      agentCardId: "oi_1",
+      paymentMethodId: "pm_1",
+      description: "Flight to SF",
+      amount: { value: "50.00", currency: "USD" },
+      merchant,
+      rail: "agentic-token",
+      provider: "vic",
+      enforced: true,
+    });
+    // The row is an audit line, not a copy of the credential. "123" is too
+    // short to assert on — a generated id can contain it — so this checks the
+    // shape instead: nothing from the credential is carried over.
+    expect(JSON.stringify(reveals)).not.toContain("4111111111111111");
+    expect(reveals[0]).not.toHaveProperty("card");
+    expect(reveals[0]).not.toHaveProperty("token");
+  });
+
+  it("is empty for a user who has minted nothing, and needs a token", async () => {
+    const { handlers } = makeServer();
+    const res = await call(handlers, "GET", "/v1/reveals");
+    expect(await res.json()).toEqual({ reveals: [] });
+
+    const anon = await call(handlers, "GET", "/v1/reveals", { auth: null });
+    expect(anon.status).toBe(401);
   });
 });

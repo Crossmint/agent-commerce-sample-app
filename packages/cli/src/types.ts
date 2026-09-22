@@ -1,8 +1,8 @@
 /**
- * Shapes the CLI reads from the GOAT HTTP API. They mirror docs/API.md.
- * Crossmint shapes (AgentCard, PaymentMethod, PendingUserAction) come from @goat-wallet/core.
+ * Shapes the CLI reads from the Agent Commerce HTTP API. They mirror docs/API.md.
+ * Crossmint shapes (AgentCard, PaymentMethod, PendingUserAction) come from @agent-commerce/core.
  */
-import type { Amount, CheckoutReceipt, CheckoutResult, CheckoutStatus, Merchant, PendingUserAction, RenderedAction } from "@goat-wallet/core";
+import type { Amount, CheckoutReceipt, CheckoutResult, CheckoutStatus, Merchant, PendingUserAction, RenderedAction } from "@agent-commerce/core";
 
 export interface PublicConfig {
   name: string;

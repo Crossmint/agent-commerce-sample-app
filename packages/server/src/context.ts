@@ -1,23 +1,31 @@
-import { bearerToken, type AuthenticatedUser } from "@goat-wallet/auth";
-import { CrossmintClient, DEFAULT_RAIL_PREFERENCE, type RailKind } from "@goat-wallet/core";
+import { bearerToken, type AuthenticatedUser } from "@agent-commerce/auth";
+import { CrossmintClient, DEFAULT_RAIL_PREFERENCE, type RailKind } from "@agent-commerce/core";
 import { z } from "zod";
 import { invalidRequest, unauthorized } from "./errors.js";
-import { memoryCheckoutStore, memorySessionStore } from "./store/memory.js";
-import type { AgentSession, CheckoutStore, GoatServerConfig, RequestStore, SessionStore } from "./types.js";
+import { memoryCheckoutStore, memoryRevealStore, memorySessionStore } from "./store/memory.js";
+import type {
+  AgentSession,
+  CheckoutStore,
+  AgentCommerceServerConfig,
+  RequestStore,
+  RevealStore,
+  SessionStore,
+} from "./types.js";
 
 export interface Ctx {
-  config: GoatServerConfig;
+  config: AgentCommerceServerConfig;
   crossmint: CrossmintClient;
   store: RequestStore;
   checkouts: CheckoutStore;
   sessions: SessionStore;
+  reveals: RevealStore;
   requestTtlMinutes: number;
   defaultRequester: string;
   railPreference: RailKind[];
   now(): Date;
 }
 
-export function createContext(config: GoatServerConfig): Ctx {
+export function createContext(config: AgentCommerceServerConfig): Ctx {
   const crossmint = new CrossmintClient({
     clientApiKey: config.crossmint.clientApiKey,
     serverApiKey: config.crossmint.serverApiKey,
@@ -36,7 +44,7 @@ export function createContext(config: GoatServerConfig): Ctx {
     checkouts = config.store as RequestStore & CheckoutStore;
   } else {
     console.warn(
-      "[goat] store has no linkCheckout/getCheckout. Falling back to an in-memory map. " +
+      "[agent-commerce] store has no linkCheckout/getCheckout. Falling back to an in-memory map. " +
         "Checkout to agent card links are lost on restart.",
     );
     checkouts = memoryCheckoutStore();
@@ -47,10 +55,21 @@ export function createContext(config: GoatServerConfig): Ctx {
     sessions = config.store as RequestStore & SessionStore;
   } else {
     console.warn(
-      "[goat] store has no getSession/putSession. Falling back to an in-memory map. " +
+      "[agent-commerce] store has no getSession/putSession. Falling back to an in-memory map. " +
         "Agents must log in again after a restart.",
     );
     sessions = memorySessionStore();
+  }
+
+  let reveals: RevealStore;
+  if (typeof config.store.recordReveal === "function" && typeof config.store.listReveals === "function") {
+    reveals = config.store as RequestStore & RevealStore;
+  } else {
+    console.warn(
+      "[agent-commerce] store has no recordReveal/listReveals. Falling back to an in-memory list. " +
+        "Transactions are lost on restart.",
+    );
+    reveals = memoryRevealStore();
   }
 
   return {
@@ -58,6 +77,7 @@ export function createContext(config: GoatServerConfig): Ctx {
     crossmint,
     store: config.store,
     checkouts,
+    reveals,
     sessions,
     requestTtlMinutes: config.requestTtlMinutes ?? 15,
     defaultRequester: config.defaultRequester ?? "Agent",
@@ -109,7 +129,7 @@ async function sessionJwtForAccessToken(accessToken: string, userId: string, ctx
   try {
     exchanged = await auth.exchangeAccessToken(accessToken);
   } catch (e) {
-    console.warn("[goat] access token exchange failed", e instanceof Error ? e.message : e);
+    console.warn("[agent-commerce] access token exchange failed", e instanceof Error ? e.message : e);
     throw unauthorized(
       "Could not exchange the agent access token for a session. The token may be older than five minutes, " +
         "or the Connected App is not first-party with full access. Log in again.",

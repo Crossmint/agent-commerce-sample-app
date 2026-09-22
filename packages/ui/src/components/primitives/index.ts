@@ -1,8 +1,10 @@
 export * from "./alert.js";
+export * from "./avatar.js";
 export * from "./badge.js";
 export * from "./button.js";
 export * from "./card.js";
 export * from "./dialog.js";
+export * from "./dropdown-menu.js";
 export * from "./input.js";
 export * from "./label.js";
 export * from "./native-select.js";
@@ -11,3 +13,5 @@ export * from "./separator.js";
 export * from "./sheet.js";
 export * from "./skeleton.js";
 export * from "./spinner.js";
+export * from "./table.js";
+export * from "./tooltip.js";

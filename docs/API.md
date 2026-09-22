@@ -1,8 +1,8 @@
-# GOAT HTTP API contract
+# Agent Commerce HTTP API contract
 
-This is the contract between `@goat-wallet/server` (implements it), `@goat-wallet/ui` (browser caller), `goat` CLI and `@goat-wallet/mcp` (agent callers). All four must match this file. Change the file first, then the code.
+This is the contract between `@agent-commerce/server` (implements it), `@agent-commerce/ui` (browser caller), `agent-commerce` CLI and `@agent-commerce/mcp` (agent callers). All four must match this file. Change the file first, then the code.
 
-Base path: the server is mounted at a prefix, in the reference app `/api/goat`. All paths below are relative to that prefix. Version segment `v1` is part of the path.
+Base path: the server is mounted at a prefix, in the reference app `/api/agent-commerce`. All paths below are relative to that prefix. Version segment `v1` is part of the path.
 
 ## Auth
 
@@ -24,8 +24,8 @@ Codes: `unauthorized`, `forbidden`, `not_found`, `invalid_request`, `expired`, `
 
 ```json
 {
-  "name": "GOAT",
-  "apiBaseUrl": "https://wallet.example.com/api/goat",
+  "name": "Agent Commerce Sample App",
+  "apiBaseUrl": "https://wallet.example.com/api/agent-commerce",
   "webBaseUrl": "https://wallet.example.com",
   "crossmintEnvironment": "staging" | "production",
   "auth": {
@@ -50,7 +50,7 @@ Codes: `unauthorized`, `forbidden`, `not_found`, `invalid_request`, `expired`, `
 
 ## Payment methods (saved cards)
 
-`GET /v1/payment-methods` → `{ "paymentMethods": PaymentMethod[] }` where `PaymentMethod` is the Crossmint shape from `@goat-wallet/core` (`paymentMethodId`, `type`, `displayName`, `card.brand`, `card.last4`, `card.expiration`). Never a full number.
+`GET /v1/payment-methods` → `{ "paymentMethods": PaymentMethod[] }` where `PaymentMethod` is the Crossmint shape from `@agent-commerce/core` (`paymentMethodId`, `type`, `displayName`, `card.brand`, `card.last4`, `card.expiration`). Never a full number.
 
 `POST /v1/payment-methods/:id/register` body `{ "email"?: string, "countryCode"?: string, "languageCode"?: string }` → `RegisterCardResult` (`{ paymentMethodId, rails: [{ rail, provider, status }] }`). Idempotent. `countryCode` defaults to `US`. When `email` is absent the server uses the token's email, then `UserAuth.lookupEmail`, then fails with `400 invalid_request`.
 
@@ -58,7 +58,7 @@ Codes: `unauthorized`, `forbidden`, `not_found`, `invalid_request`, `expired`, `
 
 ## Agent card requests
 
-The agent's ask, stored by GOAT until the user answers.
+The agent's ask, stored by Agent Commerce until the user answers.
 
 ```ts
 type AgentCardRequestStatus = "pending" | "approved" | "active" | "denied" | "expired" | "failed";
@@ -133,7 +133,7 @@ Server picks the rail (`selectRail`), mints, decrypts the encrypted-card rail wi
 
 ## Checkouts
 
-Wraps [Crossmint Agent Checkouts](https://docs.crossmint.com/api-reference/agent-checkouts/create-agent-checkout): a run that drives the store's checkout in a real browser. GOAT adds the agent card that pays and hides the payment step.
+Wraps [Crossmint Agent Checkouts](https://docs.crossmint.com/api-reference/agent-checkouts/create-agent-checkout): a run that drives the store's checkout in a real browser. Agent Commerce adds the agent card that pays and hides the payment step.
 
 `POST /v1/checkouts` (agent) body:
 
@@ -190,7 +190,7 @@ Optional `messageId` (≤200 chars) makes a retry idempotent. → `CheckoutView`
 ## Server config object
 
 ```ts
-createGoatHandlers({
+createAgentCommerceHandlers({
   crossmint: { clientApiKey, serverApiKey?, environment },
   userAuth: UserAuth,
   store: RequestStore,

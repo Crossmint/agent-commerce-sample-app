@@ -1,40 +1,24 @@
 "use client";
 
-import Link from "next/link";
+import { useState } from "react";
 import { ArrowUpRight } from "lucide-react";
-import { Badge, Button } from "@goat-wallet/ui";
-import type { CheckoutView } from "@goat-wallet/server";
+import { Badge, Button, CheckoutView as CheckoutViewPanel, Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@agent-commerce/ui";
+import type { CheckoutView } from "@agent-commerce/server";
+import { checkoutBadgeVariant, checkoutStatusLine, type ToolError } from "./parts";
 import { ToolCard, type ToolState } from "./tool-card";
 
 /**
- * A checkout as a card: status, what Crossmint needs next, a link to the
- * wallet's checkout page where the user can watch it and answer actions.
+ * A checkout as a card, for the desktop chat: status, what Crossmint needs
+ * next, and a button that opens the live checkout in a dialog, so the user
+ * watches it and answers its questions without leaving the conversation.
  */
-export function CheckoutCard({
-  title,
-  state,
-  input,
-  checkout,
-  errorText,
-}: {
-  title: string;
-  state: ToolState;
-  input?: unknown;
-  checkout?: CheckoutView | { error: string; code: string };
-  errorText?: string;
-}) {
+export function CheckoutCard({ title, state, input, checkout, errorText }: { title: string; state: ToolState; input?: unknown; checkout?: CheckoutView | ToolError; errorText?: string }) {
+  const [open, setOpen] = useState(false);
   const failed = checkout && "error" in checkout ? checkout : undefined;
   const view = checkout && !("error" in checkout) ? checkout : undefined;
 
   return (
-    <ToolCard
-      title={title}
-      state={state}
-      input={input}
-      output={checkout}
-      errorText={errorText ?? failed?.error}
-      summary={view ? <StatusLine view={view} /> : undefined}
-    >
+    <ToolCard title={title} state={state} input={input} output={checkout} errorText={errorText ?? failed?.error} summary={view ? checkoutStatusLine(view) : undefined}>
       {view ? (
         <div className="flex flex-col gap-3">
           <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-xs">
@@ -42,7 +26,7 @@ export function CheckoutCard({
             <dd className="truncate font-mono">{view.id}</dd>
             <dt className="text-muted-foreground">Status</dt>
             <dd>
-              <Badge variant={badgeVariant(view.status)}>{view.status.replace(/_/g, " ")}</Badge>
+              <Badge variant={checkoutBadgeVariant(view.status)}>{view.status.replace(/_/g, " ")}</Badge>
             </dd>
             {view.rendered ? (
               <>
@@ -71,35 +55,27 @@ export function CheckoutCard({
               </>
             ) : null}
           </dl>
-          <Button asChild size="sm" variant="outline" className="self-start">
-            <Link href={`/checkouts/${encodeURIComponent(view.id)}`}>
-              Open checkout <ArrowUpRight />
-            </Link>
+          <Button type="button" size="sm" variant="secondary" className="self-start" onClick={() => setOpen(true)}>
+            Open checkout <ArrowUpRight />
           </Button>
+          <CheckoutDialog checkoutId={view.id} open={open} onOpenChange={setOpen} />
         </div>
       ) : null}
     </ToolCard>
   );
 }
 
-function StatusLine({ view }: { view: CheckoutView }) {
-  if (view.failure) return <>{view.status === "blocked" ? "Stopped" : view.status === "cancelled" ? "Cancelled" : "Failed"}: {view.failure.message ?? view.failure.reason}</>;
-  if (view.rendered) return <>Waiting for input: {view.rendered.title}</>;
-  if (view.status === "succeeded") return <>Bought{view.receipt ? ` for ${view.receipt.total.amount} ${view.receipt.total.currency}` : ""}</>;
-  return <>{view.status.replace(/_/g, " ")}</>;
-}
-
-function badgeVariant(status: string): "success" | "warning" | "destructive" | "muted" {
-  switch (status) {
-    case "succeeded":
-      return "success";
-    case "blocked":
-    case "failed":
-    case "cancelled":
-      return "destructive";
-    case "awaiting_input":
-      return "warning";
-    default:
-      return "muted";
-  }
+/** The live checkout in a wide dialog. Mounted only while open, so polling stops with it. */
+export function CheckoutDialog({ checkoutId, open, onOpenChange }: { checkoutId: string; open: boolean; onOpenChange: (open: boolean) => void }) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-3xl">
+        <DialogHeader>
+          <DialogTitle>Checkout</DialogTitle>
+          <DialogDescription>Watch the agent buy, and answer what the store asks. Payment is handled for you.</DialogDescription>
+        </DialogHeader>
+        {open ? <CheckoutViewPanel checkoutId={checkoutId} /> : null}
+      </DialogContent>
+    </Dialog>
+  );
 }

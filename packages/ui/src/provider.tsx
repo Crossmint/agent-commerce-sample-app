@@ -1,11 +1,11 @@
 "use client";
 
 import * as React from "react";
-import type { CrossmintEnvironment } from "@goat-wallet/core";
-import { createGoatApi, type GetJwt, type GoatApi } from "./api/client.js";
+import type { CrossmintEnvironment } from "@agent-commerce/core";
+import { createAgentCommerceApi, type GetJwt, type AgentCommerceApi } from "./api/client.js";
 
-export interface GoatContextValue {
-  api: GoatApi;
+export interface AgentCommerceContextValue {
+  api: AgentCommerceApi;
   apiBaseUrl: string;
   /** The latest JWT we resolved from `getJwt`. Null until it resolves or while signed out. */
   jwt: string | null;
@@ -19,10 +19,10 @@ export interface GoatContextValue {
   mascotSrc: string;
 }
 
-const GoatContext = React.createContext<GoatContextValue | null>(null);
+const AgentCommerceContext = React.createContext<AgentCommerceContextValue | null>(null);
 
-export interface GoatProviderProps {
-  /** Where the GOAT server is mounted. Default "/api/goat". */
+export interface AgentCommerceProviderProps {
+  /** Where the Agent Commerce server is mounted. Default "/api/agent-commerce". */
   apiBaseUrl?: string;
   /** Returns the user's session JWT. Called on every API request, and polled for the Crossmint components. */
   getJwt: GetJwt;
@@ -31,25 +31,25 @@ export interface GoatProviderProps {
   crossmintEnvironment?: CrossmintEnvironment;
   /** How often to re-read the JWT for the Crossmint components. Default 30s. */
   jwtRefreshMs?: number;
-  /** Default "/brand/agents/crossmint-agents-mark.svg". */
+  /** Default "/crossmint-mark.svg". */
   mascotSrc?: string;
   children: React.ReactNode;
 }
 
 /**
- * Wires the GOAT API client to the user's session and hands the same JWT to
+ * Wires the Agent Commerce API client to the user's session and hands the same JWT to
  * the Crossmint components (save card, verification) through `CrossmintScope`,
  * so there is one identity everywhere.
  */
-export function GoatProvider({
-  apiBaseUrl = "/api/goat",
+export function AgentCommerceProvider({
+  apiBaseUrl = "/api/agent-commerce",
   getJwt,
   crossmintClientApiKey,
   crossmintEnvironment = "staging",
   jwtRefreshMs = 30_000,
-  mascotSrc = "/brand/agents/crossmint-agents-mark.svg",
+  mascotSrc = "/crossmint-mark.svg",
   children,
-}: GoatProviderProps) {
+}: AgentCommerceProviderProps) {
   const getJwtRef = React.useRef(getJwt);
   getJwtRef.current = getJwt;
 
@@ -73,11 +73,11 @@ export function GoatProvider({
   }, [refreshJwt, jwtRefreshMs]);
 
   const api = React.useMemo(
-    () => createGoatApi({ baseUrl: apiBaseUrl, getJwt: () => getJwtRef.current() }),
+    () => createAgentCommerceApi({ baseUrl: apiBaseUrl, getJwt: () => getJwtRef.current() }),
     [apiBaseUrl],
   );
 
-  const value = React.useMemo<GoatContextValue>(
+  const value = React.useMemo<AgentCommerceContextValue>(
     () => ({
       api,
       apiBaseUrl,
@@ -92,16 +92,16 @@ export function GoatProvider({
   // Crossmint's browser SDK mounts inside <CrossmintScope>, around the one
   // component that needs it. Wrapping the whole app here would change the
   // tree after hydration and remount every page.
-  return <GoatContext.Provider value={value}>{children}</GoatContext.Provider>;
+  return <AgentCommerceContext.Provider value={value}>{children}</AgentCommerceContext.Provider>;
 }
 
-export function useGoat(): GoatContextValue {
-  const ctx = React.useContext(GoatContext);
-  if (!ctx) throw new Error("useGoat must be used inside <GoatProvider>.");
+export function useAgentCommerce(): AgentCommerceContextValue {
+  const ctx = React.useContext(AgentCommerceContext);
+  if (!ctx) throw new Error("useAgentCommerce must be used inside <AgentCommerceProvider>.");
   return ctx;
 }
 
-/** Same as useGoat, but returns null outside a provider. */
-export function useGoatOptional(): GoatContextValue | null {
-  return React.useContext(GoatContext);
+/** Same as useAgentCommerce, but returns null outside a provider. */
+export function useAgentCommerceOptional(): AgentCommerceContextValue | null {
+  return React.useContext(AgentCommerceContext);
 }

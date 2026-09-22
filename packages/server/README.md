@@ -1,29 +1,29 @@
-# @goat-wallet/server
+# @agent-commerce/server
 
-The GOAT HTTP API as Web-standard request handlers. Mount it in Next.js or any runtime that speaks `Request` and `Response`.
+The Agent Commerce HTTP API as Web-standard request handlers. Mount it in Next.js or any runtime that speaks `Request` and `Response`.
 
 The contract lives in [`docs/API.md`](../../docs/API.md). This package implements it. The UI, CLI and MCP server call it.
 
 ## Install
 
 ```sh
-pnpm add @goat-wallet/server @goat-wallet/core @goat-wallet/auth
+pnpm add @agent-commerce/server @agent-commerce/core @agent-commerce/auth
 # optional, for Postgres storage
 pnpm add drizzle-orm
 ```
 
 ## Mount in Next.js
 
-Create `app/api/goat/[...path]/route.ts`:
+Create `app/api/agent-commerce/[...path]/route.ts`:
 
 ```ts
-import { createGoatHandlers } from "@goat-wallet/server";
-import { drizzleRequestStore } from "@goat-wallet/server/drizzle";
-import { createStytchUserAuth } from "@goat-wallet/auth/stytch";
-import { parsePrivateJwk } from "@goat-wallet/core";
+import { createAgentCommerceHandlers } from "@agent-commerce/server";
+import { drizzleRequestStore } from "@agent-commerce/server/drizzle";
+import { createStytchUserAuth } from "@agent-commerce/auth/stytch";
+import { parsePrivateJwk } from "@agent-commerce/core";
 import { db } from "@/lib/db";
 
-export const { GET, POST, PUT, DELETE } = createGoatHandlers({
+export const { GET, POST, PUT, DELETE } = createAgentCommerceHandlers({
   crossmint: {
     clientApiKey: process.env.CROSSMINT_CLIENT_API_KEY!,
     serverApiKey: process.env.CROSSMINT_SERVER_API_KEY,
@@ -31,11 +31,11 @@ export const { GET, POST, PUT, DELETE } = createGoatHandlers({
   },
   userAuth: createStytchUserAuth({ projectId: process.env.STYTCH_PROJECT_ID! }),
   store: drizzleRequestStore(db),
-  encryptedCardPrivateJwk: process.env.GOAT_ENCRYPTED_CARD_JWK
-    ? parsePrivateJwk(process.env.GOAT_ENCRYPTED_CARD_JWK)
+  encryptedCardPrivateJwk: process.env.AGENT_COMMERCE_ENCRYPTED_CARD_JWK
+    ? parsePrivateJwk(process.env.AGENT_COMMERCE_ENCRYPTED_CARD_JWK)
     : undefined,
   webBaseUrl: "https://wallet.example.com",
-  apiBaseUrl: "https://wallet.example.com/api/goat",
+  apiBaseUrl: "https://wallet.example.com/api/agent-commerce",
   auth: {
     provider: "stytch",
     projectId: process.env.STYTCH_PROJECT_ID!,
@@ -52,26 +52,26 @@ For a first run without a database, use `memoryRequestStore()`. It forgets every
 
 ## Other runtimes
 
-`createGoatHandlers` also returns `handler`. It dispatches on `req.method`.
+`createAgentCommerceHandlers` also returns `handler`. It dispatches on `req.method`.
 
 ```ts
-const { handler } = createGoatHandlers({ ... });
+const { handler } = createAgentCommerceHandlers({ ... });
 Bun.serve({ fetch: handler });
 ```
 
 ## Storage
 
-GOAT stores one thing: the agent's pending request, until the user answers. It also stores which agent card pays for each checkout.
+Agent Commerce stores one thing: the agent's pending request, until the user answers. It also stores which agent card pays for each checkout.
 
 `RequestStore` is the interface. Implement `create`, `get`, `update`, and optionally `listByUser`. Add `linkCheckout` and `getCheckout` (the `CheckoutStore` interface) to persist checkout links. If you leave them out, the server keeps the links in memory and logs a warning.
 
-`@goat-wallet/server/drizzle` ships both tables and a store for any Drizzle Postgres driver:
+`@agent-commerce/server/drizzle` ships both tables and a store for any Drizzle Postgres driver:
 
 ```ts
-import { agentCardRequests, checkouts, drizzleRequestStore } from "@goat-wallet/server/drizzle";
+import { agentCardRequests, checkouts, drizzleRequestStore } from "@agent-commerce/server/drizzle";
 ```
 
-Generate the migration with drizzle-kit from `goatSchema`, or run this SQL:
+Generate the migration with drizzle-kit from `agentCommerceSchema`, or run this SQL:
 
 ```sql
 create table agent_card_requests (

@@ -20,7 +20,7 @@
         "NEXT_PUBLIC_*",
         "STYTCH_*",
         "CROSSMINT_*",
-        "GOAT_*",
+        "AGENT_COMMERCE_*",
         "DATABASE_URL",
         "OPENAI_API_KEY",
         "ANTHROPIC_API_KEY",

@@ -1,7 +1,7 @@
 {
-  "name": "@goat-wallet/core",
+  "name": "@agent-commerce/core",
   "version": "0.1.0",
-  "description": "Typed Crossmint Agents client and domain logic for GOAT: saved cards, agent cards, credentials, checkouts.",
+  "description": "Typed Crossmint Agents client and domain logic for Agent Commerce: saved cards, agent cards, credentials, checkouts.",
   "license": "MIT",
   "type": "module",
   "sideEffects": false,
@@ -22,7 +22,7 @@
     "jose": "^6.2.0"
   },
   "devDependencies": {
-    "@goat-wallet/tsconfig": "workspace:*",
+    "@agent-commerce/tsconfig": "workspace:*",
     "tsup": "^8.5.0",
     "typescript": "^5.9.0",
     "vitest": "^5.0.0"

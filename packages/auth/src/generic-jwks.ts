@@ -14,7 +14,7 @@ export interface JwksUserAuthOptions {
 
 /**
  * Verify JWTs from any provider that publishes a JWKS. Use this when your platform
- * already has auth and only needs to hand GOAT a JWT. Register the same JWKS URL in
+ * already has auth and only needs to hand Agent Commerce a JWT. Register the same JWKS URL in
  * the Crossmint console as a custom JWT provider.
  */
 export function createJwksUserAuth(opts: JwksUserAuthOptions): UserAuth {

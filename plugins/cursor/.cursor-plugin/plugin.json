@@ -1,6 +1,6 @@
 {
-  "name": "goat",
-  "displayName": "GOAT Wallet",
+  "name": "agent-commerce",
+  "displayName": "Agent Commerce Wallet",
   "version": "0.1.0",
   "description": "Pay with the user's own card, with their approval. Request a bounded agent card, get it approved on the wallet, then check out at any store or mint a scoped card number. Powered by Crossmint.",
   "author": {

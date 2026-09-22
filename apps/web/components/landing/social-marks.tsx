@@ -1,5 +1,5 @@
 /**
- * Marks for the links GOAT shows in the nav, the footer, and on the sign-in
+ * Marks for the links Agent Commerce shows in the nav, the footer, and on the sign-in
  * page. GitHub and X follow the current text color; Google keeps its own.
  */
 

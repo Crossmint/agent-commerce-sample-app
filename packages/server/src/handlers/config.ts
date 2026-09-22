@@ -1,4 +1,4 @@
-import { stytchEndpoints } from "@goat-wallet/auth";
+import { stytchEndpoints } from "@agent-commerce/auth";
 import type { Ctx } from "../context.js";
 import { json } from "../errors.js";
 import type { PublicConfig } from "../types.js";
@@ -20,7 +20,7 @@ export function buildPublicConfig(ctx: Ctx): PublicConfig {
   if (config.auth.cliClientId) oauth.cliClientId = config.auth.cliClientId;
   if (config.auth.mcpClientId) oauth.mcpClientId = config.auth.mcpClientId;
   return {
-    name: config.name ?? "GOAT",
+    name: config.name ?? "Agent Commerce",
     apiBaseUrl: config.apiBaseUrl,
     webBaseUrl: config.webBaseUrl,
     crossmintEnvironment: config.crossmint.environment,

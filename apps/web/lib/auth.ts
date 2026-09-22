@@ -1,7 +1,7 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import type { UserAuth } from "@goat-wallet/auth";
-import { createStytchUserAuth, inferStytchEnvironment } from "@goat-wallet/auth/stytch";
+import type { UserAuth } from "@agent-commerce/auth";
+import { createStytchUserAuth, inferStytchEnvironment } from "@agent-commerce/auth/stytch";
 import { Client as StytchClient, envs } from "stytch";
 import { serverEnv } from "./env";
 
@@ -14,7 +14,7 @@ export interface ServerSession {
   email?: string;
   /** Stytch session id, when the JWT carries it. */
   sessionId?: string;
-  /** A valid JWT. Use it as the bearer token when calling the GOAT API from the server. */
+  /** A valid JWT. Use it as the bearer token when calling the Agent Commerce API from the server. */
   sessionJwt: string;
 }
 
@@ -22,7 +22,7 @@ let userAuth: UserAuth | undefined;
 let nodeClient: StytchClient | undefined;
 
 /**
- * The same verifier the GOAT API uses. Checks the JWT signature against the
+ * The same verifier the Agent Commerce API uses. Checks the JWT signature against the
  * Stytch JWKS. Needs only the project id.
  */
 function auth(): UserAuth {

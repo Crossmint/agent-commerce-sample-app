@@ -1,58 +1,58 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { cn } from "@/lib/cn";
-import { GoatLockup } from "@/components/brand";
-import { GridCell } from "@/components/landing/grid";
+import { CrossmintLogo } from "@/components/brand";
+import { DeviceFrame } from "@/components/frame/device-frame";
+import { FramePage } from "@/components/frame/frame-page";
+import { PhoneStatusBar } from "@/components/frame/phone-status-bar";
 
 /**
- * The ground every screen outside the wallet stands on: sign in, authorize an
- * agent, approve a budget, and the page that is not there. The landing's
- * dotted backdrop, the halftone bleeding in from the top right, and the
- * content in one cell of the hairline grid with a green diamond at each
- * corner. No nav — each of these is one decision, and the lockup at the top
- * of the cell is the only chrome it needs.
+ * The ground every screen outside the app stands on: sign in, authorize an
+ * agent, approve a budget, the CLI callback, and the page that is not there.
+ * As in the onramp sample app, each one is a phone on the dot grid canvas
+ * with the logo card top left; on a phone the screen fills the viewport.
  *
- * Every screen is one column at the same width, so the grid does not move
- * from screen to screen and nothing turns into a second layout on a wide
- * display. `width="lg"` gives the approval screen a little more room on a
- * desktop, since it carries a list and a card picker rather than a field or
- * two. The wrapper is `overflow-hidden` because the cell's rules bleed past
- * it, and `--font-heading` hands the display face to components from
- * @goat-wallet/ui, which ask for it by that name.
+ * `width` is kept for callers; every screen is the phone now, so it changes
+ * nothing. `footer` renders under the screen's content, inside the phone.
  */
 export function FocusScreen({
-  width = "md",
   footer,
   children,
+  scroll = true,
 }: {
-  /** "md" is the form width. "lg" is a step wider, from `lg` up. */
+  /** Kept for callers that used to ask for a wider cell. */
   width?: "md" | "lg";
-  /** Its own row under a full-bleed rule at the foot, as on the landing. */
   footer?: ReactNode;
   children: ReactNode;
+  /** Let the screen scroll when the content runs long. Default true. */
+  scroll?: boolean;
 }) {
   return (
-    <main
-      className="goat-backdrop relative flex flex-1 flex-col overflow-hidden [--font-heading:var(--font-display)]"
-    >
-      <div
-        aria-hidden
-        className="pointer-events-none absolute -top-10 -right-16 h-[300px] w-[420px] bg-[url(/brand/agents/texture-halftone-green.png)] bg-cover bg-right-top opacity-30 [mask-image:linear-gradient(to_bottom_left,#000_20%,transparent_72%)] sm:-right-24 sm:h-[460px] sm:w-[640px]"
-      />
-      <div className="flex flex-1 flex-col items-center justify-center px-4 py-16 sm:px-6">
-        <div className={cn("relative w-full max-w-md", width === "lg" && "lg:max-w-xl")}>
-          {/* The verticals stop on the cell's own rules: run past, they would
-              carry on down through anything at the foot. */}
-          <GridCell bleed={false} />
-          <div className="flex flex-col gap-7 px-6 py-10 sm:px-9 sm:py-12">
-            <Link href="/" aria-label="GOAT home" className="self-start">
-              <GoatLockup size="md" />
-            </Link>
-            {children}
+    <FramePage>
+      <DeviceFrame className="flex-1 md:flex-none">
+        <div className="relative flex h-full flex-col bg-background">
+          <PhoneStatusBar />
+          <div className={cn("flex min-h-0 flex-1 flex-col px-6 pb-8", scroll && "scrollbar-none overflow-y-auto")}>
+            <div className="flex shrink-0 items-center pt-6 pb-2 md:pt-3">
+              <Link href="/" aria-label="Agent Commerce Sample App home" className="rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                <CrossmintLogo height={20} />
+              </Link>
+            </div>
+            <div className="flex flex-1 flex-col gap-6 pt-6">{children}</div>
+            {footer ? <div className="shrink-0 pt-6">{footer}</div> : null}
           </div>
         </div>
-      </div>
-      {footer}
-    </main>
+      </DeviceFrame>
+    </FramePage>
+  );
+}
+
+/** The step's name and one line under it, as on the onramp login screen. */
+export function ScreenHeading({ title, sub, className }: { title: string; sub?: ReactNode; className?: string }) {
+  return (
+    <div className={cn("flex flex-col gap-2", className)}>
+      <h1 className="text-[28px] leading-[1.2] font-medium tracking-[-0.02em] text-balance text-foreground">{title}</h1>
+      {sub ? <p className="text-base text-muted-foreground">{sub}</p> : null}
+    </div>
   );
 }

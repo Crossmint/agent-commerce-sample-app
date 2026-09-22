@@ -3,7 +3,7 @@ import { nanoid } from "nanoid";
 import { z } from "zod";
 import { getSession } from "@/lib/auth";
 import { chatEnabled, chatModel } from "@/lib/chat/config";
-import { goatClient } from "@/lib/chat/goat-client";
+import { apiClient } from "@/lib/chat/api-client";
 import { systemPrompt } from "@/lib/chat/prompt";
 import { createChatTools } from "@/lib/chat/tools";
 import type { ChatMessage } from "@/lib/chat/types";
@@ -15,7 +15,7 @@ import { createChat, deleteChat, getChat, touchChat, upsertMessage } from "@/lib
  *
  * The client always sends the whole conversation. With DATABASE_URL set, the
  * route persists the chat and every message; without it, nothing is stored and
- * the client's copy is the only copy. The tools call the GOAT handlers in
+ * the client's copy is the only copy. The tools call the Agent Commerce handlers in
  * process with the user's session JWT (see lib/chat/tools.ts for the
  * human-in-the-loop pattern behind `await_agent_card_approval`).
  */
@@ -41,8 +41,8 @@ export async function POST(req: Request): Promise<Response> {
   if (!parsed.success) return error(400, "Bad request body.");
   const { id: chatId } = parsed.data;
 
-  const goat = goatClient(session.sessionJwt);
-  const tools = createChatTools(goat);
+  const api = apiClient(session.sessionJwt);
+  const tools = createChatTools(api);
 
   const validated = await safeValidateUIMessages<ChatMessage>({ messages: parsed.data.messages, tools });
   if (!validated.success) return error(400, `Bad messages: ${validated.error.message}`);

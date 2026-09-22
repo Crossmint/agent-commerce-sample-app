@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { ApiError, GoatApi } from "../src/api.js";
+import { ApiError, AgentCommerceApi } from "../src/api.js";
 import { createConfigStore } from "../src/config.js";
 import { CliExit, EXIT } from "../src/output.js";
 import { fakeFetch, json, tempConfigDir } from "./helpers.js";
 
 const base = {
-  apiBaseUrl: "https://wallet.test/api/goat",
+  apiBaseUrl: "https://wallet.test/api/agent-commerce",
   accessToken: "access-1",
   refreshToken: "refresh-1",
   tokenEndpoint: "https://test.stytch.com/v1/public/p/oauth2/token",
@@ -13,12 +13,12 @@ const base = {
   tokenFromEnv: false,
 };
 
-describe("GoatApi", () => {
+describe("AgentCommerceApi", () => {
   it("adds the bearer header and parses bodies", async () => {
     const { fetch, calls } = fakeFetch({
       "GET /v1/me": () => json({ userId: "u1", email: "a@b.c" }),
     });
-    const api = new GoatApi({
+    const api = new AgentCommerceApi({
       config: { ...base, expiresAt: new Date(Date.now() + 3_600_000).toISOString() },
       fetch,
     });
@@ -39,7 +39,7 @@ describe("GoatApi", () => {
       "GET /v1/agent-cards/ac_3": () =>
         new Response("<html>boom</html>", { status: 502, statusText: "Bad Gateway" }),
     });
-    const api = new GoatApi({ config: base, fetch });
+    const api = new AgentCommerceApi({ config: base, fetch });
     const err = await api.mintCredential("ac_1", {}).catch((e: unknown) => e);
     expect(err).toBeInstanceOf(ApiError);
     expect(err).toMatchObject({
@@ -60,7 +60,7 @@ describe("GoatApi", () => {
   });
 
   it("refreshes the access token when it is about to expire and persists it", async () => {
-    const store = createConfigStore({ GOAT_CONFIG_DIR: tempConfigDir() });
+    const store = createConfigStore({ AGENT_COMMERCE_CONFIG_DIR: tempConfigDir() });
     const now = Date.now();
     const config = { ...base, expiresAt: new Date(now + 30_000).toISOString() };
     store.write(config);
@@ -74,12 +74,12 @@ describe("GoatApi", () => {
         }),
       "GET /v1/me": () => json({ userId: "u1" }),
     });
-    const api = new GoatApi({ config, fetch, store, now: () => now });
+    const api = new AgentCommerceApi({ config, fetch, store, now: () => now });
     expect(api.needsRefresh()).toBe(true);
     await api.me();
     expect(calls.map((c) => `${c.method} ${new URL(c.url).pathname}`)).toEqual([
       "POST /v1/public/p/oauth2/token",
-      "GET /api/goat/v1/me",
+      "GET /api/agent-commerce/v1/me",
     ]);
     expect(calls[0]?.body).toMatchObject({
       grant_type: "refresh_token",
@@ -98,7 +98,7 @@ describe("GoatApi", () => {
 
   it("does not refresh env tokens, and exits 3 when refresh fails", async () => {
     const { fetch, calls } = fakeFetch({ "GET /v1/me": () => json({ userId: "u1" }) });
-    const envApi = new GoatApi({
+    const envApi = new AgentCommerceApi({
       config: { ...base, tokenFromEnv: true, expiresAt: new Date(0).toISOString() },
       fetch,
     });
@@ -109,7 +109,7 @@ describe("GoatApi", () => {
       "POST /oauth2/token": () =>
         json({ error: "invalid_grant", error_description: "revoked" }, 400),
     });
-    const api = new GoatApi({
+    const api = new AgentCommerceApi({
       config: { ...base, expiresAt: new Date(0).toISOString() },
       fetch: failing.fetch,
     });
@@ -120,7 +120,7 @@ describe("GoatApi", () => {
   });
 
   it("throws not-logged-in without a token", async () => {
-    const api = new GoatApi({
+    const api = new AgentCommerceApi({
       config: { apiBaseUrl: "https://x.test", tokenFromEnv: false },
       fetch: fakeFetch({}).fetch,
     });

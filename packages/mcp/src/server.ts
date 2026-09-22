@@ -1,16 +1,16 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import type { AuthInfo } from "@modelcontextprotocol/sdk/server/auth/types.js";
-import { GoatApi } from "./goat-api.js";
-import { registerGoatTools } from "./tools.js";
+import { AgentCommerceApi } from "./api.js";
+import { registerAgentCommerceTools } from "./tools.js";
 
-export const GOAT_MCP_SERVER_NAME = "goat";
-export const GOAT_MCP_SERVER_VERSION = "0.1.0";
+export const AGENT_COMMERCE_MCP_SERVER_NAME = "agent-commerce";
+export const AGENT_COMMERCE_MCP_SERVER_VERSION = "0.1.0";
 
-export interface GoatMcpServerOptions {
-  /** GOAT API base URL including the mount prefix, e.g. `https://wallet.example.com/api/goat`. */
+export interface AgentCommerceMcpServerOptions {
+  /** Agent Commerce API base URL including the mount prefix, e.g. `https://wallet.example.com/api/agent-commerce`. */
   apiBaseUrl: string;
-  /** The user's bearer token. Forwarded on every GOAT API call. */
+  /** The user's bearer token. Forwarded on every Agent Commerce API call. */
   bearerToken: string;
   /** Label shown to the user on the approval screen. Default "Agent". */
   requester?: string;
@@ -18,22 +18,22 @@ export interface GoatMcpServerOptions {
 }
 
 /**
- * Build an `McpServer` with the GOAT tools bound to one user token.
+ * Build an `McpServer` with the Agent Commerce tools bound to one user token.
  * Stateless: build one per request in HTTP mode, one per process in stdio mode.
  */
-export function createGoatMcpServer(opts: GoatMcpServerOptions): McpServer {
+export function createAgentCommerceMcpServer(opts: AgentCommerceMcpServerOptions): McpServer {
   const server = new McpServer(
-    { name: GOAT_MCP_SERVER_NAME, version: GOAT_MCP_SERVER_VERSION, title: "GOAT wallet" },
+    { name: AGENT_COMMERCE_MCP_SERVER_NAME, version: AGENT_COMMERCE_MCP_SERVER_VERSION, title: "Agent Commerce wallet" },
     {
       instructions:
-        "GOAT lets you spend from the user's saved cards within limits the user approves. " +
+        "Agent Commerce lets you spend from the user's saved cards within limits the user approves. " +
         "Flow: request_agent_card → show the approval URL to the user → poll get_agent_card_request until active → " +
         "create_checkout (preferred, the server pays) or reveal_agent_card (you pay in a form). " +
         "Never show revealed card numbers to the user.",
     },
   );
-  const api = new GoatApi({ baseUrl: opts.apiBaseUrl, bearerToken: opts.bearerToken, fetch: opts.fetch });
-  registerGoatTools(server, { api, requester: opts.requester });
+  const api = new AgentCommerceApi({ baseUrl: opts.apiBaseUrl, bearerToken: opts.bearerToken, fetch: opts.fetch });
+  registerAgentCommerceTools(server, { api, requester: opts.requester });
   return server;
 }
 
@@ -66,7 +66,7 @@ export function protectedResourceMetadata(opts: ProtectedResourceMetadataOptions
     resource: normalizeUrl(opts.resourceUrl),
     authorization_servers: opts.authorizationServers.map(normalizeUrl),
     bearer_methods_supported: ["header"],
-    resource_name: opts.resourceName ?? "GOAT wallet",
+    resource_name: opts.resourceName ?? "Agent Commerce wallet",
   };
   if (opts.scopes?.length) metadata.scopes_supported = opts.scopes;
   if (opts.resourceDocumentation) metadata.resource_documentation = opts.resourceDocumentation;
@@ -117,8 +117,8 @@ export function authorizationServerFromEndpoint(authorizationEndpoint: string): 
 // HTTP handler for Next.js route handlers and any Web-standard runtime
 // ---------------------------------------------------------------------------
 
-export interface GoatMcpHandlerOptions {
-  /** GOAT API base URL including the mount prefix, e.g. `https://wallet.example.com/api/goat`. */
+export interface AgentCommerceMcpHandlerOptions {
+  /** Agent Commerce API base URL including the mount prefix, e.g. `https://wallet.example.com/api/agent-commerce`. */
   apiBaseUrl: string;
   /** The public URL of this MCP endpoint, e.g. `https://wallet.example.com/api/mcp`. */
   resourceUrl: string;
@@ -138,14 +138,14 @@ export interface GoatMcpHandlerOptions {
  * the request's bearer token. No sessions, JSON responses (no SSE), so it runs
  * in serverless route handlers.
  */
-export function createGoatMcpHandler(opts: GoatMcpHandlerOptions): (req: Request) => Promise<Response> {
+export function createAgentCommerceMcpHandler(opts: AgentCommerceMcpHandlerOptions): (req: Request) => Promise<Response> {
   const metadataUrl = opts.resourceMetadataUrl ?? protectedResourceMetadataUrl(opts.resourceUrl);
 
   return async (req) => {
     const token = readBearerToken(req);
     if (!token) return unauthorized(metadataUrl, opts.scopes, "Missing bearer token");
 
-    const server = createGoatMcpServer({
+    const server = createAgentCommerceMcpServer({
       apiBaseUrl: opts.apiBaseUrl,
       bearerToken: token,
       requester: opts.requester,
@@ -184,7 +184,7 @@ function unauthorized(metadataUrl: string, scopes: string[] | undefined, descrip
 
 /**
  * Best-effort `AuthInfo` for tool handlers. The token is decoded, not verified.
- * The GOAT API verifies it on every call.
+ * The Agent Commerce API verifies it on every call.
  */
 function authInfoFromToken(token: string): AuthInfo {
   const claims = decodeJwtClaims(token);

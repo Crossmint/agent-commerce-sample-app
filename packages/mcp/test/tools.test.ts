@@ -1,25 +1,25 @@
 import { describe, expect, it } from "vitest";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
-import { TOOL_DOCS } from "@goat-wallet/core";
-import { createGoatMcpServer, GOAT_TOOL_NAMES } from "../src/index.js";
-import { mockGoatFetch } from "./helpers.js";
+import { TOOL_DOCS } from "@agent-commerce/core";
+import { createAgentCommerceMcpServer, AGENT_COMMERCE_TOOL_NAMES } from "../src/index.js";
+import { mockAgentCommerceFetch } from "./helpers.js";
 
-const API = "https://wallet.example.com/api/goat";
+const API = "https://wallet.example.com/api/agent-commerce";
 
 async function connect(fetchImpl: typeof fetch) {
-  const server = createGoatMcpServer({ apiBaseUrl: API, bearerToken: "tok_1", requester: "Test agent", fetch: fetchImpl });
+  const server = createAgentCommerceMcpServer({ apiBaseUrl: API, bearerToken: "tok_1", requester: "Test agent", fetch: fetchImpl });
   const client = new Client({ name: "test", version: "0.0.0" });
   const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
   await Promise.all([server.connect(serverTransport), client.connect(clientTransport)]);
   return { client, server };
 }
 
-describe("GOAT tools", () => {
+describe("Agent Commerce tools", () => {
   it("registers every tool by name", async () => {
-    const { client } = await connect(mockGoatFetch({}));
+    const { client } = await connect(mockAgentCommerceFetch({}));
     const { tools } = await client.listTools();
-    expect(tools.map((t) => t.name).sort()).toEqual([...GOAT_TOOL_NAMES].sort());
+    expect(tools.map((t) => t.name).sort()).toEqual([...AGENT_COMMERCE_TOOL_NAMES].sort());
     // Every description opens with the summary shared with the chat agent (core TOOL_DOCS).
     for (const tool of tools) {
       const doc = TOOL_DOCS[tool.name as keyof typeof TOOL_DOCS];
@@ -29,7 +29,7 @@ describe("GOAT tools", () => {
   });
 
   it("request_agent_card posts the request and returns the approval URL", async () => {
-    const fetchMock = mockGoatFetch({
+    const fetchMock = mockAgentCommerceFetch({
       "POST /v1/agent-card-requests": (init) => {
         const body = JSON.parse(String(init?.body)) as Record<string, unknown>;
         return {
@@ -75,7 +75,7 @@ describe("GOAT tools", () => {
 
   it("reveal_agent_card warns when the limit is not enforced", async () => {
     const { client } = await connect(
-      mockGoatFetch({
+      mockAgentCommerceFetch({
         "POST /v1/agent-cards/oi_1/credentials": {
           body: {
             agentCardId: "oi_1",
@@ -92,9 +92,9 @@ describe("GOAT tools", () => {
     expect(result.structuredContent).toMatchObject({ enforced: false, card: { number: "4111111111111111" } });
   });
 
-  it("turns GOAT API errors into isError results", async () => {
+  it("turns Agent Commerce API errors into isError results", async () => {
     const { client } = await connect(
-      mockGoatFetch({
+      mockAgentCommerceFetch({
         "GET /v1/agent-cards/nope": { status: 404, body: { error: { code: "not_found", message: "No such agent card" } } },
       }),
     );

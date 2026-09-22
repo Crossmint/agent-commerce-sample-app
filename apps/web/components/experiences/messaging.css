@@ -1,0 +1,267 @@
+/*
+ * The messaging view imitates three real apps, so it carries their own
+ * colours: Apple's Messages, WhatsApp for iOS and Instagram Direct. They live
+ * here as variables and nowhere else in the app. The approval and checkout
+ * pages that open over a thread are ours and use the theme tokens instead.
+ */
+
+.msg {
+  background: #ffffff;
+  color: #000000;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* The in-app browser bar every page opens under. Same on all three apps. */
+.msg-browser-bar {
+  background: #f6f6f6;
+  border-color: rgba(0, 0, 0, 0.12);
+  color: #000000;
+}
+.msg-browser-url {
+  background: #e9e9eb;
+  color: #3c3c43;
+}
+.msg-browser-action {
+  color: #007aff;
+}
+
+/* ------------------------------------------------------------------------ */
+/* iMessage                                                                 */
+/* ------------------------------------------------------------------------ */
+
+.msg-imessage {
+  --im-sent: #0a84ff;
+  --im-sent-foreground: #ffffff;
+  --im-recv: #e9e9eb;
+  --im-recv-foreground: #000000;
+  --im-gray: #8e8e93;
+  --im-canvas: #ffffff;
+  --im-bar: #f6f6f6;
+  --im-hairline: rgba(0, 0, 0, 0.12);
+}
+
+.im-blue {
+  color: var(--im-sent);
+}
+.im-gray {
+  color: var(--im-gray);
+}
+.im-bar {
+  background: var(--im-bar);
+  border-color: var(--im-hairline);
+}
+.im-send {
+  background: var(--im-sent);
+  color: var(--im-sent-foreground);
+}
+.im-field {
+  border-color: var(--im-hairline);
+}
+.im-preview-art {
+  background: #f2f2f7;
+}
+
+/* Bubbles. The tail is drawn by two blobs: one in the bubble colour, one in the canvas colour that cuts it back into a curve. */
+.im-bubble {
+  position: relative;
+}
+.im-bubble > * {
+  position: relative;
+}
+.im-sent-bubble {
+  background: var(--im-sent);
+  color: var(--im-sent-foreground);
+}
+.im-recv-bubble {
+  background: var(--im-recv);
+  color: var(--im-recv-foreground);
+}
+.im-tail-sent::before,
+.im-tail-recv::before,
+.im-tail-sent::after,
+.im-tail-recv::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  height: 20px;
+}
+.im-tail-sent::before {
+  right: -7px;
+  width: 20px;
+  background: var(--im-sent);
+  border-bottom-left-radius: 16px 14px;
+}
+.im-tail-sent::after {
+  right: -11px;
+  width: 11px;
+  background: var(--im-canvas);
+  border-bottom-left-radius: 10px;
+}
+.im-tail-recv::before {
+  left: -7px;
+  width: 20px;
+  background: var(--im-recv);
+  border-bottom-right-radius: 16px 14px;
+}
+.im-tail-recv::after {
+  left: -11px;
+  width: 11px;
+  background: var(--im-canvas);
+  border-bottom-right-radius: 10px;
+}
+
+/* ------------------------------------------------------------------------ */
+/* WhatsApp (iOS)                                                           */
+/* ------------------------------------------------------------------------ */
+
+.msg-whatsapp {
+  --wa-bar: #f6f6f6;
+  --wa-hairline: rgba(0, 0, 0, 0.12);
+  --wa-blue: #007aff;
+  --wa-gray: #8e8e93;
+  --wa-wallpaper: #efe7dd;
+  --wa-recv: #ffffff;
+  --wa-sent: #d9fdd3;
+  --wa-time: #667781;
+  --wa-ticks: #53bdeb;
+  --wa-preview: #f0f0f0;
+  --wa-link: #027eb5;
+}
+
+.wa-bar {
+  background: var(--wa-bar);
+  border-color: var(--wa-hairline);
+}
+.wa-blue {
+  color: var(--wa-blue);
+}
+.wa-gray {
+  color: var(--wa-gray);
+}
+.wa-time {
+  color: var(--wa-time);
+}
+.wa-ticks {
+  color: var(--wa-ticks);
+}
+.wa-link {
+  color: var(--wa-link);
+}
+.wa-preview {
+  background: var(--wa-preview);
+}
+.wa-field {
+  background: #ffffff;
+  border-color: var(--wa-hairline);
+}
+.wa-send {
+  background: var(--wa-blue);
+  color: #ffffff;
+}
+/* The beige wallpaper with a faint doodle: two offset dot grids, barely there. */
+.wa-canvas {
+  background-color: var(--wa-wallpaper);
+  background-image:
+    radial-gradient(circle at 1px 1px, rgba(0, 0, 0, 0.055) 1.5px, transparent 1.5px),
+    radial-gradient(circle at 12px 14px, rgba(0, 0, 0, 0.035) 2.5px, transparent 2.5px);
+  background-size:
+    24px 24px,
+    24px 24px;
+}
+.wa-date {
+  background: rgba(255, 255, 255, 0.92);
+  color: var(--wa-time);
+}
+.wa-recv {
+  background: var(--wa-recv);
+  color: #000000;
+}
+.wa-sent {
+  background: var(--wa-sent);
+  color: #000000;
+}
+.wa-bubble {
+  position: relative;
+  box-shadow: 0 1px 0.5px rgba(0, 0, 0, 0.13);
+}
+/* The tail sits at the top outer corner of the first bubble of a group. */
+.wa-tail-recv::before,
+.wa-tail-sent::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  width: 8px;
+  height: 13px;
+}
+.wa-tail-recv::before {
+  left: -8px;
+  background: var(--wa-recv);
+  clip-path: polygon(0 0, 100% 0, 100% 100%);
+}
+.wa-tail-sent::before {
+  right: -8px;
+  background: var(--wa-sent);
+  clip-path: polygon(0 0, 100% 0, 0 100%);
+}
+
+/* ------------------------------------------------------------------------ */
+/* Instagram Direct (light)                                                 */
+/* ------------------------------------------------------------------------ */
+
+.msg-instagram {
+  --ig-hairline: rgba(0, 0, 0, 0.1);
+  --ig-gray: #737373;
+  --ig-recv: #efefef;
+  --ig-field: #efefef;
+  --ig-sent: linear-gradient(160deg, #7a40f2 0%, #5b5cf0 45%, #3797f0 100%);
+  --ig-send: #0095f6;
+}
+
+.ig-hairline {
+  border-color: var(--ig-hairline);
+}
+.ig-gray {
+  color: var(--ig-gray);
+}
+.ig-recv {
+  background: var(--ig-recv);
+  color: #000000;
+}
+.ig-sent {
+  background: var(--ig-sent);
+  color: #ffffff;
+}
+.ig-field {
+  background: var(--ig-field);
+}
+.ig-send {
+  color: var(--ig-send);
+}
+.ig-preview {
+  background: #ffffff;
+  color: #000000;
+  border: 1px solid var(--ig-hairline);
+}
+.ig-preview-art {
+  background: #fafafa;
+}
+
+/* ------------------------------------------------------------------------ */
+/* Shared bits                                                              */
+/* ------------------------------------------------------------------------ */
+
+.msg-imessage .msg-input::placeholder {
+  color: var(--im-gray);
+}
+.msg-whatsapp .msg-input::placeholder {
+  color: var(--wa-gray);
+}
+.msg-instagram .msg-input::placeholder {
+  color: var(--ig-gray);
+}
+.im-plus {
+  background: var(--im-recv);
+}
+.wa-status {
+  width: fit-content;
+}

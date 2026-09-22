@@ -9,11 +9,11 @@ export {
   clearConfig,
   resolveConfig,
   normalizeBaseUrl,
-  type GoatConfig,
+  type AgentCommerceConfig,
   type ConfigStore,
   type ResolvedConfig,
 } from "./config.js";
-export { GoatApi, ApiError, fetchPublicConfig, REFRESH_WINDOW_MS } from "./api.js";
+export { AgentCommerceApi, ApiError, fetchPublicConfig, REFRESH_WINDOW_MS } from "./api.js";
 export { login, logout, parsePastedCode, type LoginOptions } from "./login.js";
 export { detectRequester } from "./requester.js";
 export { CliExit, EXIT } from "./output.js";

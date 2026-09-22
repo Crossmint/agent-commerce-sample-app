@@ -3,7 +3,7 @@ import { runCli } from "../src/program.js";
 import { EXIT } from "../src/output.js";
 import { fakeFetch, json, testContext } from "./helpers.js";
 
-describe("goat checkout", () => {
+describe("agent-commerce checkout", () => {
   it("create --wait stops with exit 2 and instructions when a question appears", async () => {
     let polls = 0;
     const { fetch, calls } = fakeFetch({
@@ -62,7 +62,7 @@ describe("goat checkout", () => {
     expect(out).toContain("Action needed: Where should we ship this?");
     expect(out).toContain("fullName*");
     expect(out).toContain(
-      `goat checkout answer run_1 req_1 --values '{"fullName":"","country":"US"}'`,
+      `agent-commerce checkout answer run_1 req_1 --values '{"fullName":"","country":"US"}'`,
     );
   });
 

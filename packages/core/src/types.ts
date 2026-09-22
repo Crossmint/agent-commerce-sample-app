@@ -155,7 +155,7 @@ export interface OrderIntent {
   createdAt?: string;
 }
 
-/** GOAT's user-facing name for an order intent. */
+/** Agent Commerce's user-facing name for an order intent. */
 export type AgentCard = OrderIntent;
 
 export interface CreateOrderIntentInput {
@@ -312,7 +312,7 @@ export interface CreateCheckoutInput {
   merchantGuidance?: string;
 }
 
-/** A JSON Schema object. Kept loose on purpose; GOAT walks `.properties`. */
+/** A JSON Schema object. Kept loose on purpose; Agent Commerce walks `.properties`. */
 export interface JsonSchema {
   type?: string | string[];
   title?: string;
@@ -356,7 +356,7 @@ export interface CheckoutRequiredAction {
 }
 
 /**
- * GOAT's flat view of an open input request. `id` is the `requestId` to
+ * Agent Commerce's flat view of an open input request. `id` is the `requestId` to
  * answer with. Built from `requiredAction` by `pendingActionOf`.
  */
 export interface PendingUserAction {

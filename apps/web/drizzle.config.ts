@@ -5,8 +5,8 @@ import { defineConfig } from "drizzle-kit";
 config({ path: ".env.local" });
 
 /**
- * One schema for the whole app: the chat tables and GOAT's own tables from
- * `@goat-wallet/server/drizzle`. `pnpm db:push` creates all of them.
+ * One schema for the whole app: the chat tables and Agent Commerce's own tables from
+ * `@agent-commerce/server/drizzle`. `pnpm db:push` creates all of them.
  *
  * The server package is listed by file path. drizzle-kit resolves imports with
  * Node's CommonJS resolver, which cannot see the package's `import`-only
@@ -15,7 +15,7 @@ config({ path: ".env.local" });
  */
 export default defineConfig({
   dialect: "postgresql",
-  schema: ["./lib/db/schema.ts", "./node_modules/@goat-wallet/server/dist/drizzle.js"],
+  schema: ["./lib/db/schema.ts", "./node_modules/@agent-commerce/server/dist/drizzle.js"],
   out: "./lib/db/migrations",
   dbCredentials: { url: process.env.DATABASE_URL ?? "" },
   strict: true,

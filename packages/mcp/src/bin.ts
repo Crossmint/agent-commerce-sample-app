@@ -1,18 +1,18 @@
 #!/usr/bin/env node
 /**
- * `goat-mcp`: serve the GOAT tools over stdio for local MCP hosts
+ * `agent-commerce-mcp`: serve the Agent Commerce tools over stdio for local MCP hosts
  * (Claude Code, Claude Desktop, Cursor, ...).
  *
- *   goat-mcp --api https://wallet.example.com [--requester "Claude Code"]
+ *   agent-commerce-mcp --api https://wallet.example.com [--requester "Claude Code"]
  *
- * Token: `GOAT_TOKEN` env, else `accessToken` from `~/.config/goat/config.json`
- * written by `goat login`. API URL: `--api`, else `GOAT_API` env, else the config file.
+ * Token: `AGENT_COMMERCE_TOKEN` env, else `accessToken` from `~/.config/agent-commerce/config.json`
+ * written by `agent-commerce login`. API URL: `--api`, else `AGENT_COMMERCE_API` env, else the config file.
  */
 import { readFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import { createGoatMcpServer } from "./server.js";
+import { createAgentCommerceMcpServer } from "./server.js";
 
 interface CliConfig {
   apiBaseUrl?: string;
@@ -35,9 +35,9 @@ function parseArgs(argv: string[]): { api?: string; token?: string; requester?: 
   return out;
 }
 
-export function goatConfigPath(env: NodeJS.ProcessEnv = process.env): string {
+export function cliConfigPath(env: NodeJS.ProcessEnv = process.env): string {
   const base = env.XDG_CONFIG_HOME || join(env.HOME || homedir(), ".config");
-  return join(base, "goat", "config.json");
+  return join(base, "agent-commerce", "config.json");
 }
 
 async function readCliConfig(path: string): Promise<CliConfig> {
@@ -51,25 +51,25 @@ async function readCliConfig(path: string): Promise<CliConfig> {
 
 /**
  * `--api https://wallet.example.com` points at the website. The API lives under
- * `/api/goat` in the reference app. A URL with a path is used as given.
+ * `/api/agent-commerce` in the reference app. A URL with a path is used as given.
  */
 export function resolveApiBaseUrl(input: string): string {
   const url = new URL(input);
-  if (url.pathname === "/" || url.pathname === "") url.pathname = "/api/goat";
+  if (url.pathname === "/" || url.pathname === "") url.pathname = "/api/agent-commerce";
   url.search = "";
   url.hash = "";
   return url.href.replace(/\/+$/, "");
 }
 
-const HELP = `goat-mcp: GOAT wallet tools over MCP stdio.
+const HELP = `agent-commerce-mcp: Agent Commerce wallet tools over MCP stdio.
 
-Usage: goat-mcp --api <url> [--requester <name>] [--token <jwt>]
+Usage: agent-commerce-mcp --api <url> [--requester <name>] [--token <jwt>]
 
-  --api        GOAT website or API URL, e.g. https://wallet.example.com
+  --api        Agent Commerce website or API URL, e.g. https://wallet.example.com
   --requester  Name shown to the user on approvals. Default "Agent".
-  --token      Bearer token. Default: $GOAT_TOKEN, else ~/.config/goat/config.json.
+  --token      Bearer token. Default: $AGENT_COMMERCE_TOKEN, else ~/.config/agent-commerce/config.json.
 
-Log in first with: goat login --api <url>
+Log in first with: agent-commerce login --api <url>
 `;
 
 async function main(): Promise<void> {
@@ -78,29 +78,29 @@ async function main(): Promise<void> {
     process.stderr.write(HELP);
     return;
   }
-  const config = await readCliConfig(goatConfigPath());
-  const apiInput = args.api ?? process.env.GOAT_API ?? config.apiBaseUrl;
-  const token = args.token ?? process.env.GOAT_TOKEN ?? config.accessToken;
+  const config = await readCliConfig(cliConfigPath());
+  const apiInput = args.api ?? process.env.AGENT_COMMERCE_API ?? config.apiBaseUrl;
+  const token = args.token ?? process.env.AGENT_COMMERCE_TOKEN ?? config.accessToken;
 
   if (!apiInput) {
-    process.stderr.write("goat-mcp: no API URL. Pass --api <url> or run `goat login --api <url>`.\n");
+    process.stderr.write("agent-commerce-mcp: no API URL. Pass --api <url> or run `agent-commerce login --api <url>`.\n");
     process.exit(2);
   }
   if (!token) {
-    process.stderr.write("goat-mcp: no token. Set GOAT_TOKEN or run `goat login`.\n");
+    process.stderr.write("agent-commerce-mcp: no token. Set AGENT_COMMERCE_TOKEN or run `agent-commerce login`.\n");
     process.exit(2);
   }
 
-  const server = createGoatMcpServer({
+  const server = createAgentCommerceMcpServer({
     apiBaseUrl: resolveApiBaseUrl(apiInput),
     bearerToken: token,
-    requester: args.requester ?? process.env.GOAT_REQUESTER,
+    requester: args.requester ?? process.env.AGENT_COMMERCE_REQUESTER,
   });
   const transport = new StdioServerTransport();
   await server.connect(transport);
 }
 
 main().catch((err: unknown) => {
-  process.stderr.write(`goat-mcp: ${err instanceof Error ? err.message : String(err)}\n`);
+  process.stderr.write(`agent-commerce-mcp: ${err instanceof Error ? err.message : String(err)}\n`);
   process.exit(1);
 });

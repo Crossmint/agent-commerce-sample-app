@@ -2,16 +2,15 @@
 
 import * as React from "react";
 import { CrossmintPaymentMethodManagement } from "@crossmint/client-sdk-react-ui";
-import type { PaymentMethod, RegistrationRail } from "@goat-wallet/core";
-import { CircleCheck, TriangleAlert } from "lucide-react";
+import type { PaymentMethod, RegistrationRail } from "@agent-commerce/core";
+import { AlertCircle, Check } from "lucide-react";
 import { errorMessage } from "../api/client.js";
 import { paymentMethodAppearanceFromTheme } from "../lib/appearance.js";
 import { paymentMethodLabel, registrationRailLabel } from "../lib/format.js";
 import { cn } from "../lib/utils.js";
-import { useGoat } from "../provider.js";
+import { useAgentCommerce } from "../provider.js";
 import { Skeleton } from "./primitives/skeleton.js";
 import { CrossmintScope } from "./crossmint-scope.js";
-import { Alert, AlertDescription, AlertTitle } from "./primitives/alert.js";
 import { Badge, type BadgeProps } from "./primitives/badge.js";
 import { Button } from "./primitives/button.js";
 import { Spinner } from "./primitives/spinner.js";
@@ -47,7 +46,7 @@ function railBadgeVariant(status: RegistrationRail["status"]): BadgeProps["varia
 
 /**
  * Saves a card with Crossmint's PCI component, then registers it for agent
- * cards on the GOAT server. Card numbers never touch your servers.
+ * cards on the Agent Commerce server. Card numbers never touch your servers.
  */
 export function SaveCard({
   onSaved,
@@ -59,7 +58,7 @@ export function SaveCard({
   showResult = true,
   className,
 }: SaveCardProps) {
-  const { api, jwt, crossmint } = useGoat();
+  const { api, jwt, crossmint } = useAgentCommerce();
   const [phase, setPhase] = React.useState<"idle" | "registering" | "done" | "error">("idle");
   const [error, setError] = React.useState<unknown>(undefined);
   const [result, setResult] = React.useState<SaveCardResult | undefined>(undefined);
@@ -109,13 +108,7 @@ export function SaveCard({
   );
 
   if (!crossmint.clientApiKey) {
-    return (
-      <Alert variant="destructive" className={className}>
-        <TriangleAlert />
-        <AlertTitle>Saving cards is not set up</AlertTitle>
-        <AlertDescription>The Crossmint client API key is missing.</AlertDescription>
-      </Alert>
-    );
+    return <Problem className={className} title="Saving cards is not set up" message="The Crossmint client API key is missing." />;
   }
 
   if (!jwt) {
@@ -128,11 +121,13 @@ export function SaveCard({
 
   if (phase === "done" && result && showResult) {
     return (
-      <div className={cn("flex flex-col gap-4 rounded-md border border-border bg-card p-5", className)}>
+      <div className={cn("flex flex-col gap-4 rounded-2xl bg-card p-5 ring-1 ring-foreground/10", className)}>
         <div className="flex items-center gap-3">
-          <CircleCheck className="size-6 text-success" />
+          <span aria-hidden className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground">
+            <Check className="size-4.5" strokeWidth={3} />
+          </span>
           <div>
-            <p className="font-semibold">Saved {paymentMethodLabel(result.paymentMethod)}</p>
+            <p className="text-sm font-medium">Saved {paymentMethodLabel(result.paymentMethod)}</p>
             <p className="text-sm text-muted-foreground">Agents can now ask to use it.</p>
           </div>
         </div>
@@ -152,16 +147,12 @@ export function SaveCard({
   return (
     <div className={cn("flex flex-col gap-4", className)}>
       {phase === "error" ? (
-        <Alert variant="destructive">
-          <TriangleAlert />
-          <AlertTitle>Card saved, but not registered for agents</AlertTitle>
-          <AlertDescription>
-            <p>{errorMessage(error)}</p>
-            <Button type="button" size="sm" variant="outline" onClick={() => setPhase("idle")}>
-              Try another card
-            </Button>
-          </AlertDescription>
-        </Alert>
+        <div className="flex flex-col gap-3">
+          <Problem title="Card saved, but not registered for agents" message={errorMessage(error)} />
+          <Button type="button" size="xl" variant="secondary" className="w-full" onClick={() => setPhase("idle")}>
+            Try another card
+          </Button>
+        </div>
       ) : null}
       {phase === "registering" ? (
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -178,6 +169,19 @@ export function SaveCard({
             onPaymentMethodSelected={handleSelected}
           />
         </CrossmintScope>
+      </div>
+    </div>
+  );
+}
+
+/** A fault, said plainly: the icon, a title, one line. */
+function Problem({ title, message, className }: { title: string; message: string; className?: string }) {
+  return (
+    <div role="alert" className={cn("flex items-start gap-3", className)}>
+      <AlertCircle aria-hidden className="mt-0.5 size-5 shrink-0 text-destructive" />
+      <div className="min-w-0">
+        <p className="text-sm font-medium text-foreground">{title}</p>
+        <p className="text-sm text-muted-foreground">{message}</p>
       </div>
     </div>
   );

@@ -2,7 +2,7 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { ContextOverrides } from "../src/context.js";
-import { createConfigStore, type GoatConfig } from "../src/config.js";
+import { createConfigStore, type AgentCommerceConfig } from "../src/config.js";
 
 export interface FakeCall {
   url: string;
@@ -58,21 +58,21 @@ export function json(body: unknown, status = 200): Response {
 }
 
 export function tempConfigDir(): string {
-  return mkdtempSync(join(tmpdir(), "goat-cli-test-"));
+  return mkdtempSync(join(tmpdir(), "agent-commerce-cli-test-"));
 }
 
 /** Overrides with a temp config dir, captured output, and a saved session. */
 export function testContext(opts: {
   fetch: typeof fetch;
-  config?: Partial<GoatConfig> | null;
+  config?: Partial<AgentCommerceConfig> | null;
   env?: Record<string, string>;
 }) {
   const dir = tempConfigDir();
-  const env: Record<string, string | undefined> = { GOAT_CONFIG_DIR: dir, ...opts.env };
+  const env: Record<string, string | undefined> = { AGENT_COMMERCE_CONFIG_DIR: dir, ...opts.env };
   const store = createConfigStore(env);
   if (opts.config !== null) {
     store.write({
-      apiBaseUrl: "https://wallet.test/api/goat",
+      apiBaseUrl: "https://wallet.test/api/agent-commerce",
       accessToken: "access-1",
       refreshToken: "refresh-1",
       expiresAt: new Date(Date.now() + 3_600_000).toISOString(),

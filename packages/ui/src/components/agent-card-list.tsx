@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { hasCardRail, pendingVerificationRails, type AgentCard, type OrderIntentRail } from "@goat-wallet/core";
+import { hasCardRail, pendingVerificationRails, type AgentCard, type OrderIntentRail } from "@agent-commerce/core";
 import { VerifyAgentCard } from "./verify-agent-card.js";
 import { cn } from "../lib/utils.js";
 import { formatAmount, formatDate, railLongLabel, railShortLabel } from "../lib/format.js";
@@ -33,6 +33,22 @@ export function agentCardStatusBadge(card: AgentCard): { label: string; variant:
   if (pending) return { label: "Needs verification", variant: "warning" };
   if (card.rails.some((r) => r.status === "active")) return { label: "Active", variant: "success" };
   return { label: "Inactive", variant: "muted" };
+}
+
+/** The three piles a wallet sorts budgets into. */
+export type AgentCardGroup = "active" | "needs-verification" | "expired";
+
+/**
+ * Which pile a budget belongs to, from the same reading `agentCardStatusBadge`
+ * makes — so the group a card lands in and the badge it wears can never
+ * disagree. Revoked and inactive budgets join the expired pile: all three are
+ * budgets nothing can be spent from again.
+ */
+export function agentCardGroup(card: AgentCard): AgentCardGroup {
+  const { label } = agentCardStatusBadge(card);
+  if (label === "Active") return "active";
+  if (label === "Needs verification") return "needs-verification";
+  return "expired";
 }
 
 export function RailBadge({ rail }: { rail: OrderIntentRail }) {
@@ -92,17 +108,18 @@ export function AgentCardList({
         return (
           <li
             key={card.orderIntentId}
-            className="flex flex-col gap-3 rounded-md border border-border bg-card p-5"
+            className="flex flex-col gap-3 rounded-2xl bg-card p-5 ring-1 ring-foreground/10"
           >
            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div className="min-w-0 flex-1 space-y-2">
               <div className="flex flex-wrap items-center gap-2">
-                <p className="truncate font-semibold">{card.description}</p>
+                <p className="truncate text-sm font-medium">{card.description}</p>
                 <Badge variant={status.variant}>{status.label}</Badge>
               </div>
-              <p className="text-2xl font-semibold tracking-tight">
+              {/* Money is the one thing set in the display face. */}
+              <p className="font-display text-2xl font-semibold tracking-tight tabular-nums">
                 {formatAmount(card.amount.available, card.amount.currency)}
-                <span className="ml-1 text-sm font-normal text-muted-foreground">
+                <span className="ml-1 font-sans text-sm font-normal text-muted-foreground">
                   of {formatAmount(card.amount.total, card.amount.currency)} available
                 </span>
               </p>
@@ -123,7 +140,7 @@ export function AgentCardList({
               {revocable ? (
                 <Button
                   type="button"
-                  variant="outline"
+                  variant="secondary"
                   size="sm"
                   disabled={busy === card.orderIntentId}
                   onClick={async () => {
@@ -142,7 +159,7 @@ export function AgentCardList({
             </div>
            </div>
             {isVerifying ? (
-              <div className="rounded-md border border-border bg-background p-4">
+              <div className="rounded-2xl bg-muted p-4">
                 <p className="mb-3 text-sm text-muted-foreground">
                   Confirm with your card network so agents can get a card number.
                 </p>

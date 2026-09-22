@@ -1,13 +1,13 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
-import { describeTool, formatAmount, PARAM_DOCS, paramDoc, renderPendingAction, TOOL_DOCS, toDecimalString, toolNamesFor } from "@goat-wallet/core";
-import type { RenderedAction, RenderedField, ToolNameFor } from "@goat-wallet/core";
-import { GoatApiError } from "./goat-api.js";
-import type { AgentCard, AgentCardRequest, CheckoutView, CredentialResult, GoatApi } from "./goat-api.js";
+import { describeTool, formatAmount, PARAM_DOCS, paramDoc, renderPendingAction, TOOL_DOCS, toDecimalString, toolNamesFor } from "@agent-commerce/core";
+import type { RenderedAction, RenderedField, ToolNameFor } from "@agent-commerce/core";
+import { AgentCommerceApiError } from "./api.js";
+import type { AgentCard, AgentCardRequest, CheckoutView, CredentialResult, AgentCommerceApi } from "./api.js";
 import * as z from "zod";
 
-export interface GoatToolsContext {
-  api: GoatApi;
+export interface AgentCommerceToolsContext {
+  api: AgentCommerceApi;
   /** Label shown to the user on the approval screen, e.g. "Claude". Default "Agent". */
   requester?: string;
 }
@@ -18,8 +18,8 @@ export interface GoatToolsContext {
  * MCP-specific sentence to each description (links to show, fields returned)
  * and the zod shapes.
  */
-export type GoatToolName = ToolNameFor<"mcp">;
-export const GOAT_TOOL_NAMES: readonly GoatToolName[] = toolNamesFor("mcp");
+export type AgentCommerceToolName = ToolNameFor<"mcp">;
+export const AGENT_COMMERCE_TOOL_NAMES: readonly AgentCommerceToolName[] = toolNamesFor("mcp");
 
 // ---------------------------------------------------------------------------
 // Shared schemas
@@ -37,13 +37,13 @@ const merchantSchema = z
   })
   .describe(PARAM_DOCS.merchant);
 
-const title = (name: GoatToolName) => TOOL_DOCS[name].title;
+const title = (name: AgentCommerceToolName) => TOOL_DOCS[name].title;
 
 // ---------------------------------------------------------------------------
 // Registration
 // ---------------------------------------------------------------------------
 
-export function registerGoatTools(server: McpServer, ctx: GoatToolsContext): void {
+export function registerAgentCommerceTools(server: McpServer, ctx: AgentCommerceToolsContext): void {
   const { api } = ctx;
 
   server.registerTool(
@@ -283,7 +283,7 @@ function ok(text: string, structuredContent: Record<string, unknown>): CallToolR
 }
 
 function fail(err: unknown): CallToolResult {
-  if (err instanceof GoatApiError) {
+  if (err instanceof AgentCommerceApiError) {
     const hint =
       err.code === "unauthorized"
         ? " The user must connect (log in) again."
@@ -292,7 +292,7 @@ function fail(err: unknown): CallToolResult {
           : "";
     return {
       isError: true,
-      content: [{ type: "text", text: `GOAT error ${err.code}: ${err.message}.${hint}` }],
+      content: [{ type: "text", text: `Agent Commerce error ${err.code}: ${err.message}.${hint}` }],
       structuredContent: { error: { code: err.code, message: err.message, status: err.status, details: err.details } },
     };
   }

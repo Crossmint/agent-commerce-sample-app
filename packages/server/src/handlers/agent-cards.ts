@@ -1,4 +1,4 @@
-import { withAgentRails } from "@goat-wallet/core";
+import { withAgentRails } from "@agent-commerce/core";
 import { parseBody, requireUser, type Ctx } from "../context.js";
 import { mintFromAgentCard } from "../credentials.js";
 import { json, noContent } from "../errors.js";

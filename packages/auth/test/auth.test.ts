@@ -20,13 +20,13 @@ describe("createJwksUserAuth", () => {
       .setProtectedHeader({ alg: "RS256", kid: "k1" })
       .setSubject("user-1")
       .setIssuer("me")
-      .setAudience("goat")
+      .setAudience("agent-commerce")
       .setExpirationTime("5m")
       .sign(privateKey);
     const origFetch = globalThis.fetch;
     globalThis.fetch = (async () => new Response(JSON.stringify({ keys: [jwk] }), { headers: { "content-type": "application/json" } })) as typeof fetch;
     try {
-      const auth = createJwksUserAuth({ jwksUrl: "https://example.test/jwks", issuer: "me", audience: "goat" });
+      const auth = createJwksUserAuth({ jwksUrl: "https://example.test/jwks", issuer: "me", audience: "agent-commerce" });
       const user = await auth.verify(jwt);
       expect(user?.userId).toBe("user-1");
       expect(user?.email).toBe("a@b.c");

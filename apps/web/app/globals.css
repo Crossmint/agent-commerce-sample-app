@@ -1,21 +1,30 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
-/* GOAT theme tokens and the @theme mapping. Retheme there, not here. */
-@import "@goat-wallet/ui/styles.css";
+/* Theme tokens and the @theme mapping. Retheme there, not here. */
+@import "@agent-commerce/ui/styles.css";
 
 /* Tailwind must see the classes used inside the UI package. */
-@source "../node_modules/@goat-wallet/ui/dist";
+@source "../node_modules/@agent-commerce/ui/dist";
 
 @custom-variant dark (&:where(.dark, .dark *));
 
+/*
+ * Type. The utilities read a stack variable rather than a literal, so a brand
+ * wrapper (`data-brand`) can swap the face by redefining the stack. System
+ * sans for UI text; Mona Sans is display only, for figures.
+ */
+:root {
+  --font-sans-stack:
+    ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+  --font-display-stack: var(--font-mona), var(--font-sans-stack);
+}
+
 @theme inline {
-  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-sans-stack);
   --font-mono: var(--font-geist-mono), ui-monospace, monospace;
-  /* Display type for headlines and the "agents" lockup word. */
-  --font-display: var(--font-plus-jakarta), var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
-  /* The GOAT pixel wordmark. */
-  --font-pixel: var(--font-vcr), ui-monospace, monospace;
+  --font-heading: var(--font-sans-stack);
+  --font-display: var(--font-display-stack);
 }
 
 html {
@@ -24,55 +33,234 @@ html {
 
 body {
   font-family: var(--font-sans);
+  /* The dot grid behind the device mockups. Pages with a solid ground cover it. */
+  background-image: radial-gradient(color-mix(in oklch, var(--device-frame-border) 40%, transparent) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+
+/* Hide scrollbars inside the phone screen, as a phone does. */
+.scrollbar-none {
+  scrollbar-width: none;
+}
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+
+/* Staggered entrance, pair with an inline animation-delay. */
+@keyframes enter-up {
+  from {
+    opacity: 0;
+    transform: translateY(var(--enter-up-distance, 10px));
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* `backwards` so buttons keep their press transform after the animation. */
+.enter-up {
+  animation: enter-up 340ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+
+/* .enter-up variant for a block that enters alone. */
+.enter-up-far {
+  --enter-up-distance: 28px;
+  animation-duration: 440ms;
+}
+
+/* .enter-up mirrored for blocks that enter from above. */
+@keyframes enter-down {
+  from {
+    opacity: 0;
+    transform: translateY(var(--enter-down-distance, -10px));
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.enter-down {
+  animation: enter-down 340ms cubic-bezier(0.34, 1.56, 0.64, 1) backwards;
+}
+
+.enter-down-far {
+  --enter-down-distance: -28px;
+  animation-duration: 520ms;
+}
+
+/* Typing dots and a caret for the chat mocks. */
+@keyframes caret-blink {
+  0%,
+  50% {
+    opacity: 1;
+  }
+  50.01%,
+  100% {
+    opacity: 0;
+  }
+}
+
+.caret-blink {
+  animation: caret-blink 1.1s steps(1) infinite;
 }
 
 /*
- * The powered-by marquee, used on the landing page and on sign in.
- *
- * The track repeats its items `--goat-marquee-copies` times and slides by
- * exactly one copy, so the next copy arrives where the last began and the
- * loop has no seam. Two conditions make that hold:
- *
- * 1. The spacing rides on the items themselves. A `gap` on the track would
- *    leave the gap between copies unaccounted for, and the strip would jump
- *    by that much every cycle.
- * 2. There are enough copies to keep the window full at the end of a cycle,
- *    which needs `visible width <= (copies - 1) * one copy`. With two copies
- *    a strip wider than one copy runs dry and shows a gap before it loops.
- *
- * The wrapper masks both edges, so logos fade in and out rather than being
- * cut off at the border. Hovering or tabbing in pauses the slide, which is
- * what makes the logos clickable, and reduced motion stops it outright.
+ * The powered-by marquee. The track repeats its items `--ac-marquee-copies`
+ * times and slides by exactly one copy, so the loop has no seam. Spacing
+ * rides on the items, not the track. Hover pauses it, reduced motion stops it.
  */
-.goat-marquee {
+.ac-marquee {
   overflow: hidden;
   mask-image: linear-gradient(to right, transparent, #000 7%, #000 93%, transparent);
   -webkit-mask-image: linear-gradient(to right, transparent, #000 7%, #000 93%, transparent);
 }
 
-.goat-marquee-track {
+.ac-marquee-track {
   display: flex;
   width: max-content;
   align-items: center;
-  animation: goat-marquee 24s linear infinite;
+  animation: ac-marquee 24s linear infinite;
 }
 
-.goat-marquee:hover .goat-marquee-track,
-.goat-marquee:focus-within .goat-marquee-track {
+.ac-marquee:hover .ac-marquee-track,
+.ac-marquee:focus-within .ac-marquee-track {
   animation-play-state: paused;
 }
 
-@keyframes goat-marquee {
+@keyframes ac-marquee {
   from {
     transform: translateX(0);
   }
   to {
-    transform: translateX(calc(-100% / var(--goat-marquee-copies, 2)));
+    transform: translateX(calc(-100% / var(--ac-marquee-copies, 2)));
+  }
+}
+
+/* --device-scale is seeded in app/layout.tsx and synced in components/frame/device-frame.tsx. */
+@media (min-width: 768px) {
+  .device-frame {
+    height: calc(886px * var(--device-scale, 1));
+  }
+  .device-frame-inner {
+    transform: scale(var(--device-scale, 1));
+    transform-origin: top center;
+    transition: transform 150ms ease-out;
+  }
+  /* The desktop window mock scales the same way from its own token. */
+  .desktop-frame {
+    width: calc(1120px * var(--desktop-scale, 1));
+    height: calc(720px * var(--desktop-scale, 1));
+  }
+  .desktop-frame-inner {
+    transform: scale(var(--desktop-scale, 1));
+    transform-origin: top left;
+    transition: transform 150ms ease-out;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .goat-marquee-track {
+  .device-frame-inner,
+  .desktop-frame-inner {
+    transition: none;
+  }
+  .caret-blink,
+  .ac-marquee-track {
     animation: none;
   }
+  .enter-up,
+  .enter-down {
+    animation-duration: 1ms;
+    animation-delay: 0ms !important;
+  }
+}
+
+/* A phone under a bar fixed at the top of the page keeps clear of it. */
+@media (min-width: 768px) {
+  .device-frame {
+    margin-top: var(--reserve-top, 0px);
+  }
+}
+
+/*
+ * Example brands. Each `data-brand` value redefines the theme tokens for the
+ * subtree under it; every component follows, because the UI kit reads tokens
+ * only. The list and the picker copy live in components/brand-themes.ts.
+ * "acme" is the default and needs no block: it is the :root tokens.
+ */
+[data-brand] {
+  background-color: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans-stack);
+}
+
+[data-brand="nova"] {
+  color-scheme: dark;
+  --background: #0b0b10;
+  --foreground: #f4f4f8;
+  --card: #15151d;
+  --card-foreground: #f4f4f8;
+  --popover: #15151d;
+  --popover-foreground: #f4f4f8;
+  --primary: #c8f560;
+  --primary-hover: #d6f97f;
+  --primary-foreground: #0b0b10;
+  --secondary: #1e1e28;
+  --secondary-foreground: #f4f4f8;
+  --muted: #1e1e28;
+  --muted-strong: #2a2a36;
+  --muted-foreground: #9a9aae;
+  --accent: #1e1e28;
+  --accent-foreground: #f4f4f8;
+  --destructive: #ff6b6b;
+  --success: #c8f560;
+  --warning: #f5c860;
+  --border: rgba(255, 255, 255, 0.1);
+  --input: rgba(255, 255, 255, 0.12);
+  --ring: #c8f560;
+  --hairline: var(--border);
+  --device-frame: #1a1a22;
+  --keyboard-key-active: #2a2a36;
+  --radius: 1.25rem;
+  --font-sans-stack: var(--font-nova), ui-sans-serif, system-ui, sans-serif;
+  --font-display-stack: var(--font-nova), ui-sans-serif, system-ui, sans-serif;
+}
+
+[data-brand="maple"] {
+  --background: #fbf7f0;
+  --foreground: #2b1d14;
+  --card: #ffffff;
+  --card-foreground: #2b1d14;
+  --popover: #ffffff;
+  --popover-foreground: #2b1d14;
+  --primary: #d2521b;
+  --primary-hover: #bf4816;
+  --primary-foreground: #ffffff;
+  --secondary: #f1e9dd;
+  --secondary-foreground: #2b1d14;
+  --muted: #f1e9dd;
+  --muted-strong: #e6dbcb;
+  --muted-foreground: #7a6a5b;
+  --accent: #f1e9dd;
+  --accent-foreground: #2b1d14;
+  --destructive: #b3261e;
+  --success: #3f7d3a;
+  --warning: #b8760c;
+  --border: #e7dccb;
+  --input: #e7dccb;
+  --ring: #d2521b;
+  --hairline: var(--border);
+  --device-frame: #f3ece1;
+  --keyboard-key-active: #e6dbcb;
+  --radius: 0.25rem;
+  --font-display-stack: var(--font-maple), Georgia, "Times New Roman", serif;
+}
+
+/* Maple sets its headings in the serif face. */
+[data-brand="maple"] h1,
+[data-brand="maple"] h2,
+[data-brand="maple"] h3 {
+  font-family: var(--font-display-stack);
+  letter-spacing: -0.01em;
 }

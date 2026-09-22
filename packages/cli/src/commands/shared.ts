@@ -1,8 +1,8 @@
 import type { Command } from "commander";
-import type { Merchant, PendingUserAction, RenderedAction, RenderedField } from "@goat-wallet/core";
-import { renderPendingAction } from "@goat-wallet/core";
+import type { Merchant, PendingUserAction, RenderedAction, RenderedField } from "@agent-commerce/core";
+import { renderPendingAction } from "@agent-commerce/core";
 import pc from "picocolors";
-import { GoatApi } from "../api.js";
+import { AgentCommerceApi } from "../api.js";
 import { resolveConfig } from "../config.js";
 import type { CliContext } from "../context.js";
 import { fail, kv, notLoggedIn } from "../output.js";
@@ -17,11 +17,11 @@ export function withJson(cmd: Command): Command {
 }
 
 /** Build an authenticated client, or exit 3. */
-export function getApi(ctx: CliContext): GoatApi {
+export function getApi(ctx: CliContext): AgentCommerceApi {
   const config = resolveConfig(ctx.config, ctx.env);
   if (!config) throw notLoggedIn();
   if (!config.accessToken) throw notLoggedIn();
-  return new GoatApi({
+  return new AgentCommerceApi({
     config,
     fetch: ctx.fetch,
     store: config.tokenFromEnv ? undefined : ctx.config,
@@ -95,7 +95,7 @@ export function describeAction(checkoutId: string, action: RenderedAction): stri
   lines.push("");
   lines.push("Answer with:");
   lines.push(
-    `  goat checkout answer ${checkoutId} ${action.id} --values '${JSON.stringify(valuesTemplate(action.fields))}'`,
+    `  agent-commerce checkout answer ${checkoutId} ${action.id} --values '${JSON.stringify(valuesTemplate(action.fields))}'`,
   );
   lines.push(`  ${pc.dim("or")} --decline ${pc.dim("/")} --alternative "<what to do instead>"`);
   return lines;

@@ -4,7 +4,7 @@ import { useCallback } from "react";
 import { useStytch, useStytchSession } from "@stytch/nextjs";
 
 /**
- * The current Stytch session JWT for `GoatProvider`'s `getJwt`.
+ * The current Stytch session JWT for `AgentCommerceProvider`'s `getJwt`.
  * `getJwt` reads the token at call time, so every API request carries the
  * latest JWT after the SDK refreshes it in the background.
  */

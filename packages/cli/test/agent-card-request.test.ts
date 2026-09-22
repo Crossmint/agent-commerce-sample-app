@@ -22,7 +22,7 @@ function request(overrides: Partial<AgentCardRequest> = {}): AgentCardRequest {
   };
 }
 
-describe("goat agent-card request", () => {
+describe("agent-commerce agent-card request", () => {
   it("parses options into the POST body and prints the approval URL", async () => {
     const { fetch, calls } = fakeFetch({
       "POST /v1/agent-card-requests": (call) => json(request({ ...(call.body as object) }), 201),
@@ -51,7 +51,7 @@ describe("goat agent-card request", () => {
     expect(code).toBe(EXIT.OK);
     expect(calls).toHaveLength(1);
     expect(calls[0]?.method).toBe("POST");
-    expect(calls[0]?.url).toBe("https://wallet.test/api/goat/v1/agent-card-requests");
+    expect(calls[0]?.url).toBe("https://wallet.test/api/agent-commerce/v1/agent-card-requests");
     expect(calls[0]?.headers.authorization).toBe("Bearer access-1");
     expect(calls[0]?.body).toEqual({
       amount: { value: "49.90", currency: "USD" },
@@ -102,7 +102,7 @@ describe("goat agent-card request", () => {
     });
     const t = testContext({ fetch });
     await runCli(["agent-card", "request", "--amount", "5", "--description", "x"], t.overrides);
-    expect((calls[0]?.body as { requester: string }).requester).toBe("goat CLI on testbox");
+    expect((calls[0]?.body as { requester: string }).requester).toBe("agent-commerce CLI on testbox");
   });
 
   it("rejects a partial merchant and a bad amount without calling the API", async () => {
@@ -199,6 +199,6 @@ describe("goat agent-card request", () => {
     );
     expect(code).toBe(EXIT.NOT_LOGGED_IN);
     expect(calls).toHaveLength(0);
-    expect(t.stderr.join("\n")).toContain("goat login");
+    expect(t.stderr.join("\n")).toContain("agent-commerce login");
   });
 });

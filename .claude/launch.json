@@ -6,7 +6,7 @@
       "runtimeExecutable": "pnpm",
       "runtimeArgs": [
         "--filter",
-        "@goat-wallet/web",
+        "@agent-commerce/web",
         "dev"
       ],
       "port": 3000,
@@ -17,7 +17,7 @@
       "runtimeExecutable": "pnpm",
       "runtimeArgs": [
         "--filter",
-        "@goat-wallet/web",
+        "@agent-commerce/web",
         "dev",
         "-p",
         "3005"

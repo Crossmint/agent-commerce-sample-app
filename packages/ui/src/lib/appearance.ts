@@ -1,5 +1,5 @@
 /**
- * Read the GOAT theme from CSS variables so Crossmint's iframes match the page.
+ * Read the Agent Commerce theme from CSS variables so Crossmint's iframes match the page.
  * Runs in the browser only. Returns undefined during SSR.
  */
 export interface ThemeColors {
@@ -21,15 +21,15 @@ export function readThemeColors(el?: Element | null): ThemeColors | undefined {
   const cs = getComputedStyle(target);
   const v = (name: string, fallback: string) => cs.getPropertyValue(name).trim() || fallback;
   return {
-    background: v("--background", "#f2f3ef"),
+    background: v("--background", "#ffffff"),
     card: v("--card", "#ffffff"),
-    foreground: v("--foreground", "#0a1825"),
-    mutedForeground: v("--muted-foreground", "#5b6670"),
-    primary: v("--primary", "#11ba4b"),
-    border: v("--border", "rgba(10, 24, 37, 0.12)"),
-    destructive: v("--destructive", "#c8402f"),
-    success: v("--success", "#11ba4b"),
-    radius: v("--radius", "0.5rem"),
+    foreground: v("--foreground", "#171717"),
+    mutedForeground: v("--muted-foreground", "#737373"),
+    primary: v("--primary", "#4564ff"),
+    border: v("--border", "#e5e7eb"),
+    destructive: v("--destructive", "#dc2626"),
+    success: v("--success", "#16a34a"),
+    radius: v("--radius", "0.625rem"),
     fontFamily: cs.fontFamily || "system-ui, sans-serif",
   };
 }

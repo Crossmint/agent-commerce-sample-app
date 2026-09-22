@@ -28,12 +28,12 @@ export const serverEnv = {
   /** Public URL of this deployment, for approval links. */
   webBaseUrl(): string {
     return (
-      optional("GOAT_WEB_BASE_URL") ??
+      optional("AGENT_COMMERCE_WEB_BASE_URL") ??
       (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000")
     ).replace(/\/+$/, "");
   },
   apiBaseUrl(): string {
-    return `${this.webBaseUrl()}/api/goat`;
+    return `${this.webBaseUrl()}/api/agent-commerce`;
   },
 };
 

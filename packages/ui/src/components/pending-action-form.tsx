@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import type { RenderedAction, RenderedField } from "@goat-wallet/core";
+import type { RenderedAction, RenderedField } from "@agent-commerce/core";
 import { cn } from "../lib/utils.js";
 import { formatDateTime } from "../lib/format.js";
 import { Button } from "./primitives/button.js";
@@ -19,6 +19,9 @@ export interface PendingActionFormProps {
 }
 
 type Values = Record<string, unknown>;
+
+/** The phone-screen field: tall, 12px corners, on the grey fill, no border. */
+const FIELD = "h-12 rounded-xl border-0 bg-muted px-4 shadow-none";
 
 function getAt(values: Values, path: string[]): unknown {
   let cur: unknown = values;
@@ -73,15 +76,15 @@ export function PendingActionForm({ action, onSubmit, submitting = false, submit
         void onSubmit(values);
       }}
     >
-      <div className="space-y-1">
-        <h3 className="text-xl font-semibold tracking-tight">{action.title}</h3>
+      <div className="flex flex-col gap-1">
+        <h3 className="text-xl font-medium">{action.title}</h3>
         {action.description ? <p className="text-sm text-muted-foreground">{action.description}</p> : null}
         {action.expiresAt ? (
           <p className="text-xs text-muted-foreground">Answer before {formatDateTime(action.expiresAt)}.</p>
         ) : null}
       </div>
       <FieldList fields={action.fields} values={values} update={update} disabled={submitting} />
-      <Button type="submit" className="w-full" disabled={submitting}>
+      <Button type="submit" size="xl" className="w-full" disabled={submitting}>
         {submitting ? <Spinner /> : null}
         {submitLabel}
       </Button>
@@ -133,7 +136,7 @@ function Field({
   switch (field.kind) {
     case "object":
       return (
-        <fieldset className="flex flex-col gap-3 rounded-md border border-border p-4">
+        <fieldset className="flex flex-col gap-3 rounded-2xl border border-border p-4">
           <legend className="px-1 text-sm font-medium">{field.label}</legend>
           {help}
           <FieldList fields={field.children ?? []} values={values} update={update} disabled={disabled} />
@@ -161,6 +164,7 @@ function Field({
           {label}
           <NativeSelect
             id={id}
+            className={FIELD}
             required={field.required}
             disabled={disabled}
             value={value === undefined || value === null ? "" : String(value)}
@@ -188,6 +192,7 @@ function Field({
           {label}
           <Input
             id={id}
+            className={FIELD}
             required={field.required}
             disabled={disabled}
             placeholder="Separate items with commas"
@@ -211,6 +216,7 @@ function Field({
           {label}
           <Input
             id={id}
+            className={FIELD}
             type="number"
             inputMode="decimal"
             required={field.required}
@@ -229,6 +235,7 @@ function Field({
           {label}
           <Input
             id={id}
+            className={FIELD}
             type={type}
             required={field.required}
             disabled={disabled}

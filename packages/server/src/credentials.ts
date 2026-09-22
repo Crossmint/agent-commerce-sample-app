@@ -9,8 +9,8 @@ import {
   type MintCredentialInput,
   type OrderIntent,
   type RailKind,
-} from "@goat-wallet/core";
-import type { AuthenticatedUser } from "@goat-wallet/auth";
+} from "@agent-commerce/core";
+import type { AuthenticatedUser } from "@agent-commerce/auth";
 import type { Ctx } from "./context.js";
 import { HttpError } from "./errors.js";
 import type { CredentialResponse } from "./types.js";
@@ -23,6 +23,8 @@ export interface MintOptions {
   format?: "card";
   /** Rails to consider, in order. Default: the server's preference. */
   railPreference?: RailKind[];
+  /** Who asked, for the transactions list. Default: the server's `defaultRequester`. */
+  requester?: string;
 }
 
 export interface MintResult {
@@ -133,10 +135,33 @@ export async function mintFromAgentCard(
     card = await decryptEncryptedCard(credential.credential.value, privateJwk);
     response.card = card;
   } else {
-    throw new HttpError(502, "crossmint_error", "Crossmint returned a rail GOAT does not use");
+    throw new HttpError(502, "crossmint_error", "Crossmint returned a rail Agent Commerce does not use");
   }
 
-  console.info("[goat] credential minted", {
+  /*
+   * The transactions list. Recorded after the mint so a failed one leaves no
+   * line, and awaited so the row is there by the time the caller can ask for
+   * it. A store that cannot write must not fail the mint: the agent already
+   * holds a live credential, and losing the audit line is the smaller harm.
+   */
+  try {
+    await ctx.reveals.recordReveal({
+      userId: user.userId,
+      agentCardId,
+      paymentMethodId: orderIntent.paymentMethodId,
+      description: orderIntent.description,
+      amount,
+      merchant: orderIntent.merchant ?? merchant,
+      rail: response.rail,
+      provider: response.provider,
+      enforced,
+      requester: opts.requester,
+    });
+  } catch (e) {
+    console.error("[agent-commerce] could not record the reveal", e);
+  }
+
+  console.info("[agent-commerce] credential minted", {
     agentCardId,
     rail: rail.rail,
     provider: response.provider,

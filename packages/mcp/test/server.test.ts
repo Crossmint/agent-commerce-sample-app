@@ -1,18 +1,18 @@
 import { describe, expect, it } from "vitest";
 import {
   authorizationServerFromEndpoint,
-  createGoatMcpHandler,
+  createAgentCommerceMcpHandler,
   createProtectedResourceMetadataHandler,
   protectedResourceMetadata,
 } from "../src/index.js";
-import { mockGoatFetch } from "./helpers.js";
+import { mockAgentCommerceFetch } from "./helpers.js";
 
-const handler = createGoatMcpHandler({
-  apiBaseUrl: "https://wallet.example.com/api/goat",
+const handler = createAgentCommerceMcpHandler({
+  apiBaseUrl: "https://wallet.example.com/api/agent-commerce",
   resourceUrl: "https://wallet.example.com/api/mcp",
   authorizationServers: ["https://test.stytch.com/v1/public/project-test-123"],
   scopes: ["openid", "email"],
-  fetch: mockGoatFetch({}),
+  fetch: mockAgentCommerceFetch({}),
 });
 
 function initializeRequest(token?: string): Request {
@@ -32,7 +32,7 @@ function initializeRequest(token?: string): Request {
   });
 }
 
-describe("createGoatMcpHandler", () => {
+describe("createAgentCommerceMcpHandler", () => {
   it("returns 401 with WWW-Authenticate when no token is present", async () => {
     const res = await handler(initializeRequest());
     expect(res.status).toBe(401);
@@ -49,7 +49,7 @@ describe("createGoatMcpHandler", () => {
     expect(res.headers.get("content-type")).toContain("application/json");
     expect(res.headers.get("mcp-session-id")).toBeNull();
     const body = (await res.json()) as { result: { serverInfo: { name: string }; capabilities: { tools?: unknown } } };
-    expect(body.result.serverInfo.name).toBe("goat");
+    expect(body.result.serverInfo.name).toBe("agent-commerce");
     expect(body.result.capabilities.tools).toBeDefined();
   });
 });
@@ -66,7 +66,7 @@ describe("protected resource metadata", () => {
       authorization_servers: ["https://test.stytch.com/v1/public/project-test-123"],
       bearer_methods_supported: ["header"],
       scopes_supported: ["openid"],
-      resource_name: "GOAT wallet",
+      resource_name: "Agent Commerce wallet",
     });
   });
 

@@ -1,7 +1,7 @@
 {
-  "name": "@goat-wallet/server",
+  "name": "@agent-commerce/server",
   "version": "0.1.0",
-  "description": "GOAT HTTP API as Web-standard request handlers. Mount in Next.js or any runtime with Request/Response.",
+  "description": "Agent Commerce HTTP API as Web-standard request handlers. Mount in Next.js or any runtime with Request/Response.",
   "license": "MIT",
   "type": "module",
   "main": "./dist/index.js",
@@ -30,8 +30,8 @@
     "clean": "rm -rf dist .turbo"
   },
   "dependencies": {
-    "@goat-wallet/auth": "workspace:*",
-    "@goat-wallet/core": "workspace:*",
+    "@agent-commerce/auth": "workspace:*",
+    "@agent-commerce/core": "workspace:*",
     "zod": "^4.6.0"
   },
   "peerDependencies": {
@@ -43,7 +43,7 @@
     }
   },
   "devDependencies": {
-    "@goat-wallet/tsconfig": "workspace:*",
+    "@agent-commerce/tsconfig": "workspace:*",
     "drizzle-orm": "^0.45.0",
     "tsup": "^8.5.0",
     "typescript": "^5.9.0",

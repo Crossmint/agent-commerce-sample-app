@@ -1,18 +1,18 @@
 {
-  "name": "goat",
+  "name": "agent-commerce",
   "owner": {
     "name": "Crossmint",
     "email": "hello@crossmint.com"
   },
   "metadata": {
-    "description": "GOAT: let your agent pay with the user's own card, with their approval. Agent cards and agent checkouts powered by Crossmint.",
+    "description": "Agent Commerce: let your agent pay with the user's own card, with their approval. Agent cards and agent checkouts powered by Crossmint.",
     "version": "0.1.0"
   },
   "plugins": [
     {
-      "name": "goat",
+      "name": "agent-commerce",
       "source": "./plugins/cursor",
-      "description": "Pay with the user's card through GOAT: request a bounded agent card, get it approved, check out anywhere."
+      "description": "Pay with the user's card through Agent Commerce: request a bounded agent card, get it approved, check out anywhere."
     }
   ]
 }

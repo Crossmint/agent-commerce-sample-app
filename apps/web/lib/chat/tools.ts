@@ -1,11 +1,11 @@
 import { tool } from "ai";
-import { describeTool, PARAM_DOCS, paramDoc, type ToolNameFor } from "@goat-wallet/core";
+import { describeTool, PARAM_DOCS, paramDoc, type ToolNameFor } from "@agent-commerce/core";
 import { z } from "zod";
 import { CHAT_REQUESTER } from "./config";
-import { GoatToolError, type GoatClient } from "./goat-client";
+import { AgentCommerceToolError, type AgentCommerceClient } from "./api-client";
 
 /**
- * GOAT tools for the chat model. Every tool runs in process against the GOAT
+ * Agent Commerce tools for the chat model. Every tool runs in process against the Agent Commerce
  * handlers with the user's own session JWT, so the model can do exactly what
  * the user could do from the wallet page, and nothing more.
  *
@@ -51,12 +51,12 @@ export const approvalOutcomeSchema = z.object({
 });
 export type ApprovalOutcome = z.infer<typeof approvalOutcomeSchema>;
 
-/** Turn a GOAT API error into a plain tool result the model can read and explain. */
+/** Turn a Agent Commerce API error into a plain tool result the model can read and explain. */
 async function guard<T>(fn: () => Promise<T>): Promise<T | { error: string; code: string }> {
   try {
     return await fn();
   } catch (e) {
-    if (e instanceof GoatToolError) return { error: e.message, code: e.code };
+    if (e instanceof AgentCommerceToolError) return { error: e.message, code: e.code };
     return { error: e instanceof Error ? e.message : "Unknown error", code: "internal" };
   }
 }
@@ -84,14 +84,14 @@ function summarizeAgentCard(card: {
   };
 }
 
-export function createChatTools(goat: GoatClient) {
+export function createChatTools(api: AgentCommerceClient) {
   return {
     list_payment_methods: tool({
       description: describeTool("list_payment_methods"),
       inputSchema: z.object({}),
       execute: () =>
         guard(async () => {
-          const cards = await goat.listPaymentMethods();
+          const cards = await api.listPaymentMethods();
           return {
             paymentMethods: cards.map((pm) => ({
               paymentMethodId: pm.paymentMethodId,
@@ -108,13 +108,13 @@ export function createChatTools(goat: GoatClient) {
       description: describeTool("list_agent_cards"),
       inputSchema: z.object({}),
       execute: () =>
-        guard(async () => ({ agentCards: (await goat.listAgentCards()).map(summarizeAgentCard) })),
+        guard(async () => ({ agentCards: (await api.listAgentCards()).map(summarizeAgentCard) })),
     }),
 
     get_agent_card: tool({
       description: describeTool("get_agent_card"),
       inputSchema: z.object({ agentCardId: z.string().min(1).describe(paramDoc("get_agent_card", "agentCardId")) }),
-      execute: ({ agentCardId }) => guard(async () => summarizeAgentCard(await goat.getAgentCard(agentCardId))),
+      execute: ({ agentCardId }) => guard(async () => summarizeAgentCard(await api.getAgentCard(agentCardId))),
     }),
 
     request_agent_card: tool({
@@ -130,7 +130,7 @@ export function createChatTools(goat: GoatClient) {
       }),
       execute: (input) =>
         guard(async () => {
-          const req = await goat.createAgentCardRequest({ ...input, requester: CHAT_REQUESTER });
+          const req = await api.createAgentCardRequest({ ...input, requester: CHAT_REQUESTER });
           return {
             requestId: req.id,
             approvalUrl: req.approvalUrl,
@@ -161,7 +161,7 @@ export function createChatTools(goat: GoatClient) {
       }),
       execute: ({ agentCardId, ...rest }) =>
         guard(async () => {
-          const result = await goat.mintCredentials(agentCardId, rest);
+          const result = await api.mintCredentials(agentCardId, rest);
           return {
             agentCardId: result.agentCardId,
             rail: result.rail,
@@ -184,7 +184,7 @@ export function createChatTools(goat: GoatClient) {
       inputSchema: z.object({ agentCardId: z.string().min(1).describe(paramDoc("revoke_agent_card", "agentCardId")) }),
       execute: ({ agentCardId }) =>
         guard(async () => {
-          await goat.revokeAgentCard(agentCardId);
+          await api.revokeAgentCard(agentCardId);
           return { agentCardId, revoked: true };
         }),
     }),
@@ -203,13 +203,13 @@ export function createChatTools(goat: GoatClient) {
           .describe(paramDoc("create_checkout", "maxCost")),
         buyerProfileId: z.string().min(1).optional().describe(paramDoc("create_checkout", "buyerProfileId")),
       }),
-      execute: (input) => guard(() => goat.createCheckout(input)),
+      execute: (input) => guard(() => api.createCheckout(input)),
     }),
 
     get_checkout: tool({
       description: describeTool("get_checkout"),
       inputSchema: z.object({ checkoutId: z.string().min(1).describe(paramDoc("get_checkout", "checkoutId")) }),
-      execute: ({ checkoutId }) => guard(() => goat.getCheckout(checkoutId)),
+      execute: ({ checkoutId }) => guard(() => api.getCheckout(checkoutId)),
     }),
 
     answer_checkout: tool({
@@ -221,13 +221,13 @@ export function createChatTools(goat: GoatClient) {
         values: z.record(z.string(), z.unknown()).optional().describe(paramDoc("answer_checkout", "values")),
         text: z.string().max(20000).optional().describe(paramDoc("answer_checkout", "text")),
       }),
-      execute: ({ checkoutId, ...input }) => guard(() => goat.answerCheckout(checkoutId, input)),
+      execute: ({ checkoutId, ...input }) => guard(() => api.answerCheckout(checkoutId, input)),
     }),
 
     cancel_checkout: tool({
       description: describeTool("cancel_checkout"),
       inputSchema: z.object({ checkoutId: z.string().min(1).describe(paramDoc("cancel_checkout", "checkoutId")) }),
-      execute: ({ checkoutId }) => guard(() => goat.cancelCheckout(checkoutId)),
+      execute: ({ checkoutId }) => guard(() => api.cancelCheckout(checkoutId)),
     }),
   } satisfies ChatTools;
 }

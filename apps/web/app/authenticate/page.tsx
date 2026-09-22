@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { AuthenticateClient } from "@/components/authenticate-client";
+import { FocusScreen } from "@/components/focus-screen";
 
 export const metadata: Metadata = { title: "Signing in" };
 
@@ -7,7 +8,11 @@ function first(v: string | string[] | undefined): string | undefined {
   return Array.isArray(v) ? v[0] : v;
 }
 
-/** Stytch sends magic link and OAuth callbacks here with `token` and `stytch_token_type`. */
+/**
+ * Stytch sends magic link and OAuth callbacks here with `token` and
+ * `stytch_token_type`. The same phone screen as sign in, since the user just
+ * left it.
+ */
 export default async function AuthenticatePage({
   searchParams,
 }: {
@@ -15,8 +20,8 @@ export default async function AuthenticatePage({
 }) {
   const sp = await searchParams;
   return (
-    <main className="flex flex-1 items-center justify-center px-4 py-16">
+    <FocusScreen>
       <AuthenticateClient token={first(sp.token)} tokenType={first(sp.stytch_token_type)} />
-    </main>
+    </FocusScreen>
   );
 }

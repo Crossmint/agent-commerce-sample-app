@@ -19,11 +19,18 @@ export function GridNode({ className, size = 14 }: { className?: string; size?: 
   );
 }
 
-/** A 1px hairline across the page, with a diamond where it meets each content edge. Use it between sections. */
-export function GridRule({ className }: { className?: string }) {
+/**
+ * A 1px hairline across the page, with a diamond where it meets each content
+ * edge. Use it between sections.
+ *
+ * `inset` is the width the diamonds sit at. The rule itself always runs the
+ * full width; only the diamonds move, so a narrower column — the chat's
+ * composer — gets the same rule with its own edges marked.
+ */
+export function GridRule({ className, inset = "max-w-6xl" }: { className?: string; inset?: string }) {
   return (
     <div aria-hidden className={cn("relative h-px w-full bg-hairline", className)}>
-      <div className="relative mx-auto h-full w-full max-w-6xl px-4 sm:px-6">
+      <div className={cn("relative mx-auto h-full w-full px-4 sm:px-6", inset)}>
         <GridNode className="absolute top-1/2 left-4 -translate-x-1/2 -translate-y-1/2 sm:left-6" />
         <GridNode className="absolute top-1/2 right-4 translate-x-1/2 -translate-y-1/2 sm:right-6" />
       </div>

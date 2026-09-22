@@ -4,17 +4,20 @@ import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react
 import { useSearchParams } from "next/navigation";
 import { useStytch, useStytchSession, useStytchUser } from "@stytch/nextjs";
 import { parseOAuthAuthorizeParams } from "@stytch/vanilla-js";
-import { Lock, TriangleAlert } from "lucide-react";
-import { Alert, AlertDescription, AlertTitle, Button, Spinner } from "@goat-wallet/ui";
+import { AlertCircle, Lock } from "lucide-react";
+import { Button, Spinner } from "@agent-commerce/ui";
+import { ScreenHeading } from "@/components/focus-screen";
+import { cn } from "@/lib/cn";
 import { stytchMessage } from "@/lib/stytch-client";
 
 /**
- * The consent screen for Stytch Connected Apps, on GOAT's own components.
+ * The consent screen for Stytch Connected Apps, on the sample app's own
+ * components.
  *
  * Stytch ships a prebuilt `IdentityProvider`, but it is its own little design
- * inside our page. The headless `stytch.idp` calls give the same flow —
- * `oauthAuthorizeStart` reads the client and the scopes it asks for,
- * `oauthAuthorizeSubmit` answers and hands back the URL to leave by — so the
+ * inside our page. The headless `stytch.idp` calls give the same flow:
+ * `oauthAuthorizeStart` reads the client and the scopes it asks for, and
+ * `oauthAuthorizeSubmit` answers and hands back the URL to leave by. So the
  * screen can be built from the same pieces as sign-in and approval.
  *
  * Answering always ends in a redirect. Even Deny goes back to the client,
@@ -102,11 +105,7 @@ export function OAuthConsent() {
   if (!request) {
     return (
       <Step title="This request will not open" sub="Nothing was granted.">
-        <Alert variant="destructive">
-          <TriangleAlert />
-          <AlertTitle>Could not authorize</AlertTitle>
-          <AlertDescription>This link is missing something. Ask the agent for a new one.</AlertDescription>
-        </Alert>
+        <Problem title="Could not authorize" message="This link is missing something. Ask the agent for a new one." />
       </Step>
     );
   }
@@ -124,27 +123,20 @@ export function OAuthConsent() {
   if (state.kind === "broken") {
     return (
       <Step title="This request will not open" sub="Nothing was granted.">
-        <Alert variant="destructive">
-          <TriangleAlert />
-          <AlertTitle>Could not authorize</AlertTitle>
-          <AlertDescription>{state.message}</AlertDescription>
-        </Alert>
+        <Problem title="Could not authorize" message={state.message} />
       </Step>
     );
   }
 
   if (state.kind === "answered") {
-    return <Step title="Denied." sub="The agent has no login. You can close this tab." />;
+    return <Step title="Denied" sub="The agent has no login. You can close this tab." />;
   }
 
   const { client } = state;
 
   return (
-    <Step
-      title={`${client.name} wants to sign in as you`}
-      sub="It will be able to request payments from you. You approve each one on a screen like this."
-    >
-      <dl className="flex flex-col divide-y divide-border rounded-md border border-border bg-card">
+    <Step title={`${client.name} wants to sign in as you`} sub="It can ask you to approve payments. You approve each one on a screen like this.">
+      <dl className="flex flex-col rounded-2xl border border-border px-5">
         <Row label="App">
           <span className="flex items-center justify-end gap-2">
             {client.logoUrl ? (
@@ -165,12 +157,12 @@ export function OAuthConsent() {
         Your card is never shared with the agent.
       </p>
 
-      <div className="flex flex-col items-center gap-2">
-        <Button type="button" size="lg" className="w-full" disabled={Boolean(busy)} onClick={() => void answer(true)}>
+      <div className="mt-auto flex flex-col gap-2">
+        <Button type="button" size="xl" className="w-full" disabled={Boolean(busy)} onClick={() => void answer(true)}>
           {busy === "allow" ? <Spinner /> : null}
           Allow
         </Button>
-        <Button type="button" variant="link" size="sm" disabled={Boolean(busy)} onClick={() => void answer(false)}>
+        <Button type="button" variant="secondary" size="xl" className="w-full" disabled={Boolean(busy)} onClick={() => void answer(false)}>
           {busy === "deny" ? <Spinner /> : null}
           Deny
         </Button>
@@ -179,25 +171,35 @@ export function OAuthConsent() {
   );
 }
 
-/** The step's name and one line under it, as on sign-in. */
+/** The step's name and one line under it, then the step itself. */
 function Step({ title, sub, children }: { title: string; sub?: string; children?: ReactNode }) {
   return (
-    <div className="flex flex-col gap-7">
-      <div className="flex flex-col items-start gap-2">
-        <h1 className="font-display text-3xl leading-[1.1] font-semibold tracking-[-0.03em] text-balance text-foreground sm:text-4xl">{title}</h1>
-        {sub ? <p className="max-w-prose text-muted-foreground">{sub}</p> : null}
-      </div>
+    <div className="flex flex-1 flex-col gap-6">
+      <ScreenHeading title={title} sub={sub} />
       {children}
     </div>
   );
 }
 
 /** One line of the request, as on the approval screen. */
-function Row({ label, children }: { label: string; children: ReactNode }) {
+function Row({ label, strong = false, children }: { label: string; strong?: boolean; children: ReactNode }) {
   return (
-    <div className="flex items-baseline justify-between gap-6 px-4 py-3">
-      <dt className="shrink-0 text-sm text-muted-foreground">{label}</dt>
-      <dd className="min-w-0 text-right text-sm font-medium">{children}</dd>
+    <div className="flex items-center justify-between gap-6 border-b border-border/60 py-4 last:border-0">
+      <dt className={cn("shrink-0 text-sm", strong ? "font-medium text-foreground" : "text-muted-foreground")}>{label}</dt>
+      <dd className={cn("min-w-0 text-right text-sm", strong ? "font-semibold" : "font-medium")}>{children}</dd>
+    </div>
+  );
+}
+
+/** A fault, said plainly: the icon, a title, one line. */
+function Problem({ title, message }: { title: string; message: string }) {
+  return (
+    <div role="alert" className="flex items-start gap-3">
+      <AlertCircle aria-hidden className="mt-0.5 size-5 shrink-0 text-destructive" />
+      <div className="min-w-0">
+        <p className="text-sm font-medium text-foreground">{title}</p>
+        <p className="text-sm text-muted-foreground">{message}</p>
+      </div>
     </div>
   );
 }

@@ -10,5 +10,5 @@ export function detectRequester(env: Env = process.env, hostname: string = osHos
   if (env.CODEX || env.CODEX_SANDBOX) return "Codex";
   if (env.CURSOR_AGENT) return "Cursor";
   if (env.GEMINI_CLI) return "Gemini CLI";
-  return `goat CLI on ${hostname}`;
+  return `agent-commerce CLI on ${hostname}`;
 }

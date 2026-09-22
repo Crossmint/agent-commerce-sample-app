@@ -2,22 +2,23 @@ import { describe, expect, it } from "vitest";
 import { renderCallbackPage } from "../src/login.js";
 
 describe("the callback page", () => {
-  it("ends well on a success: a green disc, and the caller's line under it", () => {
+  it("ends well on a success: a blue disc, and the caller's line under it", () => {
     const page = renderCallbackPage(200, "Logged in", "You can close this window.");
     expect(page).toContain("disc ok");
     expect(page).toContain("<h1>Logged in</h1>");
     expect(page).toContain("You can close this window.");
     // Nothing to fix, so nothing to say about running login again.
-    expect(page).not.toContain("goat login");
-    // The grid: hairline cell, four diamonds, the wordmark.
-    expect(page).toContain('class="n tl"');
-    expect(page).toContain('aria-label="GOAT by Crossmint"');
+    expect(page).not.toContain("agent-commerce login");
+    // The onramp look: one white card on the dot grid, the Crossmint logotype above.
+    expect(page).toContain('class="card"');
+    expect(page).toContain('aria-label="Crossmint"');
+    expect(page).toContain("#4564FF");
   });
 
   it("shows a failure quietly, and says to run login again", () => {
     const page = renderCallbackPage(400, "Login failed", "access_denied: Consent is required");
     expect(page).toContain("disc no");
-    expect(page).toContain("goat login");
+    expect(page).toContain("agent-commerce login");
     expect(page).not.toContain("disc ok");
   });
 

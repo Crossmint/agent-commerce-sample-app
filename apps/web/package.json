@@ -1,5 +1,5 @@
 {
-  "name": "@goat-wallet/web",
+  "name": "@agent-commerce/web",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -15,15 +15,15 @@
     "db:studio": "drizzle-kit studio"
   },
   "dependencies": {
+    "@agent-commerce/auth": "workspace:*",
+    "@agent-commerce/core": "workspace:*",
+    "@agent-commerce/mcp": "workspace:*",
+    "@agent-commerce/server": "workspace:*",
+    "@agent-commerce/ui": "workspace:*",
     "@ai-sdk/anthropic": "^4.0.0",
     "@ai-sdk/openai": "^4.0.66",
     "@ai-sdk/react": "^4.0.0",
     "@crossmint/client-sdk-react-ui": "^4.6.0",
-    "@goat-wallet/auth": "workspace:*",
-    "@goat-wallet/core": "workspace:*",
-    "@goat-wallet/mcp": "workspace:*",
-    "@goat-wallet/server": "workspace:*",
-    "@goat-wallet/ui": "workspace:*",
     "@modelcontextprotocol/sdk": "^1.30.0",
     "@stytch/nextjs": "^22.3.0",
     "@stytch/vanilla-js": "^6.3.0",
@@ -45,7 +45,7 @@
     "zod": "^4.6.0"
   },
   "devDependencies": {
-    "@goat-wallet/tsconfig": "workspace:*",
+    "@agent-commerce/tsconfig": "workspace:*",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",

@@ -30,7 +30,7 @@ function SheetOverlay({ className, ...props }: React.ComponentProps<typeof Sheet
     <SheetPrimitive.Overlay
       data-slot="sheet-overlay"
       className={cn(
-        "fixed inset-0 z-50 bg-foreground/40 backdrop-blur-[2px]",
+        "fixed inset-0 z-50 bg-black/10 backdrop-blur-xs",
         "data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0",
         className,
       )}
@@ -40,10 +40,10 @@ function SheetOverlay({ className, ...props }: React.ComponentProps<typeof Sheet
 }
 
 const SIDES = {
-  bottom: "inset-x-0 bottom-0 max-h-[88svh] w-full rounded-t-xl border-t data-[state=open]:slide-in-from-bottom data-[state=closed]:slide-out-to-bottom",
-  top: "inset-x-0 top-0 max-h-[88svh] w-full rounded-b-xl border-b data-[state=open]:slide-in-from-top data-[state=closed]:slide-out-to-top",
-  left: "inset-y-0 left-0 h-full w-3/4 border-r sm:max-w-sm data-[state=open]:slide-in-from-left data-[state=closed]:slide-out-to-left",
-  right: "inset-y-0 right-0 h-full w-3/4 border-l sm:max-w-sm data-[state=open]:slide-in-from-right data-[state=closed]:slide-out-to-right",
+  bottom: "inset-x-0 bottom-0 max-h-[92svh] w-full rounded-t-[2rem] data-[state=open]:slide-in-from-bottom data-[state=closed]:slide-out-to-bottom",
+  top: "inset-x-0 top-0 max-h-[92svh] w-full rounded-b-[2rem] data-[state=open]:slide-in-from-top data-[state=closed]:slide-out-to-top",
+  left: "inset-y-0 left-0 h-full w-3/4 rounded-r-2xl sm:max-w-sm data-[state=open]:slide-in-from-left data-[state=closed]:slide-out-to-left",
+  right: "inset-y-0 right-0 h-full w-3/4 rounded-l-2xl sm:max-w-sm data-[state=open]:slide-in-from-right data-[state=closed]:slide-out-to-right",
 } as const;
 
 function SheetContent({
@@ -59,7 +59,7 @@ function SheetContent({
       <SheetPrimitive.Content
         data-slot="sheet-content"
         className={cn(
-          "fixed z-50 flex flex-col gap-5 border-border bg-popover p-5 text-popover-foreground shadow-lg duration-300",
+          "fixed z-50 flex flex-col gap-5 bg-popover p-6 text-popover-foreground shadow-[0_-8px_40px_-12px_rgba(0,0,0,0.15)] duration-300",
           "data-[state=open]:animate-in data-[state=closed]:animate-out",
           SIDES[side],
           className,
@@ -70,7 +70,7 @@ function SheetContent({
         {showCloseButton ? (
           <SheetPrimitive.Close
             data-slot="sheet-close"
-            className="absolute top-4 right-4 rounded-sm text-muted-foreground transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/60 focus-visible:outline-none disabled:pointer-events-none"
+            className="absolute top-5 right-5 flex size-9 items-center justify-center rounded-full bg-muted text-foreground transition-colors hover:bg-muted-strong focus-visible:ring-2 focus-visible:ring-ring/60 focus-visible:outline-none disabled:pointer-events-none"
           >
             <X className="size-4" />
             <span className="sr-only">Close</span>
@@ -91,7 +91,7 @@ function SheetFooter({ className, ...props }: React.ComponentProps<"div">) {
 
 function SheetTitle({ className, ...props }: React.ComponentProps<typeof SheetPrimitive.Title>) {
   return (
-    <SheetPrimitive.Title data-slot="sheet-title" className={cn("text-lg leading-tight font-semibold tracking-tight", className)} {...props} />
+    <SheetPrimitive.Title data-slot="sheet-title" className={cn("text-[28px] leading-[1.2] font-semibold tracking-[-0.02em]", className)} {...props} />
   );
 }
 

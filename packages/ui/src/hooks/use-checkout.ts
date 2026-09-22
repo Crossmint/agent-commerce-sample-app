@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import type { CheckoutView } from "../api/types.js";
-import { useGoat } from "../provider.js";
+import { useAgentCommerce } from "../provider.js";
 import { useResource, type Resource } from "./use-resource.js";
 
 const TERMINAL = new Set(["succeeded", "blocked", "failed", "cancelled"]);
@@ -29,7 +29,7 @@ export interface UseCheckoutResult extends Resource<CheckoutView> {
 }
 
 export function useCheckout(checkoutId: string | undefined, { poll = true, pollMs }: UseCheckoutOptions = {}): UseCheckoutResult {
-  const { api } = useGoat();
+  const { api } = useAgentCommerce();
   const fetcher = React.useCallback(() => api.getCheckout(checkoutId as string), [api, checkoutId]);
   const [submitting, setSubmitting] = React.useState(false);
 

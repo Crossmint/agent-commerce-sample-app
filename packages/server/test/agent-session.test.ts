@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import type { UserAuth } from "@goat-wallet/auth";
+import type { UserAuth } from "@agent-commerce/auth";
 import { call, makeServer } from "./helpers.js";
 
 /** An auth adapter that sees "acc_*" as agent access tokens and "sess_*" as session JWTs. */

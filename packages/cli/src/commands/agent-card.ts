@@ -5,9 +5,9 @@ import {
   formatAmount,
   pollUntil,
   toDecimalString,
-} from "@goat-wallet/core";
+} from "@agent-commerce/core";
 import pc from "picocolors";
-import type { GoatApi } from "../api.js";
+import type { AgentCommerceApi } from "../api.js";
 import type { CliContext } from "../context.js";
 import { CliExit, EXIT, formatDate, kv, statusColor, table, toJson } from "../output.js";
 import { detectRequester } from "../requester.js";
@@ -142,7 +142,7 @@ export function registerAgentCardCommands(program: Command, ctx: CliContext): vo
       return;
     }
     if (agentCards.length === 0) {
-      ctx.out("No agent cards. Create one with `goat agent-card request`.");
+      ctx.out("No agent cards. Create one with `agent-commerce agent-card request`.");
       return;
     }
     const rows = agentCards.map((c) => [
@@ -220,7 +220,7 @@ export function registerAgentCardCommands(program: Command, ctx: CliContext): vo
       }
       if (!cred.enforced) {
         ctx.err(
-          pc.yellow("Warning: limit not enforced by the network. Prefer `goat checkout create`."),
+          pc.yellow("Warning: limit not enforced by the network. Prefer `agent-commerce checkout create`."),
         );
       }
     },
@@ -229,7 +229,7 @@ export function registerAgentCardCommands(program: Command, ctx: CliContext): vo
 
 async function waitForRequest(
   ctx: CliContext,
-  api: GoatApi,
+  api: AgentCommerceApi,
   request: AgentCardRequest,
   timeoutS: number | undefined,
 ): Promise<AgentCardRequest> {
@@ -260,7 +260,7 @@ async function waitForRequest(
     if ((e as Error).message === "Polling timed out") {
       throw new CliExit(
         EXIT.NEEDS_USER_ACTION,
-        `Still ${last.status}. Ask the user to open ${last.approvalUrl}, then run \`goat agent-card status ${last.id} --wait\`.`,
+        `Still ${last.status}. Ask the user to open ${last.approvalUrl}, then run \`agent-commerce agent-card status ${last.id} --wait\`.`,
         "approval_pending",
       );
     }
@@ -271,7 +271,7 @@ async function waitForRequest(
 
 async function printFinalRequest(
   ctx: CliContext,
-  api: GoatApi,
+  api: AgentCommerceApi,
   request: AgentCardRequest,
   json: boolean | undefined,
   allowPending = false,
@@ -291,7 +291,7 @@ async function printFinalRequest(
     if (card) for (const line of agentCardLines(card)) ctx.out(line);
     ctx.out("");
     ctx.out(
-      `Next: goat checkout create --url <product url> --agent-card ${request.agentCardId} --max-cost ${request.amount.value} --wait`,
+      `Next: agent-commerce checkout create --url <product url> --agent-card ${request.agentCardId} --max-cost ${request.amount.value} --wait`,
     );
   } else {
     printRequest(ctx, request);

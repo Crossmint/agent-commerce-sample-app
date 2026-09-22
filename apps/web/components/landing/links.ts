@@ -1,16 +1,17 @@
-/** External links used on the landing page. One place to update them. */
+/** External links used across the site. One place to update them. */
 export const GITHUB_URL = "https://github.com/Crossmint/goat";
-export const DOCS_URL = "https://github.com/Crossmint/goat#readme";
+export const DOCS_URL = "https://docs.crossmint.com";
 export const CROSSMINT_URL = "https://www.crossmint.com";
-// TODO: confirm the Telegram invite link before launch.
-export const TELEGRAM_URL = "https://t.me/goatwallet";
+export const CONTACT_SALES_URL = "https://www.crossmint.com/contact/sales";
 
 /** Crossmint on X. */
 export const X_URL = "https://x.com/crossmint_ai";
 
-/** The hosted MCP endpoint agents connect to. Change it when you deploy your own wallet. */
-export const MCP_URL = "https://goat-jade.vercel.app/api/mcp";
+/** The hosted deployment. Change it when you deploy your own copy. */
+export const HOSTED_ORIGIN = "https://goat-jade.vercel.app";
+/** The hosted MCP endpoint agents connect to. */
+export const MCP_URL = `${HOSTED_ORIGIN}/api/mcp`;
 /** One line to paste into any agent: it fetches the CLI install steps and the skill. */
-export const INSTALL_URL = "https://goat-jade.vercel.app/install";
+export const INSTALL_URL = `${HOSTED_ORIGIN}/install`;
 /** The plugin marketplace source for Cursor, Grok Bot and Claude Code. */
 export const PLUGIN_SOURCE = "Crossmint/goat";

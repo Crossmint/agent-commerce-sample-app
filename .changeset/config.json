@@ -5,5 +5,5 @@
   "access": "public",
   "baseBranch": "main",
   "updateInternalDependencies": "patch",
-  "ignore": ["@goat-wallet/web", "@goat-wallet/tsconfig"]
+  "ignore": ["@agent-commerce/web", "@agent-commerce/tsconfig"]
 }

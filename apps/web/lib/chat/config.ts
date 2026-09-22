@@ -45,5 +45,5 @@ export function attachmentsEnabled(): boolean {
   return Boolean(serverEnv.optional("BLOB_READ_WRITE_TOKEN"));
 }
 
-/** Label the GOAT server stores as the requester of agent card requests made from the chat. */
-export const CHAT_REQUESTER = "GOAT Chat";
+/** Label the Agent Commerce server stores as the requester of agent card requests made from the chat. */
+export const CHAT_REQUESTER = "Agent Commerce Chat";

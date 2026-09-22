@@ -1,17 +1,17 @@
 import type { OrderIntent, OrderIntentRail, RailKind } from "./types.js";
 
 /**
- * GOAT's rail policy: a card network rail (Visa Intelligent Commerce, Mastercard Agent Pay)
+ * Agent Commerce's rail policy: a card network rail (Visa Intelligent Commerce, Mastercard Agent Pay)
  * first, the encrypted-card fallback second. The Stripe `spt` rail is never used or shown.
  */
 export const DEFAULT_RAIL_PREFERENCE: RailKind[] = ["agentic-token", "encrypted-card"];
 
-/** Rails GOAT works with. Everything else is dropped before it reaches a UI or an agent. */
+/** Rails Agent Commerce works with. Everything else is dropped before it reaches a UI or an agent. */
 export function agentRails(orderIntent: Pick<OrderIntent, "rails">): OrderIntentRail[] {
   return orderIntent.rails.filter((r) => r.rail !== "spt");
 }
 
-/** Copy of an order intent with only the rails GOAT works with. */
+/** Copy of an order intent with only the rails Agent Commerce works with. */
 export function withAgentRails<T extends Pick<OrderIntent, "rails">>(orderIntent: T): T {
   return { ...orderIntent, rails: agentRails(orderIntent) };
 }

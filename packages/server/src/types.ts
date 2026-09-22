@@ -1,11 +1,11 @@
-import type { UserAuth } from "@goat-wallet/auth";
+import type { UserAuth } from "@agent-commerce/auth";
 import type {
   Amount,
   CrossmintEnvironment,
   EncryptedCardKeyPair,
   Merchant,
   RailKind,
-} from "@goat-wallet/core";
+} from "@agent-commerce/core";
 
 // ---------------------------------------------------------------------------
 // Agent card requests
@@ -14,7 +14,7 @@ import type {
 export type AgentCardRequestStatus =
   "pending" | "approved" | "active" | "denied" | "expired" | "failed";
 
-/** The agent's ask. GOAT stores it until the user answers. See docs/API.md. */
+/** The agent's ask. Agent Commerce stores it until the user answers. See docs/API.md. */
 export interface AgentCardRequest {
   /** "acr_" + 21 url-safe chars. */
   id: string;
@@ -48,8 +48,8 @@ export type AgentCardRequestPatch = Partial<
 >;
 
 /**
- * The one table GOAT owns. Implement it for your database, or use
- * `memoryRequestStore()` and `@goat-wallet/server/drizzle`.
+ * The one table Agent Commerce owns. Implement it for your database, or use
+ * `memoryRequestStore()` and `@agent-commerce/server/drizzle`.
  */
 export interface RequestStore {
   create(req: NewAgentCardRequest): Promise<AgentCardRequest>;
@@ -78,6 +78,57 @@ export interface CheckoutLink {
 export interface CheckoutStore {
   linkCheckout(checkoutId: string, userId: string, agentCardId: string): Promise<void>;
   getCheckout(checkoutId: string): Promise<CheckoutLink | null>;
+}
+
+// ---------------------------------------------------------------------------
+// Reveals
+// ---------------------------------------------------------------------------
+
+/**
+ * One credential minted from an agent card — a "reveal". This is the moment a
+ * budget turns into something spendable, so it is the line the user sees in
+ * their transactions.
+ *
+ * It records what was asked for, not what came back: no card number, no
+ * network token, no cryptogram ever reaches this row.
+ */
+export interface Reveal {
+  id: string;
+  userId: string;
+  agentCardId: string;
+  /** The saved card the budget draws on, copied so a line can show its artwork. */
+  paymentMethodId?: string;
+  /** What the agent card is for, copied at mint time so the line reads on its own. */
+  description?: string;
+  amount: Amount;
+  merchant?: Merchant;
+  /** The rail the credential came from. */
+  rail: string;
+  provider?: string;
+  /** False when the rail cannot hold the agent to the amount. */
+  enforced?: boolean;
+  /** Who asked. "Agent" when the caller did not say. */
+  requester?: string;
+  createdAt: string;
+}
+
+export type NewReveal = Omit<Reveal, "id" | "createdAt">;
+
+export interface ListRevealsOptions {
+  /** Default 100. */
+  limit?: number;
+  /** Only this budget's reveals. */
+  agentCardId?: string;
+}
+
+/**
+ * Optional. A store without it still mints credentials — the server keeps the
+ * reveals in memory instead and the list empties on restart.
+ */
+export interface RevealStore {
+  recordReveal(reveal: NewReveal): Promise<Reveal>;
+  /** Newest first. */
+  listReveals(userId: string, options?: ListRevealsOptions): Promise<Reveal[]>;
 }
 
 // ---------------------------------------------------------------------------
@@ -111,7 +162,7 @@ export interface SessionStore {
 
 export type PrivateJwk = EncryptedCardKeyPair["privateJwk"];
 
-export interface GoatCrossmintConfig {
+export interface AgentCommerceCrossmintConfig {
   /** Client-side key (`ck_...`). Used with the user JWT. */
   clientApiKey: string;
   /** Server-side key (`sk_...`). Used for Agent Checkouts with `x-crossmint-user-id`. */
@@ -127,7 +178,7 @@ export interface GoatCrossmintConfig {
   origin?: string;
 }
 
-export interface GoatAuthConfig {
+export interface AgentCommerceAuthConfig {
   provider: "stytch";
   projectId: string;
   environment: "test" | "live";
@@ -141,27 +192,27 @@ export interface GoatAuthConfig {
   authorizationUrl?: string;
 }
 
-export interface GoatServerConfig {
-  crossmint: GoatCrossmintConfig;
+export interface AgentCommerceServerConfig {
+  crossmint: AgentCommerceCrossmintConfig;
   userAuth: UserAuth;
   /**
    * Request store. Add the `CheckoutStore` methods to persist checkout links and the
    * `SessionStore` methods to persist exchanged agent sessions. Both fall back to memory.
    */
-  store: RequestStore & Partial<CheckoutStore> & Partial<SessionStore>;
+  store: RequestStore & Partial<CheckoutStore> & Partial<SessionStore> & Partial<RevealStore>;
   /** Enables the encrypted-card rail. */
   encryptedCardPrivateJwk?: PrivateJwk;
   /** For `approvalUrl`. No trailing slash. */
   webBaseUrl: string;
   /** For `GET /v1/config`. No trailing slash. */
   apiBaseUrl: string;
-  auth: GoatAuthConfig;
+  auth: AgentCommerceAuthConfig;
   /** Default 15. */
   requestTtlMinutes?: number;
   /** Default "Agent". */
   defaultRequester?: string;
   railPreference?: RailKind[];
-  /** Shown in `GET /v1/config`. Default "GOAT". */
+  /** Shown in `GET /v1/config`. Default "Agent Commerce". */
   name?: string;
 }
 

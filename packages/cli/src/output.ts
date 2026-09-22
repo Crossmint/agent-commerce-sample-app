@@ -23,7 +23,7 @@ export class CliExit extends Error {
 }
 
 export function notLoggedIn(detail?: string): CliExit {
-  const hint = "Run `goat login --api <url>` first.";
+  const hint = "Run `agent-commerce login --api <url>` first.";
   return new CliExit(
     EXIT.NOT_LOGGED_IN,
     detail ? `${detail} ${hint}` : `Not logged in. ${hint}`,

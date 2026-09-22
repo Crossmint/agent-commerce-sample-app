@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState, type ChangeEvent, type KeyboardEvent } from "react";
 import { ArrowUp, Paperclip, Square } from "lucide-react";
 import type { ChatStatus } from "ai";
-import { Button, cn } from "@goat-wallet/ui";
+import { Button, cn } from "@agent-commerce/ui";
 import type { Attachment } from "@/lib/chat/types";
 import { AttachmentPreview } from "./attachment-preview";
 import { Textarea } from "./textarea";
@@ -99,7 +99,7 @@ export function MultimodalInput({ status, attachmentsEnabled, onSend, onStop, on
 
   return (
     <form
-      className={cn("rounded-md border border-border bg-card shadow-sm transition-colors focus-within:border-ring/60", className)}
+      className={cn("rounded-2xl bg-card ring-1 ring-foreground/10 transition-shadow focus-within:ring-2 focus-within:ring-ring/40", className)}
       onSubmit={(e) => {
         e.preventDefault();
         submit();
@@ -122,7 +122,7 @@ export function MultimodalInput({ status, attachmentsEnabled, onSend, onStop, on
         onChange={(e) => setText(e.target.value)}
         onKeyDown={onKeyDown}
         onPaste={onPaste}
-        placeholder="Ask GOAT to buy something…"
+        placeholder="Ask the agent to buy something…"
         aria-label="Message"
         className="min-h-12 border-0 bg-transparent px-4 pt-3 shadow-none focus-visible:ring-0"
       />
@@ -131,18 +131,18 @@ export function MultimodalInput({ status, attachmentsEnabled, onSend, onStop, on
           {attachmentsEnabled ? (
             <>
               <input ref={fileInputRef} type="file" multiple accept="image/*,application/pdf" className="hidden" onChange={onFiles} tabIndex={-1} />
-              <Button type="button" variant="ghost" size="icon" aria-label="Attach a file" disabled={busy} onClick={() => fileInputRef.current?.click()}>
+              <Button type="button" variant="ghost" size="icon" className="rounded-full" aria-label="Attach a file" disabled={busy} onClick={() => fileInputRef.current?.click()}>
                 <Paperclip />
               </Button>
             </>
           ) : null}
         </div>
         {busy ? (
-          <Button type="button" size="icon" variant="secondary" aria-label="Stop" onClick={onStop}>
+          <Button type="button" size="icon" variant="secondary" className="rounded-full" aria-label="Stop" onClick={onStop}>
             <Square className="size-3.5 fill-current" />
           </Button>
         ) : (
-          <Button type="submit" size="icon" aria-label="Send" disabled={!canSend}>
+          <Button type="submit" size="icon" className="rounded-full" aria-label="Send" disabled={!canSend}>
             <ArrowUp />
           </Button>
         )}

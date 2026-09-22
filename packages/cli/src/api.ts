@@ -1,5 +1,5 @@
-import { refreshAccessToken } from "@goat-wallet/auth";
-import type { AgentCard, BuyerProfileInput, PaymentMethodList } from "@goat-wallet/core";
+import { refreshAccessToken } from "@agent-commerce/auth";
+import type { AgentCard, BuyerProfileInput, PaymentMethodList } from "@agent-commerce/core";
 import type { ConfigStore, ResolvedConfig } from "./config.js";
 import { EXIT, CliExit } from "./output.js";
 import type {
@@ -18,7 +18,7 @@ import type {
 /** Refresh the access token when it expires within this window. */
 export const REFRESH_WINDOW_MS = 60_000;
 
-/** An error envelope from the GOAT server, or a transport failure. */
+/** An error envelope from the Agent Commerce server, or a transport failure. */
 export class ApiError extends Error {
   readonly code: string;
   readonly status: number;
@@ -71,7 +71,7 @@ export async function fetchPublicConfig(
  * Adds the bearer token, refreshes it when near expiry, and turns the
  * error envelope into an `ApiError`.
  */
-export class GoatApi {
+export class AgentCommerceApi {
   private config: ResolvedConfig;
   private readonly fetchImpl: typeof fetch;
   private readonly store: ConfigStore | undefined;
@@ -183,7 +183,7 @@ export class GoatApi {
     if (!this.config.accessToken) {
       throw new CliExit(
         EXIT.NOT_LOGGED_IN,
-        "Not logged in. Run `goat login --api <url>` first.",
+        "Not logged in. Run `agent-commerce login --api <url>` first.",
         "not_logged_in",
       );
     }
@@ -214,7 +214,7 @@ export class GoatApi {
     } catch (e) {
       throw new CliExit(
         EXIT.NOT_LOGGED_IN,
-        `Session expired and refresh failed (${(e as Error).message}). Run \`goat login\` again.`,
+        `Session expired and refresh failed (${(e as Error).message}). Run \`agent-commerce login\` again.`,
         "not_logged_in",
       );
     }
@@ -262,7 +262,7 @@ async function parseResponse<T>(res: Response): Promise<T> {
 }
 
 /**
- * `@goat-wallet/auth` calls the global `fetch`. Swap it for the duration of
+ * `@agent-commerce/auth` calls the global `fetch`. Swap it for the duration of
  * one call so tests and custom transports stay in control.
  */
 export async function withFetch<T>(fetchImpl: typeof fetch, fn: () => Promise<T>): Promise<T> {

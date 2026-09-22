@@ -52,21 +52,23 @@ export function ConnectedAgents({ sessions, loading = false, onRevoke, className
         mascotSrc={mascotSrc}
         mascotSize={56}
         title="No agents connected"
-        description="Run goat login in a terminal, or connect an MCP client, and it appears here."
+        description="Run agent-commerce login in a terminal, or connect an MCP client."
       />
     );
   }
 
+  // The summary-list shape from the onramp sample app: one bordered block,
+  // a hairline between rows, the round grey icon leading each one.
   return (
-    <ul className={cn("flex flex-col divide-y divide-border rounded-md border border-border bg-card", className)}>
+    <ul className={cn("flex flex-col rounded-2xl border border-border px-5", className)}>
       {sessions.map((s) => (
-        <li key={s.id} className="flex items-center gap-4 px-5 py-4">
-          <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
+        <li key={s.id} className="flex items-center gap-4 border-b border-border/60 py-4 last:border-0">
+          <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-muted text-foreground">
             {s.agent ? <Bot className="size-5" /> : <Laptop className="size-5" />}
           </div>
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
-              <p className="truncate font-medium">{s.label}</p>
+              <p className="truncate text-sm font-medium">{s.label}</p>
               {s.current ? <Badge variant="muted">This session</Badge> : null}
             </div>
             {s.lastActive ? (
@@ -76,7 +78,7 @@ export function ConnectedAgents({ sessions, loading = false, onRevoke, className
           {onRevoke ? (
             <Button
               type="button"
-              variant="outline"
+              variant="secondary"
               size="sm"
               disabled={busy === s.id}
               onClick={async () => {

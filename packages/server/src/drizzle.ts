@@ -1,10 +1,12 @@
 /**
- * Postgres schema and Drizzle store for `@goat-wallet/server`.
- * Import from "@goat-wallet/server/drizzle". Needs `drizzle-orm` installed.
+ * Postgres schema and Drizzle store for `@agent-commerce/server`.
+ * Import from "@agent-commerce/server/drizzle". Needs `drizzle-orm` installed.
  */
-import type { Amount, Merchant } from "@goat-wallet/core";
-import { desc, eq } from "drizzle-orm";
+import type { Amount, Merchant } from "@agent-commerce/core";
+import { and, desc, eq } from "drizzle-orm";
 import {
+  boolean,
+  index,
   jsonb,
   pgTable,
   text,
@@ -19,14 +21,18 @@ import type {
   AgentSession,
   CheckoutLink,
   CheckoutStore,
+  ListRevealsOptions,
   NewAgentCardRequest,
+  NewReveal,
   RequestStore,
+  Reveal,
+  RevealStore,
   SessionStore,
 } from "./types.js";
 
 const tz = { withTimezone: true, mode: "date" } as const;
 
-/** The one table GOAT owns: the agent's ask, until the user answers. */
+/** The one table Agent Commerce owns: the agent's ask, until the user answers. */
 export const agentCardRequests = pgTable("agent_card_requests", {
   id: text("id").primaryKey(),
   userId: text("user_id").notNull(),
@@ -64,7 +70,32 @@ export const agentSessions = pgTable("agent_sessions", {
   updatedAt: timestamp("updated_at", tz).notNull().defaultNow(),
 });
 
-export const goatSchema = { agentCardRequests, checkouts, agentSessions };
+/**
+ * Every credential minted from an agent card: the user's transactions.
+ *
+ * What was asked for, never what came back — no card number, no network
+ * token, no cryptogram. Keep it that way.
+ */
+export const reveals = pgTable(
+  "reveals",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id").notNull(),
+    agentCardId: text("agent_card_id").notNull(),
+    paymentMethodId: text("payment_method_id"),
+    description: text("description"),
+    amount: jsonb("amount").$type<Amount>().notNull(),
+    merchant: jsonb("merchant").$type<Merchant>(),
+    rail: text("rail").notNull(),
+    provider: text("provider"),
+    enforced: boolean("enforced"),
+    requester: text("requester"),
+    createdAt: timestamp("created_at", tz).notNull().defaultNow(),
+  },
+  (t) => [index("reveals_user_id_created_at_idx").on(t.userId, t.createdAt)],
+);
+
+export const agentCommerceSchema = { agentCardRequests, checkouts, agentSessions, reveals };
 
 type RequestRow = typeof agentCardRequests.$inferSelect;
 
@@ -74,9 +105,9 @@ export type AnyPgDatabase = PgDatabase<PgQueryResultHKT, any, any>;
 
 /**
  * Request store plus checkout links on Postgres.
- * Create the tables with drizzle-kit from `goatSchema`, or run the SQL in the README.
+ * Create the tables with drizzle-kit from `agentCommerceSchema`, or run the SQL in the README.
  */
-export function drizzleRequestStore(db: AnyPgDatabase): RequestStore & CheckoutStore & SessionStore {
+export function drizzleRequestStore(db: AnyPgDatabase): RequestStore & CheckoutStore & SessionStore & RevealStore {
   return {
     async getSession(accessTokenHash: string): Promise<AgentSession | null> {
       const [row] = await db
@@ -180,6 +211,42 @@ export function drizzleRequestStore(db: AnyPgDatabase): RequestStore & CheckoutS
         .onConflictDoUpdate({ target: checkouts.id, set: { userId, agentCardId } });
     },
 
+    async recordReveal(reveal: NewReveal): Promise<Reveal> {
+      const [row] = await db
+        .insert(reveals)
+        .values({
+          // Sortable by time, and unique without another round trip.
+          id: `rev_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`,
+          userId: reveal.userId,
+          agentCardId: reveal.agentCardId,
+          paymentMethodId: reveal.paymentMethodId ?? null,
+          description: reveal.description ?? null,
+          amount: reveal.amount,
+          merchant: reveal.merchant ?? null,
+          rail: reveal.rail,
+          provider: reveal.provider ?? null,
+          enforced: reveal.enforced ?? null,
+          requester: reveal.requester ?? null,
+          createdAt: new Date(),
+        })
+        .returning();
+      return toReveal(row!);
+    },
+
+    async listReveals(userId: string, { limit = 100, agentCardId }: ListRevealsOptions = {}): Promise<Reveal[]> {
+      const rows = await db
+        .select()
+        .from(reveals)
+        .where(
+          agentCardId
+            ? and(eq(reveals.userId, userId), eq(reveals.agentCardId, agentCardId))
+            : eq(reveals.userId, userId),
+        )
+        .orderBy(desc(reveals.createdAt))
+        .limit(limit);
+      return rows.map(toReveal);
+    },
+
     async getCheckout(checkoutId: string): Promise<CheckoutLink | null> {
       const [row] = await db.select().from(checkouts).where(eq(checkouts.id, checkoutId)).limit(1);
       if (!row) return null;
@@ -191,6 +258,24 @@ export function drizzleRequestStore(db: AnyPgDatabase): RequestStore & CheckoutS
       };
     },
   };
+}
+
+function toReveal(row: typeof reveals.$inferSelect): Reveal {
+  const out: Reveal = {
+    id: row.id,
+    userId: row.userId,
+    agentCardId: row.agentCardId,
+    amount: row.amount,
+    rail: row.rail,
+    createdAt: row.createdAt.toISOString(),
+  };
+  if (row.paymentMethodId) out.paymentMethodId = row.paymentMethodId;
+  if (row.description) out.description = row.description;
+  if (row.merchant) out.merchant = row.merchant;
+  if (row.provider) out.provider = row.provider;
+  if (row.enforced !== null) out.enforced = row.enforced;
+  if (row.requester) out.requester = row.requester;
+  return out;
 }
 
 function toRequest(row: RequestRow): AgentCardRequest {

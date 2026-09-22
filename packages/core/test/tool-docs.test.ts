@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { describeTool, GOAT_TOOL_NAMES, paramDoc, TOOL_DOCS, toolNamesFor } from "../src/tool-docs.js";
+import { describeTool, AGENT_COMMERCE_TOOL_NAMES, paramDoc, TOOL_DOCS, toolNamesFor } from "../src/tool-docs.js";
 
 describe("tool docs", () => {
   it("every tool has a title, a summary, and at least one surface", () => {
-    for (const name of GOAT_TOOL_NAMES) {
+    for (const name of AGENT_COMMERCE_TOOL_NAMES) {
       const doc = TOOL_DOCS[name];
       expect(doc.title.length, name).toBeGreaterThan(3);
       expect(doc.summary.length, name).toBeGreaterThan(20);

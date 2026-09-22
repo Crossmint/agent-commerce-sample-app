@@ -48,7 +48,7 @@ export async function authenticateWithSessionFallback(authenticate: (minutes: nu
     await authenticate(SESSION_MINUTES);
   } catch (e: unknown) {
     if (!isSessionDurationError(e)) throw e;
-    console.warn("[goat] Session duration above the Stytch project maximum. Retrying with", FALLBACK_SESSION_MINUTES, "minutes.");
+    console.warn("[agent-commerce] Session duration above the Stytch project maximum. Retrying with", FALLBACK_SESSION_MINUTES, "minutes.");
     await authenticate(FALLBACK_SESSION_MINUTES);
   }
 }

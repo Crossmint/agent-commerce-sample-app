@@ -2,8 +2,8 @@
  * Postgres schema for the chat half, adapted from the Vercel AI Chatbot template.
  * Users are not stored here: `user_id` is the Stytch user id from the session.
  *
- * GOAT's own tables (agent card requests, checkout links) come from
- * `@goat-wallet/server/drizzle`. drizzle.config.ts lists that file next to this
+ * Agent Commerce's own tables (agent card requests, checkout links) come from
+ * `@agent-commerce/server/drizzle`. drizzle.config.ts lists that file next to this
  * one, so one `db:push` creates everything. This file does not import it:
  * drizzle-kit resolves imports with Node's CommonJS resolver, and the server
  * package only exports an `import` condition for `./drizzle`.

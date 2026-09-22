@@ -5,8 +5,8 @@ import { EXIT } from "../src/output.js";
 import { fakeFetch, json, stripAnsi, testContext } from "./helpers.js";
 
 const publicConfig = {
-  name: "GOAT",
-  apiBaseUrl: "https://wallet.test/api/goat",
+  name: "Agent Commerce",
+  apiBaseUrl: "https://wallet.test/api/agent-commerce",
   webBaseUrl: "https://wallet.test",
   crossmintEnvironment: "staging",
   auth: {
@@ -34,7 +34,7 @@ describe("parsePastedCode", () => {
   });
 });
 
-describe("goat login --code", () => {
+describe("agent-commerce login --code", () => {
   it("runs PKCE against /v1/config endpoints and saves the session", async () => {
     let printedUrl = "";
     const { fetch, calls } = fakeFetch({
@@ -58,7 +58,7 @@ describe("goat login --code", () => {
       err(line);
     };
     const code = await runCli(
-      ["login", "--api", "https://wallet.test/api/goat/", "--code"],
+      ["login", "--api", "https://wallet.test/api/agent-commerce/", "--code"],
       t.overrides,
     );
     expect(code).toBe(EXIT.OK);
@@ -76,7 +76,7 @@ describe("goat login --code", () => {
     });
     expect((tokenCall?.body as { code_verifier: string }).code_verifier).toBeTruthy();
     expect(t.store.read()).toMatchObject({
-      apiBaseUrl: "https://wallet.test/api/goat",
+      apiBaseUrl: "https://wallet.test/api/agent-commerce",
       accessToken: "at",
       refreshToken: "rt",
       tokenEndpoint: publicConfig.auth.oauth.tokenEndpoint,

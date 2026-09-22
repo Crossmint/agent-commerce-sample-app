@@ -1,5 +1,5 @@
-import { stytchEndpoints, inferStytchEnvironment } from "@goat-wallet/auth/stytch";
-import { createGoatMcpHandler, createProtectedResourceMetadataHandler } from "@goat-wallet/mcp";
+import { stytchEndpoints, inferStytchEnvironment } from "@agent-commerce/auth/stytch";
+import { createAgentCommerceMcpHandler, createProtectedResourceMetadataHandler } from "@agent-commerce/mcp";
 import { serverEnv } from "./env";
 
 // No full_access: MCP hosts are third-party clients, and Crossmint accepts their
@@ -19,7 +19,7 @@ function mcpOptions() {
     authorizationServers: [ep.projectDomain],
     scopes: SCOPES,
     requester: "MCP agent",
-    resourceName: "GOAT",
+    resourceName: "Agent Commerce",
   };
 }
 
@@ -27,7 +27,7 @@ let handler: ((req: Request) => Promise<Response>) | undefined;
 let metadata: ReturnType<typeof createProtectedResourceMetadataHandler> | undefined;
 
 export function getMcpHandler() {
-  handler ??= createGoatMcpHandler(mcpOptions());
+  handler ??= createAgentCommerceMcpHandler(mcpOptions());
   return handler;
 }
 

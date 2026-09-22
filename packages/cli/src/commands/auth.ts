@@ -10,7 +10,7 @@ export function registerAuthCommands(program: Command, ctx: CliContext): void {
     program
       .command("login")
       .description("log in through the browser (OAuth PKCE)")
-      .option("--api <url>", "GOAT API base URL, e.g. https://wallet.example.com/api/goat")
+      .option("--api <url>", "Agent Commerce API base URL, e.g. https://wallet.example.com/api/agent-commerce")
       .option("--code", "no local browser: print a URL and paste the code back"),
   ).action(async (opts: JsonOption & { api?: string; code?: boolean }) => {
     await login(ctx, { api: opts.api, code: opts.code, json: opts.json });

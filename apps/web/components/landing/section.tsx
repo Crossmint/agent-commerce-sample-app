@@ -6,15 +6,10 @@ export function Container({ className, children }: { className?: string; childre
   return <div className={cn("mx-auto w-full max-w-6xl px-4 sm:px-6", className)}>{children}</div>;
 }
 
-export interface SectionProps {
-  id?: string;
-  className?: string;
-  children: ReactNode;
-}
-
-export function Section({ id, className, children }: SectionProps) {
+/** A plain section on the canvas. Spacing separates it from its neighbors; there are no rules. */
+export function Section({ id, className, children }: { id?: string; className?: string; children: ReactNode }) {
   return (
-    <section id={id} className={cn("scroll-mt-20 py-20 sm:py-28", className)}>
+    <section id={id} className={cn("scroll-mt-24 py-16 sm:py-24", className)}>
       <Container>{children}</Container>
     </section>
   );
@@ -23,9 +18,9 @@ export function Section({ id, className, children }: SectionProps) {
 /** A section title with an optional line under it. Left-aligned, like all landing copy. */
 export function SectionHeading({ title, sub, className }: { title: string; sub?: ReactNode; className?: string }) {
   return (
-    <Reveal className={cn("mb-12 flex flex-col items-start gap-3 sm:mb-16", className)}>
-      <h2 className="font-display text-4xl font-semibold tracking-[-0.03em] text-foreground sm:text-5xl">{title}</h2>
-      {sub ? <p className="max-w-2xl text-lg text-muted-foreground sm:text-xl">{sub}</p> : null}
+    <Reveal className={cn("mb-10 flex flex-col items-start gap-3 sm:mb-14", className)}>
+      <h2 className="text-[28px] leading-[1.15] font-medium tracking-[-0.02em] text-foreground sm:text-[36px]">{title}</h2>
+      {sub ? <p className="max-w-2xl text-base text-muted-foreground sm:text-lg">{sub}</p> : null}
     </Reveal>
   );
 }

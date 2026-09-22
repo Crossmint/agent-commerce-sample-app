@@ -4,16 +4,21 @@ import type {
   AgentSession,
   CheckoutLink,
   CheckoutStore,
+  ListRevealsOptions,
   NewAgentCardRequest,
+  NewReveal,
   RequestStore,
+  Reveal,
+  RevealStore,
   SessionStore,
 } from "../types.js";
 
 /** In-memory request store. For tests and a first `pnpm dev` without a database. */
-export function memoryRequestStore(): RequestStore & CheckoutStore & SessionStore {
+export function memoryRequestStore(): RequestStore & CheckoutStore & SessionStore & RevealStore {
   const requests = new Map<string, AgentCardRequest>();
   const checkouts = memoryCheckoutStore();
   const sessions = memorySessionStore();
+  const reveals = memoryRevealStore();
   return {
     async create(req: NewAgentCardRequest) {
       const now = new Date().toISOString();
@@ -42,6 +47,32 @@ export function memoryRequestStore(): RequestStore & CheckoutStore & SessionStor
     getCheckout: checkouts.getCheckout,
     getSession: sessions.getSession,
     putSession: sessions.putSession,
+    recordReveal: reveals.recordReveal,
+    listReveals: reveals.listReveals,
+  };
+}
+
+/** In-memory reveals. Lost on restart, which empties the transactions list. */
+export function memoryRevealStore(): RevealStore {
+  const rows: Reveal[] = [];
+  let seq = 0;
+  return {
+    async recordReveal(reveal: NewReveal) {
+      const row: Reveal = {
+        ...reveal,
+        id: `rev_${Date.now().toString(36)}${(seq++).toString(36)}`,
+        createdAt: new Date().toISOString(),
+      };
+      // Newest first, so `listReveals` can slice from the front.
+      rows.unshift(row);
+      return { ...row };
+    },
+    async listReveals(userId: string, { limit = 100, agentCardId }: ListRevealsOptions = {}) {
+      return rows
+        .filter((r) => r.userId === userId && (!agentCardId || r.agentCardId === agentCardId))
+        .slice(0, limit)
+        .map((r) => ({ ...r }));
+    },
   };
 }
 
