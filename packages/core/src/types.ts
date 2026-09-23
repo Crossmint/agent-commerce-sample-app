@@ -98,7 +98,17 @@ export type OrderIntentStatus = "active" | "cancelled" | "expired";
 
 export type AgenticTokenProvider = "vic" | "agentpay";
 
-export type RailStatus = "active" | "pending_verification" | "error" | (string & {});
+/**
+ * `pending_verification`: the card network still wants a word with the user.
+ * `pending_cvc_recollection`: the vault's copy of the saved card's security
+ * code lapsed, so the user has to type it again before this rail mints.
+ */
+export type RailStatus =
+  | "active"
+  | "pending_verification"
+  | "pending_cvc_recollection"
+  | "error"
+  | (string & {});
 
 export interface OrderIntentAgenticTokenRail {
   rail: "agentic-token";
@@ -501,4 +511,28 @@ export interface BuyerProfileInput {
 
 export interface BuyerProfile extends BuyerProfileInput {
   id: string;
+}
+
+export interface BrowserProfileInput {
+  /** 1-120 characters. What the saved logins are for, in the user's words. */
+  label: string;
+}
+
+/**
+ * A user's saved merchant logins.
+ *
+ * Metadata only: the browser state itself stays opaque to Crossmint and never
+ * comes back over the API, so there are no cookies or tokens in this shape and
+ * nothing here reaches a model. A user holds at most one, and deleting it
+ * erases the state, not just the record.
+ */
+export interface BrowserProfile extends BrowserProfileInput {
+  id: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface BrowserProfileList {
+  data: BrowserProfile[];
+  nextCursor?: string | null;
 }

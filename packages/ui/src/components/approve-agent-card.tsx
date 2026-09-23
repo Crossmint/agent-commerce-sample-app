@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import type { AgentCard, PaymentMethod } from "@agent-commerce/core";
-import { pendingVerificationRails } from "@agent-commerce/core";
+import { needsCvcRecollection, pendingVerificationRails } from "@agent-commerce/core";
 import { AlertCircle, Clock, Lock } from "lucide-react";
 import { errorMessage } from "../api/client.js";
 import type { AgentCardRequest } from "../api/types.js";
@@ -16,6 +16,7 @@ import { Label } from "./primitives/label.js";
 import { Skeleton } from "./primitives/skeleton.js";
 import { Spinner } from "./primitives/spinner.js";
 import { CardPicker } from "./card-picker.js";
+import { RecollectCvc } from "./recollect-cvc.js";
 import { VerifyAgentCard, type VerificationAppearance } from "./verify-agent-card.js";
 
 /**
@@ -67,6 +68,7 @@ type Phase =
   | { kind: "choose" }
   | { kind: "approving" }
   | { kind: "verifying"; agentCard: AgentCard }
+  | { kind: "recollecting"; agentCard: AgentCard }
   | { kind: "confirming"; agentCard: AgentCard }
   | { kind: "denying" };
 
@@ -130,6 +132,8 @@ export function ApproveAgentCard({
         setAgentCard(card);
         if (pendingVerificationRails(card).length) {
           setPhase({ kind: "verifying", agentCard: card });
+        } else if (needsCvcRecollection(card)) {
+          setPhase({ kind: "recollecting", agentCard: card });
         } else {
           setPhase({ kind: "confirming", agentCard: card });
           await api.verifiedAgentCardRequest(req.id);
@@ -189,6 +193,8 @@ export function ApproveAgentCard({
       request.setData(result.request);
       if (result.needsVerification) {
         setPhase({ kind: "verifying", agentCard: result.agentCard });
+      } else if (result.needsCvcRecollection ?? needsCvcRecollection(result.agentCard)) {
+        setPhase({ kind: "recollecting", agentCard: result.agentCard });
       } else {
         setPhase({ kind: "confirming", agentCard: result.agentCard });
         if (result.request.status !== "active") {
@@ -209,6 +215,23 @@ export function ApproveAgentCard({
     setActionError(undefined);
     setChangingCard(true);
     setPhase({ kind: "choose" });
+  }
+
+  /**
+   * The code is back in the vault. The rail that wanted it flips on Crossmint's
+   * side, so the card is read again rather than trusted as it was.
+   */
+  async function recollected(card: AgentCard) {
+    setPhase({ kind: "confirming", agentCard: card });
+    setActionError(undefined);
+    try {
+      const fresh = await api.getAgentCard(card.orderIntentId);
+      setAgentCard(fresh);
+      await verified(fresh);
+    } catch (e) {
+      setActionError(e);
+      setPhase({ kind: "recollecting", agentCard: card });
+    }
   }
 
   async function verified(card: AgentCard) {
@@ -450,6 +473,20 @@ export function ApproveAgentCard({
           onRetryApproval={() => void allow()}
           onComplete={() => void verified(phase.agentCard)}
         />
+      ) : phase.kind === "recollecting" ? (
+        <div className="flex flex-col gap-3">
+          <p className="text-sm text-muted-foreground">
+            One more step. Crossmint&rsquo;s copy of this card&rsquo;s security code lapsed. Enter
+            it again and the budget is ready.
+          </p>
+          <RecollectCvc
+            paymentMethodId={phase.agentCard.paymentMethodId}
+            onComplete={() => void recollected(phase.agentCard)}
+          />
+          <Button type="button" variant="link" size="sm" onClick={useAnotherCard}>
+            Use a different card
+          </Button>
+        </div>
       ) : phase.kind === "confirming" || resuming ? (
         <div className="flex items-center gap-3 rounded-2xl bg-muted p-4 text-sm">
           <Spinner className="text-primary" />

@@ -35,6 +35,8 @@ export type {
   VerifyAgentCardProps,
   VerificationAppearance,
 } from "./components/verify-agent-card.js";
+export { RecollectCvc } from "./components/recollect-cvc.js";
+export type { RecollectCvcProps, CvcAppearance, CvcError } from "./components/recollect-cvc.js";
 export {
   AgentCardList,
   RailBadge,

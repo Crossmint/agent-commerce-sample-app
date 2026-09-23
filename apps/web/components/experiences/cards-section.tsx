@@ -22,10 +22,11 @@ import {
 } from "@agent-commerce/ui";
 import { ScreenHeading } from "@/components/focus-screen";
 
-/** The three piles, in the order a user cares about them. */
+/** The piles, in the order a user cares about them. */
 const PILES: Array<{ group: AgentCardGroup; title: string; description: string }> = [
   { group: "active", title: "Active", description: "Live budgets. An agent can spend from these right now." },
   { group: "needs-verification", title: "Needs verification", description: "Approved, but the card network still wants a word before a number can be minted." },
+  { group: "needs-cvc", title: "Needs security code", description: "Crossmint's copy of the card's security code lapsed. Enter it again from the row's menu." },
   { group: "expired", title: "Expired", description: "Lapsed or revoked. Nothing can be spent from these." },
 ];
 
@@ -81,6 +82,11 @@ export function CardsSection() {
               loading={agentCards.loading}
               onRevoke={(id) => agentCards.revoke(id)}
               onVerified={async () => {
+                await agentCards.refetch();
+              }}
+              // One saved card can back several budgets, so the whole list is
+              // read again rather than this one row.
+              onCvcRecollected={async () => {
                 await agentCards.refetch();
               }}
               onSelect={(card: AgentCard) => setOpenId(card.orderIntentId)}

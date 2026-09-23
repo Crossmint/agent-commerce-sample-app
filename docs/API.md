@@ -16,7 +16,7 @@ Session JWTs are forwarded as is to Crossmint on every payment-method and order-
 { "error": { "code": "string", "message": "string", "details": {} } }
 ```
 
-Codes: `unauthorized`, `forbidden`, `not_found`, `invalid_request`, `expired`, `no_usable_rail`, `verification_required`, `merchant_required`, `crossmint_error`, `internal`. `crossmint_error` carries `details.status` and `details.body` from Crossmint.
+Codes: `unauthorized`, `forbidden`, `not_found`, `invalid_request`, `expired`, `no_usable_rail`, `verification_required`, `cvc_recollection_required`, `merchant_required`, `crossmint_error`, `internal`. `crossmint_error` carries `details.status` and `details.body` from Crossmint.
 
 ## Public config
 
@@ -94,7 +94,7 @@ interface AgentCardRequest {
 
 `POST /v1/agent-card-requests/:id/approve` (browser) body `{ "paymentMethodId": string, "email"?: string, "countryCode"?: string }`.
 Server: registers the card for order intents (idempotent), creates the order intent with the user JWT, stores `agentCardId`, sets `status: "approved"`, or `"active"` right away if a rail is already active.
-→ `{ "request": AgentCardRequest, "agentCard": AgentCard, "needsVerification": boolean }`. `AgentCard` is the Crossmint `OrderIntent` shape.
+→ `{ "request": AgentCardRequest, "agentCard": AgentCard, "needsVerification": boolean, "needsCvcRecollection": boolean }`. `AgentCard` is the Crossmint `OrderIntent` shape. `needsCvcRecollection` says the card cannot pay until the user types the security code again, so the approval screen asks for the digits. It is false when a live rail still pays and only the unused fallback is stale.
 Answers a `pending` request, and a second time while it is `approved`: the card exists but no agent can spend from it until verification lands, so the user may still swap cards or retry. The earlier order intent is revoked first, best effort. Once the request is `active`, `denied`, `expired` or `failed`, approve returns `409`.
 
 `POST /v1/agent-card-requests/:id/verified` (browser) → re-reads the order intent. If a rail is active, `status: "active"`. → `{ "request": AgentCardRequest, "agentCard": AgentCard }`.
@@ -129,7 +129,7 @@ Server picks the rail (`selectRail`), mints, decrypts the encrypted-card rail wi
 }
 ```
 
-`enforced: false` means Crossmint does not cap this rail; the limit is advisory. Rail order is fixed: `agentic-token` (Visa Intelligent Commerce or Mastercard Agent Pay) first, `encrypted-card` second. The Stripe `spt` rail is never used and is stripped from every agent card response. If the only card rail still needs the user's verification: `409 verification_required`. If no rail is active: `409 no_usable_rail`. If the agent card has no merchant and the body names none: `400 merchant_required`. Card networks issue credentials per merchant, so agents pass the store they are about to pay.
+`enforced: false` means Crossmint does not cap this rail; the limit is advisory. Rail order is fixed: `agentic-token` (Visa Intelligent Commerce or Mastercard Agent Pay) first, `encrypted-card` second. The Stripe `spt` rail is never used and is stripped from every agent card response. If the only card rail still needs the user's verification: `409 verification_required`. If it needs the saved card's security code typed again: `409 cvc_recollection_required`, with `details.paymentMethodId` — the wallet's field is keyed by the saved card, not by the budget. Both signals Crossmint gives are folded into that one code: a rail that reads `pending_cvc_recollection` before the mint, and the `409 ORDER_INTENT_CVC_RECOLLECTION_REQUIRED` it returns when the vault lapses during one. If no rail is active: `409 no_usable_rail`. If the agent card has no merchant and the body names none: `400 merchant_required`. Card networks issue credentials per merchant, so agents pass the store they are about to pay.
 
 ## Checkouts
 
@@ -138,10 +138,12 @@ Wraps [Crossmint Agent Checkouts](https://docs.crossmint.com/api-reference/agent
 `POST /v1/checkouts` (agent) body:
 
 ```json
-{ "startUrl": "https://shop.example/p/1", "task"?: "medium, black", "agentCardId"?: "…", "maxCost": { "amount": "100.00", "currency": "USD" }, "buyerProfileId"?: "…", "browserProfileId"?: "…", "merchantGuidance"?: "…" }
+{ "startUrl": "https://shop.example/p/1", "task"?: "medium, black", "agentCardId"?: "…", "maxCost": { "amount": "100.00", "currency": "USD" }, "buyerProfileId"?: "…", "browserProfileId"?: "…", "freshBrowser"?: false, "merchantGuidance"?: "…" }
 ```
 
 `url` and `request` are accepted as older names for `startUrl` and `task`. → `201 CheckoutView`.
+
+Sessions are sticky: the server attaches the user's browser profile to every run, so a store they signed into once stays signed in. Callers need pass nothing. `browserProfileId` names a different profile; `freshBrowser: true` starts signed out, which is the way past a login that has gone stale. If the profile cannot be resolved the run still goes ahead, in a fresh browser — the convenience never fails a purchase.
 
 ```ts
 interface CheckoutView {
@@ -201,6 +203,10 @@ Optional `messageId` (≤200 chars) makes a retry idempotent. → `CheckoutView`
 `POST /v1/checkouts/:id/actions/:actionId` body `{ "values": {...} }` → `CheckoutView`. Older route, same as a `submit` message with `requestId = actionId`.
 
 `POST /v1/buyer-profiles` body `BuyerProfileInput` (core) → `{ "id": "…" }`.
+
+`GET /v1/browser-profile` → `{ "browserProfile": { "id": "…" } | null }`. The user's saved merchant logins, as metadata: Crossmint returns no cookies or tokens, so there is nothing else to show. Null until a checkout has made the profile; reading does not create one.
+
+`DELETE /v1/browser-profile` → `204`. Sign out everywhere. Irreversible: it erases the stored browser state, not just the record. The next checkout starts signed out and saves whatever the user logs into then.
 
 ## Server config object
 

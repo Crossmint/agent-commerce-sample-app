@@ -9,6 +9,7 @@ export type ErrorCode =
   | "expired"
   | "no_usable_rail"
   | "verification_required"
+  | "cvc_recollection_required"
   | "merchant_required"
   | "payment_handled_by_server"
   | "crossmint_error"

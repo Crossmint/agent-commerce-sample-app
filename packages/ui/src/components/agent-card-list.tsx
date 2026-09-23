@@ -3,10 +3,12 @@
 import * as React from "react";
 import {
   hasCardRail,
+  needsCvcRecollection,
   pendingVerificationRails,
   type AgentCard,
   type OrderIntentRail,
 } from "@agent-commerce/core";
+import { RecollectCvc } from "./recollect-cvc.js";
 import { VerifyAgentCard } from "./verify-agent-card.js";
 import { cn } from "../lib/utils.js";
 import { formatAmount, formatDate, railLongLabel, railShortLabel } from "../lib/format.js";
@@ -22,6 +24,12 @@ export interface AgentCardListProps {
   onRevoke?: (agentCardId: string) => void | Promise<void>;
   /** Called after the user finishes a pending network verification. Refetch here. */
   onVerified?: (agentCardId: string) => void | Promise<void>;
+  /**
+   * Called after the user types the saved card's security code again. Refetch
+   * here: one card can back several budgets, so more than this row may have
+   * come back to life.
+   */
+  onCvcRecollected?: (agentCardId: string) => void | Promise<void>;
   /** Hide cancelled and expired cards. Default false. */
   activeOnly?: boolean;
   className?: string;
@@ -38,12 +46,15 @@ export function agentCardStatusBadge(card: AgentCard): {
   const pending = pendingVerificationRails(card).length > 0;
   if (hasCardRail(card)) return { label: "Active", variant: "success" };
   if (pending) return { label: "Needs verification", variant: "warning" };
+  // Only ever true when no rail is live: a card that still pays says Active
+  // above, whatever state its unused fallback is in.
+  if (needsCvcRecollection(card)) return { label: "Needs security code", variant: "warning" };
   if (card.rails.some((r) => r.status === "active")) return { label: "Active", variant: "success" };
   return { label: "Inactive", variant: "muted" };
 }
 
-/** The three piles a wallet sorts budgets into. */
-export type AgentCardGroup = "active" | "needs-verification" | "expired";
+/** The piles a wallet sorts budgets into. */
+export type AgentCardGroup = "active" | "needs-verification" | "needs-cvc" | "expired";
 
 /**
  * Which pile a budget belongs to, from the same reading `agentCardStatusBadge`
@@ -55,6 +66,7 @@ export function agentCardGroup(card: AgentCard): AgentCardGroup {
   const { label } = agentCardStatusBadge(card);
   if (label === "Active") return "active";
   if (label === "Needs verification") return "needs-verification";
+  if (label === "Needs security code") return "needs-cvc";
   return "expired";
 }
 
@@ -62,7 +74,7 @@ export function RailBadge({ rail }: { rail: OrderIntentRail }) {
   const variant: BadgeProps["variant"] =
     rail.status === "active"
       ? "outline"
-      : rail.status === "pending_verification"
+      : rail.status === "pending_verification" || rail.status === "pending_cvc_recollection"
         ? "warning"
         : "destructive";
   return (
@@ -80,12 +92,14 @@ export function AgentCardList({
   loading = false,
   onRevoke,
   onVerified,
+  onCvcRecollected,
   activeOnly = false,
   className,
   emptyAction,
 }: AgentCardListProps) {
   const [busy, setBusy] = React.useState<string | null>(null);
   const [verifying, setVerifying] = React.useState<string | null>(null);
+  const [recollecting, setRecollecting] = React.useState<string | null>(null);
 
   if (loading && !agentCards) {
     return (
@@ -116,7 +130,11 @@ export function AgentCardList({
         const revocable = card.status === "active" && onRevoke;
         const needsVerification =
           card.status === "active" && pendingVerificationRails(card).length > 0;
+        // Verification first when a card wants both: either one unblocks it,
+        // and the network rail is the one that holds the agent to the amount.
+        const needsCvc = card.status === "active" && !needsVerification && needsCvcRecollection(card);
         const isVerifying = verifying === card.orderIntentId;
+        const isRecollecting = recollecting === card.orderIntentId;
         return (
           <li
             key={card.orderIntentId}
@@ -147,6 +165,15 @@ export function AgentCardList({
                 {needsVerification && !isVerifying ? (
                   <Button type="button" size="sm" onClick={() => setVerifying(card.orderIntentId)}>
                     Verify
+                  </Button>
+                ) : null}
+                {needsCvc && !isRecollecting ? (
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={() => setRecollecting(card.orderIntentId)}
+                  >
+                    Enter code
                   </Button>
                 ) : null}
                 {revocable ? (
@@ -182,6 +209,21 @@ export function AgentCardList({
                     await onVerified?.(card.orderIntentId);
                   }}
                   onError={() => setVerifying(null)}
+                />
+              </div>
+            ) : null}
+            {isRecollecting ? (
+              <div className="rounded-2xl bg-muted p-4">
+                <p className="mb-3 text-sm text-muted-foreground">
+                  Crossmint&rsquo;s copy of the security code for the card behind this budget
+                  lapsed. Enter it again to bring the budget back.
+                </p>
+                <RecollectCvc
+                  paymentMethodId={card.paymentMethodId}
+                  onComplete={async () => {
+                    setRecollecting(null);
+                    await onCvcRecollected?.(card.orderIntentId);
+                  }}
                 />
               </div>
             ) : null}

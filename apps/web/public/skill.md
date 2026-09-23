@@ -58,6 +58,8 @@ agent-commerce checkout cancel <checkoutId>   # if the user changes their mind
 
 Shipping details repeat across purchases. Create a buyer profile once with `agent-commerce buyer-profile create --json-file profile.json` and pass `--buyer-profile <id>` to `checkout create`.
 
+Merchant logins are kept for you. A store the user signed into on an earlier checkout has them signed in on the next one, so do not ask for merchant passwords and do not pass `--browser-profile`. If a run is stuck on a stale or half-finished login, retry it once with `--fresh-browser` and let the user sign in again.
+
 Check on any checkout later with `agent-commerce checkout get <id> --wait`.
 
 ## Step 2: the payment step
@@ -110,6 +112,7 @@ agent-commerce agent-card reveal <id> --merchant-name <store> --merchant-url <ht
 Rules:
 
 - **Never paste the card number, expiry, or CVC into the chat, into logs, into files, or into commit messages.** Type it directly into the payment form and nothing else.
+- If the reveal comes back `cvc_recollection_required`, Crossmint's copy of the card's security code lapsed. Only the user can type it again, in the wallet under Cards. Say so and wait. **Never ask the user for the digits here** — they belong in Crossmint's own field and nowhere else.
 - If the output warns `limit not enforced by the network`, the budget is advisory. Stop and prefer `agent-commerce checkout create`, or confirm the exact amount with the user first.
 - Ask for the smallest `--amount` that covers the charge.
 

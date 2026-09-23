@@ -1,6 +1,9 @@
 import { newMessageId, submitResponse } from "./checkout-messages.js";
 import { CrossmintApiError } from "./errors.js";
 import type {
+  BrowserProfile,
+  BrowserProfileInput,
+  BrowserProfileList,
   BuyerProfile,
   BuyerProfileInput,
   Checkout,
@@ -259,6 +262,49 @@ export class CrossmintClient {
         body: input,
         baseUrl: this.checkoutsBaseUrl,
       }),
+
+    /**
+     * The user's saved merchant logins. At most one comes back, because a user
+     * holds at most one profile.
+     *
+     * Whose logins these are is decided entirely by `ctx`: a JWT names the
+     * user, and a server key needs `x-crossmint-user-id` beside it. Pass a
+     * server key with no user and Crossmint files every end user's logins
+     * under the project's own subject, in one shared profile. `checkoutAuth`
+     * will not build that combination.
+     */
+    listBrowserProfiles: (
+      ctx: CheckoutContext,
+      opts: { cursor?: string; limit?: number } = {},
+    ): Promise<BrowserProfileList> =>
+      this.request<BrowserProfileList>(
+        "GET",
+        `/unstable/agent-checkouts/browser-profiles${pageQuery(opts)}`,
+        { auth: this.checkoutAuth(ctx), baseUrl: this.checkoutsBaseUrl },
+      ),
+
+    /** Create the user's one profile. A second returns 409. */
+    createBrowserProfile: (
+      ctx: CheckoutContext,
+      input: BrowserProfileInput,
+    ): Promise<BrowserProfile> =>
+      this.request<BrowserProfile>("POST", "/unstable/agent-checkouts/browser-profiles", {
+        auth: this.checkoutAuth(ctx),
+        body: input,
+        baseUrl: this.checkoutsBaseUrl,
+      }),
+
+    /**
+     * Forget the saved logins. Irreversible: it erases the browser state, not
+     * just the record. Another user's id returns 404 rather than 403, so an id
+     * cannot be probed for existence.
+     */
+    deleteBrowserProfile: (ctx: CheckoutContext, profileId: string): Promise<void> =>
+      this.request<void>(
+        "DELETE",
+        `/unstable/agent-checkouts/browser-profiles/${encodeURIComponent(profileId)}`,
+        { auth: this.checkoutAuth(ctx), baseUrl: this.checkoutsBaseUrl },
+      ),
   };
 
   // ---------------------------------------------------------------------

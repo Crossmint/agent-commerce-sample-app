@@ -36,6 +36,7 @@ interface CreateOptions extends JsonOption {
   request?: string;
   buyerProfile?: string;
   browserProfile?: string;
+  freshBrowser?: boolean;
   guidance?: string;
   wait?: boolean;
   timeout?: number;
@@ -62,6 +63,7 @@ export function buildCheckoutBody(opts: CreateOptions): CreateCheckoutBody {
   if (task) body.task = task;
   if (opts.buyerProfile) body.buyerProfileId = opts.buyerProfile;
   if (opts.browserProfile) body.browserProfileId = opts.browserProfile;
+  if (opts.freshBrowser) body.freshBrowser = true;
   if (opts.guidance) body.merchantGuidance = opts.guidance;
   return body;
 }
@@ -118,7 +120,11 @@ export function registerCheckoutCommands(program: Command, ctx: CliContext): voi
         .option("--task <text>", 'what to buy and how, e.g. "medium, black, cheapest shipping"')
         .option("--request <text>", "older name for --task")
         .option("--buyer-profile <id>", "buyer profile with name, contact and shipping")
-        .option("--browser-profile <id>", "browser profile with the user's merchant logins")
+        .option(
+          "--browser-profile <id>",
+          "a browser profile other than the user's own, which is attached by default",
+        )
+        .option("--fresh-browser", "start signed out, ignoring the user's saved merchant logins")
         .option("--guidance <text>", "notes about the store for the agent"),
     ),
   ).action(async (opts: CreateOptions) => {

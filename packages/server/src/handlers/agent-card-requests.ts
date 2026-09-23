@@ -2,6 +2,7 @@ import type { AuthenticatedUser } from "@agent-commerce/auth";
 import {
   expiresInHours,
   isReadyForAgent,
+  needsCvcRecollection,
   pendingVerificationRails,
   withAgentRails,
 } from "@agent-commerce/core";
@@ -115,7 +116,16 @@ export async function approveRequest(req: Request, ctx: Ctx, params: Params): Pr
     paymentMethodId: body.paymentMethodId,
   });
   const needsVerification = pendingVerificationRails(agentCard).length > 0;
-  return json({ request: updated, agentCard: withAgentRails(agentCard), needsVerification });
+  // A card that cannot pay until the user types the security code again: the
+  // approval screen asks for the digits rather than leaving the request
+  // sitting at `approved`. A lapsed code behind a live rail is not this.
+  const needsCvc = needsCvcRecollection(agentCard);
+  return json({
+    request: updated,
+    agentCard: withAgentRails(agentCard),
+    needsVerification,
+    needsCvcRecollection: needsCvc,
+  });
 }
 
 /** POST /v1/agent-card-requests/:id/verified */

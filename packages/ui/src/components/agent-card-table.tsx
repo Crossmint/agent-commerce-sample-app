@@ -1,8 +1,14 @@
 "use client";
 
 import * as React from "react";
-import { pendingVerificationRails, type AgentCard, type PaymentMethod } from "@agent-commerce/core";
+import {
+  needsCvcRecollection,
+  pendingVerificationRails,
+  type AgentCard,
+  type PaymentMethod,
+} from "@agent-commerce/core";
 import { MoreHorizontal } from "lucide-react";
+import { RecollectCvc } from "./recollect-cvc.js";
 import { VerifyAgentCard } from "./verify-agent-card.js";
 import { cn } from "../lib/utils.js";
 import {
@@ -41,6 +47,12 @@ export interface AgentCardTableProps {
   onRevoke?: (agentCardId: string) => void | Promise<void>;
   /** Called after the user finishes a pending network verification. Refetch here. */
   onVerified?: (agentCardId: string) => void | Promise<void>;
+  /**
+   * Called after the user types the saved card's security code again. Refetch
+   * here: one card can back several budgets, so more rows than this one may
+   * have come back to life.
+   */
+  onCvcRecollected?: (agentCardId: string) => void | Promise<void>;
   /** Opens a row. With it, rows become buttons; without it they are plain. */
   onSelect?: (agentCard: AgentCard) => void;
   /** Hide cancelled and expired cards. Default false. */
@@ -87,16 +99,17 @@ const BASE_COLUMNS = 3;
 
 /**
  * Every budget the user approved, newest first: what it is for, the card
- * behind it, what is left of it, when it lapses, and one menu for the two
- * things they can do about it.
+ * behind it, what is left of it, when it lapses, and one menu for the things
+ * they can do about it.
  *
  * The same data as `AgentCardList`, which stays for anywhere a list reads
  * better. Both the wallet and the phone show the table: budgets are one shape
  * repeated, and a column of amounts is read down. The phone passes `compact`
  * rather than taking the list, so the two surfaces stay one design.
  *
- * Verifying opens under its own row rather than in a dialog, so the row it
- * belongs to stays in sight.
+ * Verifying with the network, and typing a lapsed security code again, both
+ * open under their own row rather than in a dialog, so the row they belong to
+ * stays in sight.
  */
 export function AgentCardTable({
   agentCards,
@@ -104,6 +117,7 @@ export function AgentCardTable({
   loading = false,
   onRevoke,
   onVerified,
+  onCvcRecollected,
   onSelect,
   activeOnly = false,
   compact = false,
@@ -112,9 +126,10 @@ export function AgentCardTable({
 }: AgentCardTableProps) {
   const [busy, setBusy] = React.useState<string | null>(null);
   const [verifying, setVerifying] = React.useState<string | null>(null);
+  const [recollecting, setRecollecting] = React.useState<string | null>(null);
 
-  // How wide the verify panel has to be. Both queries settle before anyone can
-  // open the panel, which is the only thing that reads them.
+  // How wide the panel under a row has to be. Both queries settle before
+  // anyone can open one, which is the only thing that reads them.
   const wideEnoughForCard = useMediaQuery(CARD.query!);
   const wideEnoughForExpires = useMediaQuery(EXPIRES.query!);
   const cardClass = compact ? "" : CARD.className;
@@ -185,7 +200,12 @@ export function AgentCardTable({
           const revocable = card.status === "active" && Boolean(onRevoke);
           const needsVerification =
             card.status === "active" && pendingVerificationRails(card).length > 0;
+          // Verification first when a card wants both: either one unblocks it,
+          // and the network rail is the one that holds the agent to the amount.
+          const needsCvc =
+            card.status === "active" && !needsVerification && needsCvcRecollection(card);
           const isVerifying = verifying === card.orderIntentId;
+          const isRecollecting = recollecting === card.orderIntentId;
           const spent = card.amount.available !== card.amount.total;
           const pm = byId.get(card.paymentMethodId);
           const working = busy === card.orderIntentId;
@@ -209,7 +229,7 @@ export function AgentCardTable({
                     }
                   : {})}
                 className={cn(
-                  isVerifying && "border-b-0",
+                  (isVerifying || isRecollecting) && "border-b-0",
                   onSelect &&
                     "cursor-pointer outline-none focus-visible:bg-accent focus-visible:inset-ring-2 focus-visible:inset-ring-ring/60",
                 )}
@@ -264,7 +284,7 @@ export function AgentCardTable({
                   className={cn(ACTIONS.className, "text-right")}
                   onClick={(e) => e.stopPropagation()}
                 >
-                  {needsVerification || revocable ? (
+                  {needsVerification || needsCvc || revocable ? (
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button
@@ -283,7 +303,14 @@ export function AgentCardTable({
                             Verify with the network
                           </DropdownMenuItem>
                         ) : null}
-                        {needsVerification && revocable ? <DropdownMenuSeparator /> : null}
+                        {needsCvc ? (
+                          <DropdownMenuItem onSelect={() => setRecollecting(card.orderIntentId)}>
+                            Enter the security code
+                          </DropdownMenuItem>
+                        ) : null}
+                        {(needsVerification || needsCvc) && revocable ? (
+                          <DropdownMenuSeparator />
+                        ) : null}
                         {revocable ? (
                           <DropdownMenuItem
                             variant="destructive"
@@ -317,6 +344,24 @@ export function AgentCardTable({
                         await onVerified?.(card.orderIntentId);
                       }}
                       onError={() => setVerifying(null)}
+                    />
+                  </TableCell>
+                </TableRow>
+              ) : null}
+              {isRecollecting ? (
+                <TableRow>
+                  <TableCell colSpan={visibleColumns} className="bg-muted/40">
+                    <p className="mb-3 text-sm text-muted-foreground">
+                      Crossmint&rsquo;s copy of the security code for{" "}
+                      {pm ? paymentMethodLabel(pm) : "the card behind this budget"} lapsed. Enter it
+                      again to bring the budget back.
+                    </p>
+                    <RecollectCvc
+                      paymentMethodId={card.paymentMethodId}
+                      onComplete={async () => {
+                        setRecollecting(null);
+                        await onCvcRecollected?.(card.orderIntentId);
+                      }}
                     />
                   </TableCell>
                 </TableRow>

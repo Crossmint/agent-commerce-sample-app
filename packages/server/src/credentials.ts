@@ -1,5 +1,7 @@
 import {
+  CrossmintApiError,
   decryptEncryptedCard,
+  pendingCvcRecollectionRails,
   pendingVerificationRails,
   selectRail,
   toPublicJwk,
@@ -62,6 +64,11 @@ export async function mintFromAgentCard(
         { rails: orderIntent.rails, status: orderIntent.status },
       );
     }
+    // Nothing the agent can do about this one either: the digits are the
+    // user's to type, and only into Crossmint's own field.
+    if (pendingCvcRecollectionRails(orderIntent).length) {
+      throw cvcRecollectionRequired(orderIntent);
+    }
     throw new HttpError(409, "no_usable_rail", "No rail on this agent card is active right now", {
       rails: orderIntent.rails,
       status: orderIntent.status,
@@ -115,7 +122,20 @@ export async function mintFromAgentCard(
       throw new HttpError(409, "no_usable_rail", `Unsupported rail ${rail.rail}`);
   }
 
-  const credential = await ctx.crossmint.orderIntents.mintCredential(jwt, agentCardId, input);
+  /*
+   * The rail read `active` a moment ago, so the vault's copy of the security
+   * code lapsed between that read and this call. Crossmint says so with a
+   * 409; it becomes the same answer the rail status would have given.
+   */
+  let credential;
+  try {
+    credential = await ctx.crossmint.orderIntents.mintCredential(jwt, agentCardId, input);
+  } catch (e) {
+    if (e instanceof CrossmintApiError && e.isCvcRecollectionRequired) {
+      throw cvcRecollectionRequired(orderIntent);
+    }
+    throw e;
+  }
 
   const response: CredentialResponse = { agentCardId, rail: rail.rail as CredentialResponse["rail"], enforced };
   let card: CardCredentialValue | undefined;
@@ -171,4 +191,23 @@ export async function mintFromAgentCard(
   });
 
   return { response, card, orderIntent };
+}
+
+/**
+ * The one answer both CVC signals get: the rail that said
+ * `pending_cvc_recollection` before the mint, and the 409 Crossmint returns
+ * when the vault lapses during it. `paymentMethodId` is in the details
+ * because the wallet's field is keyed by the saved card, not by the budget.
+ */
+function cvcRecollectionRequired(orderIntent: OrderIntent): HttpError {
+  return new HttpError(
+    409,
+    "cvc_recollection_required",
+    "The security code Crossmint holds for this card lapsed. Ask the user to enter it again in the wallet; nobody but them can type it.",
+    {
+      paymentMethodId: orderIntent.paymentMethodId,
+      rails: orderIntent.rails,
+      status: orderIntent.status,
+    },
+  );
 }

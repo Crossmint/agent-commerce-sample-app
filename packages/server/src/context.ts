@@ -1,6 +1,7 @@
 import { bearerToken, type AuthenticatedUser } from "@agent-commerce/auth";
 import { CrossmintClient, DEFAULT_RAIL_PREFERENCE, type RailKind } from "@agent-commerce/core";
 import { z } from "zod";
+import type { BrowserProfileCache } from "./browser-profile.js";
 import { invalidRequest, unauthorized } from "./errors.js";
 import { memoryCheckoutStore, memoryRevealStore, memorySessionStore } from "./store/memory.js";
 import type {
@@ -19,6 +20,8 @@ export interface Ctx {
   checkouts: CheckoutStore;
   sessions: SessionStore;
   reveals: RevealStore;
+  /** Resolved browser profile ids, by user. See `browser-profile.ts`. */
+  browserProfiles: BrowserProfileCache;
   requestTtlMinutes: number;
   defaultRequester: string;
   railPreference: RailKind[];
@@ -79,6 +82,7 @@ export function createContext(config: AgentCommerceServerConfig): Ctx {
     checkouts,
     reveals,
     sessions,
+    browserProfiles: new Map(),
     requestTtlMinutes: config.requestTtlMinutes ?? 15,
     defaultRequester: config.defaultRequester ?? "Agent",
     railPreference: config.railPreference ?? DEFAULT_RAIL_PREFERENCE,

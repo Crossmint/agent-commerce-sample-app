@@ -128,7 +128,10 @@ export const TOOL_DOCS = {
       maxCost: "Maximum total to pay, including shipping and tax. Enforced.",
       currency: PARAM_DOCS.currency,
       buyerProfileId: "Saved buyer profile (name, contact, shipping).",
-      browserProfileId: "Saved merchant logins, for stores where the user is signed in.",
+      browserProfileId:
+        "Rarely needed. The user's saved merchant logins are attached for you, so a store they signed into once stays signed in. Pass this only to name a different profile.",
+      freshBrowser:
+        "Start signed out, ignoring the user's saved merchant logins. Use it when a stale login is what is blocking the run, not by default.",
       merchantGuidance: "Notes about this store for the agent.",
     },
     surfaces: ["mcp", "chat"],

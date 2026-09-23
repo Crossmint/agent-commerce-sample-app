@@ -119,6 +119,8 @@ export interface ApproveAgentCardRequestResult {
   request: AgentCardRequest;
   agentCard: AgentCard;
   needsVerification: boolean;
+  /** The vault's copy of the card's security code lapsed. The user types it again. */
+  needsCvcRecollection?: boolean;
 }
 
 export interface VerifiedAgentCardRequestResult {
@@ -148,7 +150,10 @@ export interface CreateCheckoutInput {
   agentCardId: string;
   maxCost: { amount: string; currency: string };
   buyerProfileId?: string;
+  /** Overrides the user's own profile, which the server otherwise attaches. */
   browserProfileId?: string;
+  /** Start signed out, ignoring the user's saved merchant logins. */
+  freshBrowser?: boolean;
   merchantGuidance?: string;
 }
 

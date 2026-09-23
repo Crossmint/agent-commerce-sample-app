@@ -25,8 +25,13 @@ import {
   type RenderedAction,
 } from "@agent-commerce/core";
 import { parseBody, requireUser, type Ctx } from "../context.js";
+import {
+  findBrowserProfileId,
+  forgetBrowserProfile,
+  stickyBrowserProfileId,
+} from "../browser-profile.js";
 import { mintFromAgentCard } from "../credentials.js";
-import { forbidden, HttpError, json } from "../errors.js";
+import { forbidden, HttpError, json, noContent } from "../errors.js";
 import { agentCardRequestId } from "../ids.js";
 import type { Params } from "../router.js";
 import {
@@ -107,11 +112,22 @@ export async function createCheckout(req: Request, ctx: Ctx): Promise<Response> 
   const body = await parseBody(req, createCheckoutSchema);
   const cctx = checkoutContext(ctx, user);
   const task = body.task ?? body.request;
+  /*
+   * Sessions are sticky by default: without a profile every run starts in a
+   * fresh browser and the store asks the user to log in again. A caller that
+   * names its own profile keeps it; one that asks for `freshBrowser` gets the
+   * signed-out browser, which is the way out of a login that has gone stale.
+   */
+  const browserProfileId = body.browserProfileId
+    ? body.browserProfileId
+    : body.freshBrowser
+      ? undefined
+      : await stickyBrowserProfileId(ctx, cctx, user.userId);
   const checkout = await ctx.crossmint.checkouts.create(cctx, {
     request: { startUrl: (body.startUrl ?? body.url)!, ...(task ? { task } : {}) },
     constraints: { maxCost: body.maxCost },
     ...(body.buyerProfileId ? { buyerProfileId: body.buyerProfileId } : {}),
-    ...(body.browserProfileId ? { browserProfileId: body.browserProfileId } : {}),
+    ...(browserProfileId ? { browserProfileId } : {}),
     ...(body.merchantGuidance ? { merchantGuidance: body.merchantGuidance } : {}),
   });
   await ctx.checkouts.linkCheckout(
@@ -205,6 +221,36 @@ export async function cancelCheckout(req: Request, ctx: Ctx, params: Params): Pr
 }
 
 /** POST /v1/buyer-profiles */
+/**
+ * GET /v1/browser-profile
+ *
+ * What the user's saved merchant logins amount to: metadata, because that is
+ * all Crossmint hands back. Null until a checkout has made the profile —
+ * reading is no reason to start saving.
+ */
+export async function getBrowserProfile(req: Request, ctx: Ctx): Promise<Response> {
+  const user = await requireUser(req, ctx);
+  const cctx = checkoutContext(ctx, user);
+  const id = await findBrowserProfileId(ctx, cctx, user.userId);
+  return json({ browserProfile: id ? { id } : null });
+}
+
+/**
+ * DELETE /v1/browser-profile
+ *
+ * Sign out everywhere. Irreversible: it erases the stored browser state, not
+ * just the record. The next checkout starts signed out and makes a new profile
+ * from whatever the user logs into then.
+ */
+export async function deleteBrowserProfile(req: Request, ctx: Ctx): Promise<Response> {
+  const user = await requireUser(req, ctx);
+  const cctx = checkoutContext(ctx, user);
+  const id = await findBrowserProfileId(ctx, cctx, user.userId);
+  if (id) await ctx.crossmint.checkouts.deleteBrowserProfile(cctx, id);
+  forgetBrowserProfile(ctx, user.userId);
+  return noContent();
+}
+
 export async function createBuyerProfile(req: Request, ctx: Ctx): Promise<Response> {
   const user = await requireUser(req, ctx);
   const body = await parseBody(req, buyerProfileSchema);

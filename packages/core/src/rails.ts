@@ -44,6 +44,38 @@ export function pendingVerificationRails(
   return agentRails(orderIntent).filter((r) => r.status === "pending_verification");
 }
 
+/**
+ * Rails waiting on the security code of the saved card behind them.
+ *
+ * Crossmint keeps the CVC in its vault for a limited time. When that copy
+ * lapses, the rail that needs it reports `pending_cvc_recollection` and mints
+ * nothing until the user types the three digits again. Today only the
+ * encrypted-card rail asks; the filter reads the status rather than the rail,
+ * so another one asking later needs no change here.
+ */
+export function pendingCvcRecollectionRails(
+  orderIntent: Pick<OrderIntent, "rails">,
+): OrderIntentRail[] {
+  return agentRails(orderIntent).filter((r) => r.status === "pending_cvc_recollection");
+}
+
+/**
+ * Does the user have to type the security code before this card can pay?
+ *
+ * Only when nothing else on it will. Rails are tried in order, so a live
+ * network rail pays without the encrypted-card fallback ever being reached: a
+ * lapsed code behind a working rail costs nothing today and is not the user's
+ * problem yet, so no surface asks about it. It becomes one the moment the
+ * fallback is the rail the payment needs — which is where `selectRail` comes
+ * back empty and the mint answers `cvc_recollection_required`.
+ *
+ * `pendingCvcRecollectionRails` is the raw read, for anyone who wants to know
+ * a rail is stale whether or not it is in the way.
+ */
+export function needsCvcRecollection(orderIntent: Pick<OrderIntent, "rails">): boolean {
+  return !hasCardRail(orderIntent) && pendingCvcRecollectionRails(orderIntent).length > 0;
+}
+
 export function hasUsableRail(orderIntent: Pick<OrderIntent, "rails">): boolean {
   return selectRail(orderIntent) !== null;
 }

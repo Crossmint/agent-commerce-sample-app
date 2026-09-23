@@ -1,7 +1,12 @@
 "use client";
 
 import * as React from "react";
-import { pendingVerificationRails, type AgentCard, type PaymentMethod } from "@agent-commerce/core";
+import {
+  needsCvcRecollection,
+  pendingVerificationRails,
+  type AgentCard,
+  type PaymentMethod,
+} from "@agent-commerce/core";
 import { cn } from "../lib/utils.js";
 import { formatAmount, formatDateTime, formatRelativeTime, paymentMethodLabel } from "../lib/format.js";
 import { useIsMobile } from "../hooks/use-media-query.js";
@@ -22,6 +27,8 @@ export interface AgentCardDetailProps {
   paymentMethods?: PaymentMethod[];
   onRevoke?: (agentCardId: string) => void | Promise<void>;
   onVerify?: (agentCardId: string) => void;
+  /** Sends the user to the security-code field for the card behind this budget. */
+  onRecollectCvc?: (agentCardId: string) => void;
 }
 
 /**
@@ -33,7 +40,14 @@ export interface AgentCardDetailProps {
  * for only while it is open, and only for this budget, so opening a panel
  * costs one narrow query rather than a slice of the whole list.
  */
-export function AgentCardDetail({ agentCard, onOpenChange, paymentMethods, onRevoke, onVerify }: AgentCardDetailProps) {
+export function AgentCardDetail({
+  agentCard,
+  onOpenChange,
+  paymentMethods,
+  onRevoke,
+  onVerify,
+  onRecollectCvc,
+}: AgentCardDetailProps) {
   const isMobile = useIsMobile();
   const [busy, setBusy] = React.useState(false);
   const open = agentCard !== null;
@@ -65,6 +79,17 @@ export function AgentCardDetail({ agentCard, onOpenChange, paymentMethods, onRev
             }
           : undefined
       }
+      // The field belongs where the budgets are listed, so the panel closes
+      // behind it: one card can back several rows, and typing the code once
+      // brings all of them back.
+      onRecollectCvc={
+        onRecollectCvc && agentCard.status === "active" && needsCvcRecollection(agentCard)
+          ? () => {
+              onOpenChange(false);
+              onRecollectCvc(agentCard.orderIntentId);
+            }
+          : undefined
+      }
     />
   ) : null;
 
@@ -92,6 +117,7 @@ export interface AgentCardDetailBodyProps {
   busy: boolean;
   onRevoke?: () => void;
   onVerify?: () => void;
+  onRecollectCvc?: () => void;
 }
 
 /**
@@ -105,16 +131,22 @@ export function AgentCardDetailBody({
   busy,
   onRevoke,
   onVerify,
+  onRecollectCvc,
 }: AgentCardDetailBodyProps) {
   return (
     <div className="flex flex-col gap-6">
       <AgentCardArt agentCard={agentCard} paymentMethod={paymentMethod} />
 
-      {onVerify || onRevoke ? (
+      {onVerify || onRecollectCvc || onRevoke ? (
         <div className="flex flex-wrap gap-2">
           {onVerify ? (
             <Button type="button" size="sm" onClick={onVerify}>
               Verify with the network
+            </Button>
+          ) : null}
+          {onRecollectCvc ? (
+            <Button type="button" size="sm" onClick={onRecollectCvc}>
+              Enter the security code
             </Button>
           ) : null}
           {onRevoke ? (

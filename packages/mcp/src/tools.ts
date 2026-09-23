@@ -261,6 +261,7 @@ export function registerAgentCommerceTools(
           .string()
           .optional()
           .describe(paramDoc("create_checkout", "browserProfileId")),
+        freshBrowser: z.boolean().optional().describe(paramDoc("create_checkout", "freshBrowser")),
         merchantGuidance: z
           .string()
           .max(20000)
@@ -280,6 +281,7 @@ export function registerAgentCommerceTools(
         },
         buyerProfileId: args.buyerProfileId,
         browserProfileId: args.browserProfileId,
+        freshBrowser: args.freshBrowser,
         merchantGuidance: args.merchantGuidance,
       });
       return ok(`Checkout ${checkout.id} created.\n${describeCheckout(checkout)}`, { checkout });
@@ -360,9 +362,11 @@ function fail(err: unknown): CallToolResult {
     const hint =
       err.code === "unauthorized"
         ? " The user must connect (log in) again."
-        : err.code === "no_usable_rail"
-          ? " The agent card has no active rail. The user may still need to verify it in the wallet."
-          : "";
+        : err.code === "cvc_recollection_required"
+          ? " The security code Crossmint holds for the card lapsed. Only the user can type it again, in the wallet under Cards. Do not ask them for it here."
+          : err.code === "no_usable_rail"
+            ? " The agent card has no active rail. The user may still need to verify it in the wallet."
+            : "";
     return {
       isError: true,
       content: [{ type: "text", text: `Agent Commerce error ${err.code}: ${err.message}.${hint}` }],

@@ -63,7 +63,10 @@ export const createCheckoutSchema = z
       currency: z.string().length(3),
     }),
     buyerProfileId: z.string().min(1).optional(),
+    /** Overrides the user's own profile, which the server otherwise attaches. */
     browserProfileId: z.string().min(1).optional(),
+    /** Start signed out, ignoring the user's saved merchant logins. */
+    freshBrowser: z.boolean().optional(),
     merchantGuidance: z.string().min(1).max(20000).optional(),
   })
   .refine((b) => Boolean(b.startUrl ?? b.url), {

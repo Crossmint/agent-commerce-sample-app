@@ -17,6 +17,8 @@ import { listReveals } from "./handlers/reveals.js";
 import {
   cancelCheckout,
   createBuyerProfile,
+  deleteBrowserProfile,
+  getBrowserProfile,
   createCheckout,
   getCheckout,
   listCheckoutMessages,
@@ -75,7 +77,9 @@ export function buildRouter(): Router<Ctx> {
     .post("/v1/checkouts/:id/messages", sendCheckoutMessage)
     .post("/v1/checkouts/:id/cancel", cancelCheckout)
     .post("/v1/checkouts/:id/actions/:actionId", submitCheckoutAction)
-    .post("/v1/buyer-profiles", createBuyerProfile);
+    .post("/v1/buyer-profiles", createBuyerProfile)
+    .get("/v1/browser-profile", getBrowserProfile)
+    .delete("/v1/browser-profile", deleteBrowserProfile);
 }
 
 /**

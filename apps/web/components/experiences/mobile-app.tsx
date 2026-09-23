@@ -646,10 +646,11 @@ function Composer({ chat, disabled }: { chat: AgentChat; disabled: boolean }) {
 // The Cards sheet: two panels, the list and the card form.
 // ---------------------------------------------------------------------------
 
-/** The three piles the desktop Cards section uses, in the same order. */
+/** The piles the desktop Cards section uses, in the same order. */
 const PILES: Array<{ group: AgentCardGroup; title: string }> = [
   { group: "active", title: "Active" },
   { group: "needs-verification", title: "Needs verification" },
+  { group: "needs-cvc", title: "Needs security code" },
   { group: "expired", title: "Expired" },
 ];
 
@@ -752,6 +753,11 @@ function CardsSheetBody() {
               loading={agentCards.loading}
               onRevoke={(id) => agentCards.revoke(id)}
               onVerified={async () => {
+                await agentCards.refetch();
+              }}
+              // One saved card can back several budgets, so the whole list is
+              // read again rather than this one row.
+              onCvcRecollected={async () => {
                 await agentCards.refetch();
               }}
               onSelect={(card) => {

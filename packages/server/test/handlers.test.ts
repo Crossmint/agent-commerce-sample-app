@@ -1,5 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
-import { activeOrderIntent, call, cardCredential, makeServer } from "./helpers.js";
+import {
+  BROWSER_PROFILE_ID,
+  activeOrderIntent,
+  call,
+  cardCredential,
+  findCall,
+  makeServer,
+} from "./helpers.js";
 
 describe("auth", () => {
   it("rejects a missing bearer token", async () => {
@@ -455,6 +462,74 @@ describe("POST /v1/agent-cards/:id/credentials", () => {
     expect((await res.json()).error.code).toBe("verification_required");
   });
 
+  it("returns 409 cvc_recollection_required when the rail wants the security code", async () => {
+    const { handlers } = makeServer([
+      {
+        method: "GET",
+        path: "/unstable/order-intents/oi_1",
+        reply: {
+          body: activeOrderIntent({
+            rails: [{ rail: "encrypted-card", status: "pending_cvc_recollection" }],
+          }),
+        },
+      },
+    ]);
+    const res = await call(handlers, "POST", "/v1/agent-cards/oi_1/credentials", { body: {} });
+    expect(res.status).toBe(409);
+    const body = await res.json();
+    expect(body.error.code).toBe("cvc_recollection_required");
+    // The wallet's field is keyed by the saved card, so the caller is told which.
+    expect(body.error.details.paymentMethodId).toBe("pm_1");
+  });
+
+  it("mints from the live rail when only the unused fallback wants the code", async () => {
+    const { handlers } = makeServer([
+      {
+        method: "GET",
+        path: "/unstable/order-intents/oi_1",
+        reply: {
+          body: activeOrderIntent({
+            rails: [
+              { rail: "agentic-token", provider: "vic", status: "active", credentialFormats: ["card"] },
+              { rail: "encrypted-card", status: "pending_cvc_recollection" },
+            ],
+          }),
+        },
+      },
+      { method: "POST", path: "/credentials", reply: { status: 201, body: cardCredential } },
+    ]);
+    // The network rail issues per merchant, and this order intent names none.
+    const merchant = { name: "United", url: "https://united.com", countryCode: "US" };
+    const res = await call(handlers, "POST", "/v1/agent-cards/oi_1/credentials", {
+      body: { merchant },
+    });
+    expect(res.status).toBe(200);
+    expect((await res.json()).rail).toBe("agentic-token");
+  });
+
+  it("turns Crossmint's CVC 409 on the mint into cvc_recollection_required", async () => {
+    const { handlers } = makeServer([
+      { method: "GET", path: "/unstable/order-intents/oi_1", reply: { body: activeOrderIntent() } },
+      {
+        method: "POST",
+        path: "/credentials",
+        reply: {
+          status: 409,
+          body: {
+            code: "ORDER_INTENT_CVC_RECOLLECTION_REQUIRED",
+            message: "The vaulted CVC expired",
+          },
+        },
+      },
+    ]);
+    const merchant = { name: "United", url: "https://united.com", countryCode: "US" };
+    const res = await call(handlers, "POST", "/v1/agent-cards/oi_1/credentials", {
+      body: { merchant },
+    });
+    expect(res.status).toBe(409);
+    expect((await res.json()).error.code).toBe("cvc_recollection_required");
+  });
+
   it("returns 409 no_usable_rail when no rail is active", async () => {
     const { handlers } = makeServer([
       {
@@ -556,7 +631,7 @@ describe("checkouts", () => {
       embedUrl: "https://www.crossmint.com/embed/run_1",
       createdAt: "2026-09-17T00:00:00.000Z",
     });
-    const create = calls[0]!;
+    const create = findCall(calls, "POST", /\/unstable\/agent-checkouts$/)!;
     expect(create.url).toBe("https://www.crossmint.com/api/unstable/agent-checkouts");
     expect(create.headers).toMatchObject({
       "X-API-KEY": "sk_test",
@@ -566,6 +641,9 @@ describe("checkouts", () => {
       request: { startUrl: "https://shop.example/p/1", task: "medium, black" },
       constraints: { maxCost: { amount: "100.00", currency: "USD" } },
       buyerProfileId: "bp_1",
+      // Attached by the server: the run picks up where the user's last one
+      // left off, signed in to the stores they signed into before.
+      browserProfileId: BROWSER_PROFILE_ID,
     });
   });
 
@@ -586,7 +664,7 @@ describe("checkouts", () => {
       },
     });
     expect(res.status).toBe(201);
-    expect(calls[0]!.body).toMatchObject({
+    expect(findCall(calls, "POST", /\/unstable\/agent-checkouts$/)!.body).toMatchObject({
       request: { startUrl: "https://shop.example/p/1", task: "blue" },
     });
   });
@@ -937,6 +1015,136 @@ describe("checkouts", () => {
       reason: "policy.max_cost_exceeded",
       message: "The total was 31.00, above the 30.00 cap.",
     });
+  });
+});
+
+describe("sticky browser sessions", () => {
+  const created = { status: 202, body: { runId: "run_1", status: "queued" } };
+  const createRoute = { method: "POST" as const, path: /\/unstable\/agent-checkouts$/, reply: created };
+  const body = { startUrl: "https://shop.example/p/1", maxCost: { amount: "5.00", currency: "USD" } };
+
+  it("makes the user's profile the first time and reuses it after", async () => {
+    let profiles: Array<{ id: string; label: string }> = [];
+    const { handlers, calls } = makeServer([
+      createRoute,
+      {
+        method: "GET",
+        path: "/unstable/agent-checkouts/browser-profiles",
+        reply: () => ({ body: { data: profiles, nextCursor: null } }),
+      },
+      {
+        method: "POST",
+        path: "/unstable/agent-checkouts/browser-profiles",
+        reply: () => {
+          profiles = [{ id: "bp_new", label: "Merchant logins" }];
+          return { status: 201, body: profiles[0] };
+        },
+      },
+    ]);
+
+    await call(handlers, "POST", "/v1/checkouts", { body });
+    const made = findCall(calls, "POST", "/browser-profiles")!;
+    // Server key plus the user id: without the header every end user's logins
+    // would pile into the project's own shared profile.
+    expect(made.headers).toMatchObject({ "X-API-KEY": "sk_test", "x-crossmint-user-id": "user-test-1" });
+    expect(made.body).toEqual({ label: "Merchant logins" });
+    expect(findCall(calls, "POST", /\/unstable\/agent-checkouts$/)!.body).toMatchObject({
+      browserProfileId: "bp_new",
+    });
+
+    // The second run is already signed in and asks Crossmint nothing.
+    calls.length = 0;
+    await call(handlers, "POST", "/v1/checkouts", { body });
+    expect(findCall(calls, "GET", "/browser-profiles")).toBeUndefined();
+    expect(findCall(calls, "POST", "/browser-profiles")).toBeUndefined();
+    expect(findCall(calls, "POST", /\/unstable\/agent-checkouts$/)!.body).toMatchObject({
+      browserProfileId: "bp_new",
+    });
+  });
+
+  it("reads the profile back when a run in flight made it first", async () => {
+    const { handlers, calls } = makeServer([
+      createRoute,
+      {
+        method: "GET",
+        path: "/unstable/agent-checkouts/browser-profiles",
+        reply: { body: { data: [], nextCursor: null } },
+        once: true,
+      },
+      {
+        method: "POST",
+        path: "/unstable/agent-checkouts/browser-profiles",
+        reply: { status: 409, body: { code: "already_exists", message: "The user already has a browser profile." } },
+      },
+      {
+        method: "GET",
+        path: "/unstable/agent-checkouts/browser-profiles",
+        reply: { body: { data: [{ id: "bp_raced", label: "Merchant logins" }], nextCursor: null } },
+      },
+    ]);
+    await call(handlers, "POST", "/v1/checkouts", { body });
+    expect(findCall(calls, "POST", /\/unstable\/agent-checkouts$/)!.body).toMatchObject({
+      browserProfileId: "bp_raced",
+    });
+  });
+
+  it("buys anyway when the profile cannot be resolved", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const { handlers, calls } = makeServer([
+      createRoute,
+      {
+        method: "GET",
+        path: "/unstable/agent-checkouts/browser-profiles",
+        reply: { status: 503, body: { message: "Upstream service unavailable" } },
+      },
+    ]);
+    const res = await call(handlers, "POST", "/v1/checkouts", { body });
+    // A convenience must not take a purchase down with it.
+    expect(res.status).toBe(201);
+    expect(findCall(calls, "POST", /\/unstable\/agent-checkouts$/)!.body).not.toHaveProperty(
+      "browserProfileId",
+    );
+    expect(warn).toHaveBeenCalled();
+    vi.restoreAllMocks();
+  });
+
+  it("starts signed out for freshBrowser, and takes an explicit profile over the user's own", async () => {
+    const { handlers, calls } = makeServer([createRoute]);
+    await call(handlers, "POST", "/v1/checkouts", { body: { ...body, freshBrowser: true } });
+    expect(findCall(calls, "POST", /\/unstable\/agent-checkouts$/)!.body).not.toHaveProperty(
+      "browserProfileId",
+    );
+    // Nothing was asked of Crossmint: a fresh browser needs no profile at all.
+    expect(findCall(calls, "GET", "/browser-profiles")).toBeUndefined();
+
+    calls.length = 0;
+    await call(handlers, "POST", "/v1/checkouts", { body: { ...body, browserProfileId: "bp_theirs" } });
+    expect(findCall(calls, "POST", /\/unstable\/agent-checkouts$/)!.body).toMatchObject({
+      browserProfileId: "bp_theirs",
+    });
+    expect(findCall(calls, "GET", "/browser-profiles")).toBeUndefined();
+  });
+
+  it("deletes the saved logins and makes a new profile next time", async () => {
+    const { handlers, calls } = makeServer([
+      createRoute,
+      { method: "DELETE", path: "/unstable/agent-checkouts/browser-profiles/", reply: { status: 204 } },
+    ]);
+    const res = await call(handlers, "DELETE", "/v1/browser-profile");
+    expect(res.status).toBe(204);
+    expect(findCall(calls, "DELETE", `/browser-profiles/${BROWSER_PROFILE_ID}`)).toBeDefined();
+
+    // The cached id went with it, so the next run resolves from Crossmint again.
+    calls.length = 0;
+    await call(handlers, "POST", "/v1/checkouts", { body });
+    expect(findCall(calls, "GET", "/browser-profiles")).toBeDefined();
+  });
+
+  it("reports the profile without leaking anything about the logins", async () => {
+    const { handlers } = makeServer();
+    const res = await call(handlers, "GET", "/v1/browser-profile");
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ browserProfile: { id: BROWSER_PROFILE_ID } });
   });
 });
 

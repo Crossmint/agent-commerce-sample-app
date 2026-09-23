@@ -108,6 +108,7 @@ export interface CreateCheckoutInput {
   maxCost: { amount: string; currency: string };
   buyerProfileId?: string;
   browserProfileId?: string;
+  freshBrowser?: boolean;
   merchantGuidance?: string;
 }
 

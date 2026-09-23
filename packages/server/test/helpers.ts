@@ -67,8 +67,34 @@ export function fakeCrossmint(routes: FakeRoute[]) {
   return { fetch: fetchImpl, calls };
 }
 
+/**
+ * The user's saved merchant logins, which the server attaches to every
+ * checkout. Appended after the caller's routes, so a test that wants a
+ * different answer — no profile yet, or a failure — states its own first.
+ */
+export const BROWSER_PROFILE_ID = "bp_browser_1";
+
+const defaultRoutes: FakeRoute[] = [
+  {
+    method: "GET",
+    path: "/unstable/agent-checkouts/browser-profiles",
+    reply: {
+      body: { data: [{ id: BROWSER_PROFILE_ID, label: "Merchant logins" }], nextCursor: null },
+    },
+  },
+];
+
+/** A recorded call by method and path fragment. Index is no use: a checkout makes several. */
+export function findCall(calls: FakeCall[], method: string, path: string | RegExp): FakeCall | undefined {
+  return calls.find(
+    (c) =>
+      c.method === method.toUpperCase() &&
+      (typeof path === "string" ? c.path.includes(path) : path.test(c.path)),
+  );
+}
+
 export function makeServer(routes: FakeRoute[] = [], overrides: Partial<AgentCommerceServerConfig> = {}) {
-  const crossmint = fakeCrossmint(routes);
+  const crossmint = fakeCrossmint([...routes, ...defaultRoutes]);
   const store = memoryRequestStore();
   const handlers = createAgentCommerceHandlers({
     crossmint: {
