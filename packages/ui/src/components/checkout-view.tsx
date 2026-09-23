@@ -5,6 +5,7 @@ import { AlertCircle } from "lucide-react";
 import { errorMessage } from "../api/client.js";
 import type { CheckoutView as CheckoutViewData } from "../api/types.js";
 import { isTerminalCheckoutView, useCheckout } from "../hooks/use-checkout.js";
+import { useCheckoutMessages } from "../hooks/use-checkout-messages.js";
 import { cn } from "../lib/utils.js";
 import { Alert, AlertDescription, AlertTitle } from "./primitives/alert.js";
 import { Badge, type BadgeProps } from "./primitives/badge.js";
@@ -12,6 +13,7 @@ import { Button } from "./primitives/button.js";
 import { Skeleton } from "./primitives/skeleton.js";
 import { Spinner } from "./primitives/spinner.js";
 import { ApproveAgentCard, PAYMENT_STEP_ASK } from "./approve-agent-card.js";
+import { CheckoutSteps, checkoutSteps } from "./checkout-steps.js";
 import { PendingActionForm } from "./pending-action-form.js";
 
 export interface CheckoutViewProps {
@@ -21,8 +23,6 @@ export interface CheckoutViewProps {
   /** Called once when the checkout reaches a terminal status. */
   onDone?: (view: CheckoutViewData) => void;
   className?: string;
-  /** Height of the browser iframe. Default 560px. */
-  frameHeight?: number;
   /**
    * The name the card network shows while the user saves a card at the
    * payment step. It is the platform saving it, not the agent asking.
@@ -55,9 +55,13 @@ function receiptTotal(receipt: CheckoutViewData["receipt"]): string | undefined 
   return receipt ? `${receipt.total.amount} ${receipt.total.currency}` : undefined;
 }
 
+const PANEL = "rounded-2xl bg-card p-6 ring-1 ring-foreground/10";
+
 /**
- * Watches an Agent Checkout. Shows the live browser when Crossmint provides
- * one, asks the user any question the store asks, and ends with a receipt.
+ * Watches an Agent Checkout on a page of its own. Lists what the agent does
+ * as steps that tick off, asks the user any question the store asks, and
+ * ends with a receipt. The agent's browser is never shown: the steps say
+ * what it does there.
  *
  * The store's card form never reaches this component. When the run wants
  * paying, the view carries a `paymentRequest` instead and the user picks one
@@ -69,13 +73,15 @@ export function CheckoutView({
   poll = true,
   onDone,
   className,
-  frameHeight = 560,
   platformName,
 }: CheckoutViewProps) {
   const { data, error, loading, refetch, submitAction, decline, cancel, submitting } = useCheckout(
     checkoutId,
     { poll },
   );
+  const messages = useCheckoutMessages(checkoutId, {
+    live: poll && Boolean(data) && !isTerminalCheckoutView(data),
+  });
   const [actionError, setActionError] = React.useState<unknown>(undefined);
 
   const doneRef = React.useRef(false);
@@ -90,7 +96,7 @@ export function CheckoutView({
     return (
       <div className={cn("flex flex-col gap-4", className)}>
         <Skeleton className="h-9 w-48" />
-        <Skeleton className="h-[320px]" />
+        <Skeleton className="h-[160px]" />
       </div>
     );
   }
@@ -119,6 +125,7 @@ export function CheckoutView({
   const summary = data.result?.summary;
   const stopped =
     data.status === "failed" || data.status === "blocked" || data.status === "cancelled";
+  const steps = checkoutSteps(messages.data ?? [], data);
 
   return (
     <div className={cn("flex flex-col gap-6", className)}>
@@ -131,6 +138,8 @@ export function CheckoutView({
         <span className="ml-auto font-mono text-xs text-muted-foreground">{data.id}</span>
       </div>
 
+      {steps.length ? <CheckoutSteps steps={steps} className={PANEL} /> : null}
+
       {error ? (
         <Alert variant="warning">
           <AlertCircle />
@@ -142,7 +151,7 @@ export function CheckoutView({
       {/* The ending the onramp sample app gives a finished deposit: the
           figure is the news, so it is the big blue thing. */}
       {data.status === "succeeded" ? (
-        <div className="flex flex-col gap-2 rounded-2xl bg-card p-6 ring-1 ring-foreground/10">
+        <div className={cn("flex flex-col gap-2", PANEL)}>
           <p className="text-[28px] leading-[1.2] font-medium tracking-[-0.02em]">Bought.</p>
           {total ? (
             <p className="font-display text-4xl font-semibold tracking-tight text-primary tabular-nums">
@@ -175,7 +184,7 @@ export function CheckoutView({
       ) : null}
 
       {!terminal && data.paymentRequest ? (
-        <div className="rounded-2xl bg-card p-6 ring-1 ring-foreground/10">
+        <div className={PANEL}>
           <ApproveAgentCard
             requestId={data.paymentRequest.requestId}
             variant="plain"
@@ -183,13 +192,16 @@ export function CheckoutView({
             ask={PAYMENT_STEP_ASK}
             // Once the card is live the server can pay, but only on the next
             // read of the run. Ask for one rather than waiting out the poll.
-            onDone={() => void refetch()}
+            onDone={() => {
+              void refetch();
+              void messages.refetch();
+            }}
           />
         </div>
       ) : null}
 
       {!terminal && data.rendered ? (
-        <div className="rounded-2xl bg-card p-6 ring-1 ring-foreground/10">
+        <div className={PANEL}>
           {actionError ? (
             <Problem
               className="mb-4"
@@ -204,6 +216,8 @@ export function CheckoutView({
               setActionError(undefined);
               try {
                 await submitAction(data.rendered!.id, values);
+                // Tick the answered question now, not on the next poll.
+                void messages.refetch();
               } catch (e) {
                 setActionError(e);
               }
@@ -219,6 +233,7 @@ export function CheckoutView({
               setActionError(undefined);
               try {
                 await decline(data.rendered!.id);
+                void messages.refetch();
               } catch (e) {
                 setActionError(e);
               }
@@ -227,24 +242,6 @@ export function CheckoutView({
             Skip this question
           </Button>
         </div>
-      ) : null}
-
-      {!terminal && data.embedUrl ? (
-        <div className="ac-window">
-          <iframe
-            title="Checkout browser"
-            src={data.embedUrl}
-            allow="clipboard-write"
-            className="block w-full bg-background"
-            style={{ height: frameHeight }}
-          />
-        </div>
-      ) : null}
-
-      {!terminal && !data.embedUrl && !data.rendered && !data.paymentRequest ? (
-        <p className="text-sm text-muted-foreground">
-          The agent is working on it. This page updates on its own.
-        </p>
       ) : null}
 
       {!terminal ? (

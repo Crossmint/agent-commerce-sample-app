@@ -220,6 +220,7 @@ A request from an agent is a request from the user. An agent sees every agent ca
 | `POST /v1/checkouts/:id/messages` | agent, user | Answer the open request (`submit` values, `decline`, `alternative` text) or send the agent a note. Card fields are refused. |
 | `GET /v1/checkouts/:id/messages` | agent, user | The run's transcript. |
 | `POST /v1/checkouts/:id/cancel` | agent, user | Stop the run. |
+| `POST /v1/checkouts/:id/agent-card` | agent, user | Pay the payment step from an agent card the user already has. It must be active, have money left, and not be locked to another store. |
 
 **Storage.** One interface, two implementations.
 
@@ -254,7 +255,7 @@ Credential issuance is logged, not stored: rail, amount, merchant, agent card id
 
 Nothing asks for the code while the card can still pay without it. Rails are tried in order, so a live network rail never reaches the encrypted-card fallback, and a lapsed code behind that live rail is not the user's problem yet — `needsCvcRecollection` is false for such a card, and no badge, pile, row action or approval step mentions it. It flips the moment the fallback is the rail the payment needs, which is the same moment `selectRail` comes back empty and the mint answers `cvc_recollection_required`. `pendingCvcRecollectionRails` is the raw read, for a caller that wants to know a rail is stale whether or not it is in the way.
 - `<AgentCardList>`: list, balance, revoke.
-- `<CheckoutView checkoutId>`: polls, renders `embedUrl` in a view-only iframe, renders the open `pendingUserAction` from its JSON Schema via `<PendingActionForm>` (with skip and cancel), and ends with the receipt or the blocked/failed summary.
+- `<CheckoutView checkoutId>`: polls the run and its transcript (`GET /v1/checkouts/:id/messages`), lists what the agent does as steps that tick off (`<CheckoutSteps>`, built by `checkoutSteps` from the transcript's progress and input-request parts), renders the open `pendingUserAction` from its JSON Schema via `<PendingActionForm>` (with skip and cancel) and the payment step via `<ApproveAgentCard>`, and ends with the receipt or the blocked/failed summary. A question that is a single choice shows its options as buttons that answer it on a tap. The agent's browser is never shown: `embedUrl` stays on the API for callers that want it. It is the `/checkouts/:id` page; the chat does not use it.
 - `<ConnectedAgents>`: the user's Stytch sessions, with labels and a revoke button.
 
 Two layers: headless hooks (`useAgentCardRequest`, `useCheckout`, ...) and styled components on top. Styled with CSS variables so a platform can retheme without forking.
@@ -273,6 +274,8 @@ Two layers: headless hooks (`useAgentCardRequest`, `useCheckout`, ...) and style
 - `create_checkout({ startUrl, task?, agentCardId?, maxCost, currency?, buyerProfileId?, browserProfileId?, freshBrowser?, merchantGuidance? })`. `agentCardId` is optional: without one the run raises its payment step and the user chooses a payment method there. `browserProfileId` is rarely needed — see sticky sessions below.
 
 **Sticky browser sessions.** Every Agent Checkout otherwise starts in a fresh browser, signed out, so a store that wants an account asks the user to log in on every purchase. Crossmint gives a user at most one browser profile, which keeps the state from that first login; `packages/server/src/browser-profile.ts` resolves it get-or-create, caches the id per user on the `Ctx`, and `createCheckout` attaches it to every run. No caller passes anything. Whose logins these are is decided by the auth: a user JWT, or a server key with `x-crossmint-user-id` beside it — a server key alone would file every end user's logins under the project's own subject, in one shared profile, which is why `checkoutAuth` will not build that combination. A 409 on create means a run in flight won the race, so the id is read back rather than the checkout failing; any other failure is logged and the run goes ahead signed out, because a convenience must not take a purchase down with it. `freshBrowser: true` skips the profile for one run, and `DELETE /v1/browser-profile` erases the stored state for good.
+
+**Saved buyer details.** A store asks for the buyer's name, email and shipping address on every checkout. `packages/server/src/buyer-profile.ts` finds the user's newest buyer profile, caches it per user on the `Ctx`, and `createCheckout` attaches it to every run that names no `buyerProfileId`, so the store fills those fields itself. The chat saves one with `save_buyer_profile` the first time the user gives a full name and address, and its prompt carries the user's email and saved details every turn, so the agent answers those questions itself instead of asking. Reading the profile fails quietly: without it the run goes ahead and the store asks.
 - `get_checkout({ checkoutId })`
 - `answer_checkout({ checkoutId, requestId?, action?, values?, text? })`
 - `cancel_checkout({ checkoutId })`
@@ -417,6 +420,8 @@ That is the preferred path and the skill says so. Asking for an agent card up fr
 ### 4.3 Agent inside a web app (the chat half of apps/web)
 
 No approval URL and no polling. The model's `request_agent_card` tool call streams to the client as a tool part. The chat renders `<ApproveAgentCard>` in that slot. The user approves in place. The client returns the agent card id as the tool result and the model continues.
+
+A checkout is a conversation, not a component. The model calls `create_checkout`, then `watch_checkout({ checkoutId })`, a client-side tool with no execute. The client polls the run and its transcript with no time limit, and posts each update the store's agent writes as a line of the agent's own in the thread. It hands back, with those updates as the tool result, when one of three things happens. The store asks a question: the model asks the user in one casual line, turns their free-form reply into values that fit the question's JSON Schema, sends them with `answer_checkout` (or `alternative` with their words, or `decline`), and watches again. The run reaches its payment step: the model lists the user's agent cards and asks whether to pay with one that fits or set up a new one; an existing card goes to `POST /v1/checkouts/:id/agent-card`, a new one is `await_agent_card_approval` with the payment step's request, and either way the model watches again. The run ends: the model says how it went. The approval screen is the only component: inline in the desktop chat, a sheet on the phone, and a link in the messaging frames. The model never polls `get_checkout`.
 
 ### 4.4 Rail fallback inside `POST /agent-cards/:id/credentials`
 

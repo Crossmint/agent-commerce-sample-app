@@ -1,6 +1,7 @@
 import type { CheckoutView } from "@agent-commerce/server";
 import type { ApproveOutcome } from "@agent-commerce/ui";
-import type { ApprovalOutcome } from "@/lib/chat/tools";
+import type { CheckoutMessage } from "@agent-commerce/core";
+import type { ApprovalOutcome, CheckoutOutcome, CheckoutUpdate } from "@/lib/chat/tools";
 import type { ChatMessage, ChatMessagePart } from "@/lib/chat/types";
 import { humanizeToolName } from "./tool-card";
 
@@ -56,6 +57,129 @@ export function approvalLabel(outcome: ApprovalOutcome): string {
   }
 }
 
+const ENDINGS = ["succeeded", "blocked", "failed", "cancelled"] as const;
+
+/**
+ * What the store's agent has written so far, one update per progress or text
+ * part of its messages, oldest first. Questions are left out: the model asks
+ * those itself. The id is stable across polls, so a later watch can tell what
+ * the chat already showed.
+ */
+export function feedUpdates(messages: CheckoutMessage[]): CheckoutUpdate[] {
+  const out: CheckoutUpdate[] = [];
+  for (const m of messages) {
+    if (m.role !== "assistant") continue;
+    m.parts.forEach((part, i) => {
+      if (part.type !== "progress" && part.type !== "text") return;
+      const text = typeof part.text === "string" ? part.text.trim() : "";
+      if (text && out.at(-1)?.text !== text) out.push({ id: `${m.id}:${i}`, text });
+    });
+  }
+  return out;
+}
+
+/**
+ * Why a watch should hand back now, or undefined to keep polling: the run
+ * ended, the store asks a question not handed back before, or the payment
+ * step waits on the user. The caller adds the updates.
+ */
+export function stopReason(
+  view: CheckoutView,
+  asked: ReadonlySet<string>,
+): Omit<CheckoutOutcome, "updates"> | undefined {
+  const ending = ENDINGS.find((s) => s === view.status);
+  if (ending) {
+    return {
+      checkoutId: view.id,
+      status: ending,
+      ...(view.receipt ? { total: view.receipt.total } : {}),
+      ...(view.receipt?.merchantOrderId ? { merchantOrderId: view.receipt.merchantOrderId } : {}),
+      ...(view.result?.summary ? { summary: view.result.summary } : {}),
+      ...(view.failure ? { failure: view.failure } : {}),
+    };
+  }
+  const pay = view.paymentRequest;
+  // Approved and about to pay: the next read answers the store, so keep going.
+  if (pay && pay.status !== "active") {
+    return {
+      checkoutId: view.id,
+      status: "awaiting_payment",
+      payment: {
+        requestId: pay.requestId,
+        status: pay.status,
+        amount: pay.amount,
+        description: pay.description,
+        ...(pay.merchant ? { merchant: { name: pay.merchant.name, url: pay.merchant.url } } : {}),
+      },
+    };
+  }
+  const action = view.pendingUserAction;
+  // Watching again right after an answer can still see that question for a
+  // moment, until the store takes it. It was asked; wait for what comes next.
+  if (view.status === "awaiting_input" && action && !pay && !asked.has(action.id)) {
+    return {
+      checkoutId: view.id,
+      status: "awaiting_input",
+      question: {
+        requestId: action.id,
+        question: action.question || view.rendered?.title || "The store needs an answer.",
+        ...(action.expiresAt ? { expiresAt: action.expiresAt } : {}),
+        responseSchema: action.responseSchema as Record<string, unknown>,
+      },
+    };
+  }
+  return undefined;
+}
+
+/**
+ * True when a `watch_checkout` in the same message covers this checkout
+ * part's run. The watch says all the part would, so the part draws nothing.
+ */
+export function watchedHere(message: ChatMessage, part: ChatMessagePart): boolean {
+  const id = checkoutIdOf(part);
+  if (!id) return false;
+  return message.parts.some((p) => p.type === "tool-watch_checkout" && p.input?.checkoutId === id);
+}
+
+/** What the thread's finished watches already did, so the next one does not do it twice. */
+export interface WatchIndex {
+  /** Updates already posted, by checkout. A new watch posts only what came after. */
+  shown: Map<string, Set<string>>;
+  /** Questions already handed to the model. */
+  asked: Set<string>;
+  /** Agent card requests raised by a checkout's payment step: approving one is choosing how to pay. */
+  paymentRequests: Set<string>;
+}
+
+export function watchIndex(messages: ChatMessage[]): WatchIndex {
+  const index: WatchIndex = { shown: new Map(), asked: new Set(), paymentRequests: new Set() };
+  for (const m of messages) {
+    for (const part of m.parts) {
+      if (part.type !== "tool-watch_checkout" || part.state !== "output-available") continue;
+      const out = part.output;
+      let shown = index.shown.get(out.checkoutId);
+      if (!shown) index.shown.set(out.checkoutId, (shown = new Set()));
+      for (const u of out.updates ?? []) shown.add(u.id);
+      if (out.question) index.asked.add(out.question.requestId);
+      if (out.payment) index.paymentRequests.add(out.payment.requestId);
+    }
+  }
+  return index;
+}
+
+/** The pending `watch_checkout` calls in a thread, for a surface that watches them out of sight. */
+export function pendingWatches(messages: ChatMessage[]): Array<{ toolCallId: string; checkoutId: string }> {
+  const out: Array<{ toolCallId: string; checkoutId: string }> = [];
+  for (const m of messages) {
+    for (const part of m.parts) {
+      if (part.type === "tool-watch_checkout" && part.state === "input-available") {
+        out.push({ toolCallId: part.toolCallId, checkoutId: part.input.checkoutId });
+      }
+    }
+  }
+  return out;
+}
+
 export const CHECKOUT_TITLES = {
   "tool-create_checkout": "Starting a checkout",
   "tool-get_checkout": "Checking the checkout",
@@ -98,6 +222,9 @@ export function toolTitle(type: string): string {
     "tool-get_agent_card": "Checking an agent card",
     "tool-request_agent_card": "Requesting an agent card",
     "tool-await_agent_card_approval": "Waiting for your approval",
+    "tool-watch_checkout": "Following the checkout",
+    "tool-pay_checkout_with_agent_card": "Paying with your agent card",
+    "tool-save_buyer_profile": "Saving your details for next time",
     "tool-reveal_agent_card": "Minting a card credential",
     "tool-revoke_agent_card": "Revoking an agent card",
     ...CHECKOUT_TITLES,
@@ -156,9 +283,10 @@ export function checkoutBadgeVariant(status: string): "success" | "warning" | "d
 }
 
 /**
- * The store a checkout runs at, for a link bubble: "nike.com". Only the
- * `create_checkout` call carries the URL, so a later `get_checkout` part looks
- * for the create call with the same checkout id in the same message.
+ * The store a checkout runs at, for a link bubble or a card header:
+ * "nike.com". Only the `create_checkout` call carries the URL, so a later
+ * `watch_checkout` or `get_checkout` part looks for the create call with the
+ * same checkout id in the same message.
  */
 export function checkoutHost(message: ChatMessage, part: ChatMessagePart): string | undefined {
   const url = startUrlOf(part) ?? startUrlOf(createPartFor(message, checkoutIdOf(part)));
@@ -177,6 +305,7 @@ function startUrlOf(part: ChatMessagePart | undefined): string | undefined {
 }
 
 function checkoutIdOf(part: ChatMessagePart): string | undefined {
+  if (part.type === "tool-watch_checkout") return part.input?.checkoutId;
   const view = checkoutOf(part);
   if (view) return view.id;
   if (isCheckoutPart(part) && part.type !== "tool-create_checkout") return (part.input as { checkoutId?: string } | undefined)?.checkoutId;

@@ -200,9 +200,13 @@ Optional `messageId` (≤200 chars) makes a retry idempotent. → `CheckoutView`
 
 `POST /v1/checkouts/:id/cancel` → `CheckoutView`. The run reaches `cancelled` on a later poll.
 
+`POST /v1/checkouts/:id/agent-card` body `{ "agentCardId": "oi_…" }` → `CheckoutView`. Pay the run's payment step from an agent card the user already has, instead of minting a new one. The card must be active, have money left, and not be locked to another store: `409 agent_card_unusable` or `409 agent_card_wrong_merchant` otherwise, and `409 checkout_finished` once the run has ended. The payment step is answered on this read, or on the first read after the run gets there.
+
 `POST /v1/checkouts/:id/actions/:actionId` body `{ "values": {...} }` → `CheckoutView`. Older route, same as a `submit` message with `requestId = actionId`.
 
-`POST /v1/buyer-profiles` body `BuyerProfileInput` (core) → `{ "id": "…" }`.
+`POST /v1/buyer-profiles` body `BuyerProfileInput` (core) → `{ "id": "…" }`. Save the user's name, contact and shipping address. The newest profile is the one every later checkout starts with: `POST /v1/checkouts` attaches it when the caller names no `buyerProfileId`, so the store fills those fields itself instead of asking.
+
+`GET /v1/buyer-profile` → `{ "buyerProfile": BuyerProfile | null }`. The saved details later checkouts start with.
 
 `GET /v1/browser-profile` → `{ "browserProfile": { "id": "…" } | null }`. The user's saved merchant logins, as metadata: Crossmint returns no cookies or tokens, so there is nothing else to show. Null until a checkout has made the profile; reading does not create one.
 

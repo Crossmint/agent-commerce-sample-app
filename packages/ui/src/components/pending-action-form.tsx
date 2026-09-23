@@ -55,18 +55,81 @@ function defaultsFor(fields: RenderedField[], acc: Values = {}): Values {
   return out;
 }
 
+/** Most options a question may have and still show as buttons. */
+const MAX_CHOICES = 8;
+
+/** The one field of a question that is only a choice, when it is. Its options become buttons. */
+function singleChoice(fields: RenderedField[]): RenderedField | undefined {
+  const [only] = fields;
+  if (fields.length !== 1 || !only || only.kind !== "select") return undefined;
+  const n = only.options?.length ?? 0;
+  return n > 0 && n <= MAX_CHOICES ? only : undefined;
+}
+
 /**
  * Renders a checkout's pending user action (shipping, size, a question) from
  * its JSON Schema, walked into fields by `renderPendingAction` in core.
+ *
+ * A question that is one choice shows its options as buttons, and a tap
+ * answers it. Everything else is a form with a submit button.
  */
 export function PendingActionForm({ action, onSubmit, submitting = false, submitLabel = "Continue", className }: PendingActionFormProps) {
   const [values, setValues] = React.useState<Values>(() => defaultsFor(action.fields));
+  const [picked, setPicked] = React.useState<unknown>(undefined);
 
-  React.useEffect(() => {
+  // Start over for a new question, and only then. A poll hands back the same
+  // question as a fresh object every few seconds; keying on the object would
+  // wipe what the user is typing. Reset during render, the React pattern for
+  // state derived from the previous render.
+  const [shownId, setShownId] = React.useState(action.id);
+  if (shownId !== action.id) {
+    setShownId(action.id);
     setValues(defaultsFor(action.fields));
-  }, [action.id, action.fields]);
+    setPicked(undefined);
+  }
 
   const update = (path: string[], value: unknown) => setValues((prev) => setAt(prev, path, value));
+  const choice = singleChoice(action.fields);
+
+  const heading = (
+    <div className="flex flex-col gap-1">
+      <h3 className="text-xl font-medium">{action.title}</h3>
+      {action.description ? <p className="text-sm text-muted-foreground">{action.description}</p> : null}
+      {action.expiresAt ? (
+        <p className="text-xs text-muted-foreground">Answer before {formatDateTime(action.expiresAt)}.</p>
+      ) : null}
+    </div>
+  );
+
+  if (choice) {
+    return (
+      <div className={cn("flex flex-col gap-5", className)}>
+        {heading}
+        <div role="group" aria-label={choice.label} className="flex flex-col gap-2">
+          {choice.options!.map((o) => {
+            const busy = submitting && picked === o.value;
+            return (
+              <Button
+                key={String(o.value)}
+                type="button"
+                size="xl"
+                variant="secondary"
+                className="w-full justify-start"
+                disabled={submitting}
+                onClick={() => {
+                  setPicked(o.value);
+                  void onSubmit(setAt({}, choice.path, o.value));
+                }}
+              >
+                {busy ? <Spinner /> : null}
+                {o.label}
+              </Button>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <form
@@ -76,13 +139,7 @@ export function PendingActionForm({ action, onSubmit, submitting = false, submit
         void onSubmit(values);
       }}
     >
-      <div className="flex flex-col gap-1">
-        <h3 className="text-xl font-medium">{action.title}</h3>
-        {action.description ? <p className="text-sm text-muted-foreground">{action.description}</p> : null}
-        {action.expiresAt ? (
-          <p className="text-xs text-muted-foreground">Answer before {formatDateTime(action.expiresAt)}.</p>
-        ) : null}
-      </div>
+      {heading}
       <FieldList fields={action.fields} values={values} update={update} disabled={submitting} />
       <Button type="submit" size="xl" className="w-full" disabled={submitting}>
         {submitting ? <Spinner /> : null}

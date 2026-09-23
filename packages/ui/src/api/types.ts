@@ -6,6 +6,7 @@ import type {
   AgentCard,
   Amount,
   BuyerProfileInput,
+  CheckoutMessageList,
   CheckoutReceipt,
   CheckoutResult,
   CheckoutStatus,
@@ -197,4 +198,11 @@ export interface CheckoutView {
   createdAt?: string;
 }
 
-export type { PaymentMethod, AgentCard, RegisterCardInput, RegisterCardResult, BuyerProfileInput };
+export type {
+  PaymentMethod,
+  AgentCard,
+  RegisterCardInput,
+  RegisterCardResult,
+  BuyerProfileInput,
+  CheckoutMessageList,
+};

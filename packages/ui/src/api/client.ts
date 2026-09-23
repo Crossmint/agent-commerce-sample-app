@@ -4,6 +4,7 @@ import type {
   ApproveAgentCardRequestInput,
   ApproveAgentCardRequestResult,
   CheckoutMessageInput,
+  CheckoutMessageList,
   CheckoutView,
   CreateAgentCardRequestInput,
   CreateCheckoutInput,
@@ -137,6 +138,14 @@ export function createAgentCommerceApi(opts: AgentCommerceApiOptions) {
     // Checkouts
     createCheckout: (input: CreateCheckoutInput) => request<CheckoutView>("POST", "/checkouts", input),
     getCheckout: (id: string) => request<CheckoutView>("GET", `/checkouts/${enc(id)}`),
+    /** The run's transcript, oldest first: progress, questions, answers, the result. */
+    listCheckoutMessages: (id: string, options: { cursor?: string; limit?: number } = {}) => {
+      const q = new URLSearchParams();
+      if (options.cursor) q.set("cursor", options.cursor);
+      if (options.limit) q.set("limit", String(options.limit));
+      const query = q.toString();
+      return request<CheckoutMessageList>("GET", `/checkouts/${enc(id)}/messages${query ? `?${query}` : ""}`);
+    },
     answerCheckout: (id: string, input: CheckoutMessageInput) => request<CheckoutView>("POST", `/checkouts/${enc(id)}/messages`, input),
     cancelCheckout: (id: string) => request<CheckoutView>("POST", `/checkouts/${enc(id)}/cancel`, {}),
     createBuyerProfile: (input: BuyerProfileInput) => request<{ id: string }>("POST", "/buyer-profiles", input),

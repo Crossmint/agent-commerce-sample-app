@@ -8,7 +8,7 @@ import {
   lastAssistantMessageIsCompleteWithToolCalls,
   type ChatStatus,
 } from "ai";
-import type { ApprovalOutcome } from "@/lib/chat/tools";
+import type { ApprovalOutcome, CheckoutOutcome } from "@/lib/chat/tools";
 import type { Attachment, ChatMessage } from "@/lib/chat/types";
 
 export interface UseAgentChatOptions {
@@ -27,6 +27,8 @@ export interface AgentChat {
   stop: () => void;
   /** Hand the approval screen's answer back to the `await_agent_card_approval` tool call. */
   onApprovalOutcome: (toolCallId: string, outcome: ApprovalOutcome) => void;
+  /** Hand a watched checkout's question or ending back to the `watch_checkout` tool call. Once per call. */
+  onCheckoutOutcome: (toolCallId: string, outcome: CheckoutOutcome) => void;
   error: string | null;
   dismissError: () => void;
   /** Show an error that came from outside the model turn, such as a failed upload. */
@@ -40,7 +42,9 @@ export interface AgentChat {
  * - `sendAutomaticallyWhen` resubmits once every tool call in the last
  *   assistant message has an output, which is how the client-side
  *   `await_agent_card_approval` tool hands control back to the model,
- * - `onApprovalOutcome` is what an approval screen calls when the user answers.
+ * - `onApprovalOutcome` is what an approval screen calls when the user answers,
+ * - `onCheckoutOutcome` is what a watched checkout calls when the store asks
+ *   something, the run reaches its payment step, or it ends.
  *
  * With persistence on, the first message of a new chat writes `?chat=<id>`
  * into the URL so a reload finds the history, and each finished turn asks the
@@ -96,6 +100,18 @@ export function useAgentChat({ id, initialMessages, persist }: UseAgentChatOptio
     [addToolOutput],
   );
 
+  // A run can end in front of more than one watcher (a card and a sheet), and
+  // a watcher can remount. The model hears about each ending once.
+  const reported = useRef(new Set<string>());
+  const onCheckoutOutcome = useCallback(
+    (toolCallId: string, output: CheckoutOutcome) => {
+      if (reported.current.has(toolCallId)) return;
+      reported.current.add(toolCallId);
+      void addToolOutput({ tool: "watch_checkout", toolCallId, output });
+    },
+    [addToolOutput],
+  );
+
   return {
     messages,
     status,
@@ -103,6 +119,7 @@ export function useAgentChat({ id, initialMessages, persist }: UseAgentChatOptio
     send,
     stop: () => void stop(),
     onApprovalOutcome,
+    onCheckoutOutcome,
     error,
     dismissError: () => setError(null),
     reportError: setError,

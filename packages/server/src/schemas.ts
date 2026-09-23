@@ -108,6 +108,11 @@ export const checkoutMessageSchema = z
   });
 
 /** Body of the older POST /v1/checkouts/:id/actions/:actionId. */
+/** Body of POST /v1/checkouts/:id/agent-card: pay the run from a card the user already has. */
+export const checkoutAgentCardSchema = z.object({
+  agentCardId: z.string().min(1),
+});
+
 export const submitActionSchema = z.object({
   values: z.record(z.string(), z.unknown()),
 });

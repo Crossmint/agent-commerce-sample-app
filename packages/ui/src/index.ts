@@ -57,6 +57,12 @@ export type {
 export { PendingActionForm } from "./components/pending-action-form.js";
 export type { PendingActionFormProps } from "./components/pending-action-form.js";
 export { CheckoutView } from "./components/checkout-view.js";
+export { CheckoutSteps, checkoutSteps } from "./components/checkout-steps.js";
+export type {
+  CheckoutStep,
+  CheckoutStepState,
+  CheckoutStepsProps,
+} from "./components/checkout-steps.js";
 export type { CheckoutViewProps } from "./components/checkout-view.js";
 export { ConnectedAgents } from "./components/connected-agents.js";
 export type { ConnectedAgentsProps, ConnectedAgentSession } from "./components/connected-agents.js";

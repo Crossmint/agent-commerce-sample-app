@@ -6,6 +6,7 @@ import type {
   BrowserProfileList,
   BuyerProfile,
   BuyerProfileInput,
+  BuyerProfileList,
   Checkout,
   CreateCheckoutInput,
   CreateOrderIntentInput,
@@ -262,6 +263,20 @@ export class CrossmintClient {
         body: input,
         baseUrl: this.checkoutsBaseUrl,
       }),
+
+    /**
+     * The user's saved buyer profiles: name, contact and shipping. A user can
+     * hold several. Whose they are is decided by `ctx`, as for browser profiles.
+     */
+    listBuyerProfiles: (
+      ctx: CheckoutContext,
+      opts: { cursor?: string; limit?: number } = {},
+    ): Promise<BuyerProfileList> =>
+      this.request<BuyerProfileList>(
+        "GET",
+        `/unstable/agent-checkouts/buyer-profiles${pageQuery(opts)}`,
+        { auth: this.checkoutAuth(ctx), baseUrl: this.checkoutsBaseUrl },
+      ),
 
     /**
      * The user's saved merchant logins. At most one comes back, because a user

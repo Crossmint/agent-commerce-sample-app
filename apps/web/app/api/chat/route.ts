@@ -42,7 +42,7 @@ export async function POST(req: Request): Promise<Response> {
   const { id: chatId } = parsed.data;
 
   const api = apiClient(session.sessionJwt);
-  const tools = createChatTools(api);
+  const tools = createChatTools(api, { userEmail: session.email });
 
   const validated = await safeValidateUIMessages<ChatMessage>({ messages: parsed.data.messages, tools });
   if (!validated.success) return error(400, `Bad messages: ${validated.error.message}`);
@@ -66,7 +66,7 @@ export async function POST(req: Request): Promise<Response> {
 
   const result = streamText({
     model: chatModel(),
-    instructions: systemPrompt({ userEmail: session.email }),
+    instructions: systemPrompt({ userEmail: session.email, buyerProfile: await savedDetails(api) }),
     messages: await convertToModelMessages(messages, { tools, ignoreIncompleteToolCalls: true }),
     tools,
     stopWhen: stepCountIs(8),
@@ -104,6 +104,16 @@ export async function DELETE(req: Request): Promise<Response> {
   if (!db) return error(501, "No database. Set DATABASE_URL to keep chat history.");
   const ok = await deleteChat(db, id, session.userId);
   return ok ? new Response(null, { status: 204 }) : error(404, "No such chat.");
+}
+
+/** The user's saved buyer details, for the prompt. None is fine: the chat works without. */
+async function savedDetails(api: ReturnType<typeof apiClient>) {
+  try {
+    return (await api.getBuyerProfile()) ?? undefined;
+  } catch (e) {
+    console.warn("[chat] could not read the buyer profile", e instanceof Error ? e.message : e);
+    return undefined;
+  }
 }
 
 /** A title from the first user message: its first line, cut to 60 characters. */

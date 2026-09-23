@@ -24,6 +24,12 @@ import { AgentCommerceToolError, type AgentCommerceClient } from "./api-client";
  * The outcome lives in the tool part, so history shows what happened, and the
  * model reads a real tool result instead of a synthetic user message.
  *
+ * `watch_checkout` works the same way for a stretch of a checkout. The client
+ * polls the run and posts each update the store's agent writes as a chat
+ * message, then hands back when the store asks a question, the run reaches
+ * its payment step, or it ends. The model asks the question in words, or asks
+ * how to pay, sends the answer, and watches again. It never polls itself.
+ *
  * Descriptions: the shared facts come from `TOOL_DOCS` in core (the MCP
  * server uses the same ones); this file adds the chat-specific sentence,
  * such as approving inline instead of through a link.
@@ -53,6 +59,56 @@ export const approvalOutcomeSchema = z.object({
   agentCardId: z.string().optional(),
 });
 export type ApprovalOutcome = z.infer<typeof approvalOutcomeSchema>;
+
+/** One thing the store's agent wrote while a checkout ran, shown to the user as a chat message. */
+export const checkoutUpdateSchema = z.object({ id: z.string(), text: z.string() });
+export type CheckoutUpdate = z.infer<typeof checkoutUpdateSchema>;
+
+/**
+ * Why `watch_checkout` returned: the store asked a question, the run reached
+ * its payment step, or it ended. `updates` are what the chat showed the user
+ * meanwhile, so history keeps them and the model knows what was said.
+ */
+export const checkoutOutcomeSchema = z.object({
+  checkoutId: z.string(),
+  status: z.enum([
+    "succeeded",
+    "blocked",
+    "failed",
+    "cancelled",
+    "awaiting_input",
+    "awaiting_payment",
+  ]),
+  updates: z.array(checkoutUpdateSchema),
+  /** On `awaiting_input`: what the store asks, and the JSON Schema the answer must fit. */
+  question: z
+    .object({
+      requestId: z.string(),
+      question: z.string(),
+      expiresAt: z.string().optional(),
+      responseSchema: z.record(z.string(), z.unknown()),
+    })
+    .optional(),
+  /**
+   * On `awaiting_payment`: the payment step. `requestId` is what
+   * await_agent_card_approval takes when the user wants a new agent card;
+   * `amount` is the checkout's ceiling, not the price.
+   */
+  payment: z
+    .object({
+      requestId: z.string(),
+      status: z.string(),
+      amount: z.object({ value: z.string(), currency: z.string() }),
+      description: z.string(),
+      merchant: z.object({ name: z.string(), url: z.string() }).optional(),
+    })
+    .optional(),
+  total: z.object({ amount: z.string(), currency: z.string() }).optional(),
+  merchantOrderId: z.string().optional(),
+  summary: z.string().optional(),
+  failure: z.object({ reason: z.string(), message: z.string().optional() }).optional(),
+});
+export type CheckoutOutcome = z.infer<typeof checkoutOutcomeSchema>;
 
 /** Turn a Agent Commerce API error into a plain tool result the model can read and explain. */
 async function guard<T>(fn: () => Promise<T>): Promise<T | { error: string; code: string }> {
@@ -89,7 +145,7 @@ function summarizeAgentCard(card: {
   };
 }
 
-export function createChatTools(api: AgentCommerceClient) {
+export function createChatTools(api: AgentCommerceClient, opts: { userEmail?: string } = {}) {
   return {
     list_payment_methods: tool({
       description: describeTool("list_payment_methods"),
@@ -220,7 +276,7 @@ export function createChatTools(api: AgentCommerceClient) {
     create_checkout: tool({
       description: describeTool(
         "create_checkout",
-        "The payment step appears in this conversation: call get_checkout, then await_agent_card_approval with the requestId on its paymentRequest.",
+        "Then call watch_checkout with the checkoutId, with no text in between.",
       ),
       inputSchema: z.object({
         startUrl: z.string().url().describe(paramDoc("create_checkout", "startUrl")),
@@ -248,10 +304,19 @@ export function createChatTools(api: AgentCommerceClient) {
       execute: (input) => guard(() => api.createCheckout(input)),
     }),
 
+    // Client-side tool: no `execute`. The chat UI shows the run live and supplies the output when it ends.
+    watch_checkout: tool({
+      description: describeTool("watch_checkout"),
+      inputSchema: z.object({
+        checkoutId: z.string().min(1).describe(paramDoc("watch_checkout", "checkoutId")),
+      }),
+      outputSchema: checkoutOutcomeSchema,
+    }),
+
     get_checkout: tool({
       description: describeTool(
         "get_checkout",
-        "When the result carries paymentRequest, call await_agent_card_approval with its requestId: the user picks a payment method right here in the chat.",
+        "In this chat you rarely need it: watch_checkout follows the run for you. Use it for a checkout from an earlier conversation.",
       ),
       inputSchema: z.object({
         checkoutId: z.string().min(1).describe(paramDoc("get_checkout", "checkoutId")),
@@ -259,8 +324,78 @@ export function createChatTools(api: AgentCommerceClient) {
       execute: ({ checkoutId }) => guard(() => api.getCheckout(checkoutId)),
     }),
 
+    save_buyer_profile: tool({
+      description: describeTool("save_buyer_profile"),
+      inputSchema: z.object({
+        firstName: z.string().min(1).describe(paramDoc("save_buyer_profile", "firstName")),
+        lastName: z.string().min(1).describe(paramDoc("save_buyer_profile", "lastName")),
+        email: z.string().email().optional().describe(paramDoc("save_buyer_profile", "email")),
+        phone: z.string().min(3).optional().describe(paramDoc("save_buyer_profile", "phone")),
+        addressLines: z
+          .array(z.string().min(1))
+          .min(1)
+          .describe(paramDoc("save_buyer_profile", "addressLines")),
+        city: z.string().min(1).describe(paramDoc("save_buyer_profile", "city")),
+        region: z.string().min(2).optional().describe(paramDoc("save_buyer_profile", "region")),
+        postalCode: z.string().min(1).describe(paramDoc("save_buyer_profile", "postalCode")),
+        countryCode: z.string().length(2).describe(paramDoc("save_buyer_profile", "countryCode")),
+        label: z
+          .string()
+          .min(1)
+          .max(60)
+          .optional()
+          .describe(paramDoc("save_buyer_profile", "label")),
+      }),
+      execute: (input) =>
+        guard(async () => {
+          const email = input.email ?? opts.userEmail;
+          if (!email) {
+            return { error: "No email to save. Ask the user for one.", code: "invalid_request" };
+          }
+          const saved = await api.createBuyerProfile({
+            label: input.label ?? "Home",
+            name: { first: input.firstName, last: input.lastName },
+            contact: { email, ...(input.phone ? { phone: input.phone } : {}) },
+            shipping: {
+              addressLines: input.addressLines,
+              locality: input.city,
+              ...(input.region ? { administrativeAreaCode: input.region.toUpperCase() } : {}),
+              postalCode: input.postalCode,
+              countryCode: input.countryCode.toUpperCase(),
+            },
+          });
+          return {
+            buyerProfileId: saved.id,
+            saved: true,
+            note: "Later checkouts start with these details. The one running now already has its answers from you.",
+          };
+        }),
+    }),
+
+    pay_checkout_with_agent_card: tool({
+      description: describeTool(
+        "pay_checkout_with_agent_card",
+        "Then call watch_checkout again, with no text in between.",
+      ),
+      inputSchema: z.object({
+        checkoutId: z
+          .string()
+          .min(1)
+          .describe(paramDoc("pay_checkout_with_agent_card", "checkoutId")),
+        agentCardId: z
+          .string()
+          .min(1)
+          .describe(paramDoc("pay_checkout_with_agent_card", "agentCardId")),
+      }),
+      execute: ({ checkoutId, agentCardId }) =>
+        guard(() => api.setCheckoutAgentCard(checkoutId, agentCardId)),
+    }),
+
     answer_checkout: tool({
-      description: describeTool("answer_checkout"),
+      description: describeTool(
+        "answer_checkout",
+        "For a checkout you watch, call watch_checkout again right after, with no text in between.",
+      ),
       inputSchema: z.object({
         checkoutId: z.string().min(1).describe(paramDoc("answer_checkout", "checkoutId")),
         requestId: z.string().min(1).optional().describe(paramDoc("answer_checkout", "requestId")),

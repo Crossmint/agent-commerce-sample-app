@@ -910,6 +910,104 @@ describe("checkouts", () => {
     vi.restoreAllMocks();
   });
 
+  it("pays the payment step from an agent card the user already has", async () => {
+    vi.spyOn(console, "info").mockImplementation(() => {});
+    // Its own request id: the server remembers payment requests it answered, per run.
+    const payStep = { ...paymentRequest, requestId: "req_pay_existing" };
+    const { handlers, calls } = makeServer([
+      {
+        method: "POST",
+        path: /\/unstable\/agent-checkouts$/,
+        reply: { status: 202, body: run({ status: "queued" }) },
+      },
+      {
+        method: "GET",
+        path: "/unstable/agent-checkouts/run_1",
+        once: true,
+        reply: { body: run({ status: "awaiting_input", requiredAction: payStep }) },
+      },
+      { method: "GET", path: "/unstable/order-intents/oi_1", reply: { body: activeOrderIntent() } },
+      {
+        method: "POST",
+        path: "/unstable/order-intents/oi_1/credentials",
+        reply: { status: 201, body: cardCredential },
+      },
+      {
+        method: "POST",
+        path: "/unstable/agent-checkouts/run_1/messages",
+        reply: { status: 202, body: { messageId: "m_1", status: "accepted" } },
+      },
+      {
+        method: "GET",
+        path: "/unstable/agent-checkouts/run_1",
+        reply: { body: run({ status: "running" }) },
+      },
+    ]);
+    await call(handlers, "POST", "/v1/checkouts", {
+      body: { startUrl: "https://shop.example/p/1", maxCost: { amount: "30.00", currency: "USD" } },
+    });
+
+    const res = await call(handlers, "POST", "/v1/checkouts/run_1/agent-card", {
+      body: { agentCardId: "oi_1" },
+    });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ id: "run_1", status: "running", agentCardId: "oi_1" });
+    expect(calls.some((c) => c.path.endsWith("/credentials"))).toBe(true);
+    // No new agent card request: the user chose a card they had.
+    expect(calls.some((c) => c.method === "POST" && c.path.includes("order-intents") && !c.path.endsWith("/credentials"))).toBe(false);
+    vi.restoreAllMocks();
+  });
+
+  it("refuses an agent card that is spent or locked to another store", async () => {
+    const { handlers } = makeServer([
+      {
+        method: "POST",
+        path: /\/unstable\/agent-checkouts$/,
+        reply: { status: 202, body: run({ status: "queued" }) },
+      },
+      {
+        method: "GET",
+        path: "/unstable/agent-checkouts/run_1",
+        reply: { body: run({ status: "awaiting_input", requiredAction: paymentRequest }) },
+      },
+      {
+        method: "GET",
+        path: "/unstable/order-intents/oi_spent",
+        reply: {
+          body: activeOrderIntent({
+            orderIntentId: "oi_spent",
+            amount: { currency: "USD", total: "50.00", available: "0.00", reserved: "0.00", spent: "50.00" },
+          }),
+        },
+      },
+      {
+        method: "GET",
+        path: "/unstable/order-intents/oi_other",
+        reply: {
+          body: activeOrderIntent({
+            orderIntentId: "oi_other",
+            merchant: { name: "Other", url: "https://other.example", countryCode: "US" },
+          }),
+        },
+      },
+    ]);
+    await call(handlers, "POST", "/v1/checkouts", {
+      body: { startUrl: "https://shop.example/p/1", maxCost: { amount: "30.00", currency: "USD" } },
+    });
+
+    const spent = await call(handlers, "POST", "/v1/checkouts/run_1/agent-card", {
+      body: { agentCardId: "oi_spent" },
+    });
+    expect(spent.status).toBe(409);
+    expect((await spent.json()).error.code).toBe("agent_card_unusable");
+
+    const other = await call(handlers, "POST", "/v1/checkouts/run_1/agent-card", {
+      body: { agentCardId: "oi_other" },
+    });
+    expect(other.status).toBe(409);
+    expect((await other.json()).error.code).toBe("agent_card_wrong_merchant");
+  });
+
   it("passes other input requests through with a rendered form and relays the answer as a message", async () => {
     let answered = false;
     const sizeRequest = {
@@ -1145,6 +1243,85 @@ describe("sticky browser sessions", () => {
     const res = await call(handlers, "GET", "/v1/browser-profile");
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ browserProfile: { id: BROWSER_PROFILE_ID } });
+  });
+});
+
+describe("saved buyer details", () => {
+  const created = { status: 202, body: { runId: "run_1", status: "queued" } };
+  const createRoute = { method: "POST" as const, path: /\/unstable\/agent-checkouts$/, reply: created };
+  const body = { startUrl: "https://shop.example/p/1", maxCost: { amount: "5.00", currency: "USD" } };
+  const details = {
+    label: "Home",
+    name: { first: "Ada", last: "Lovelace" },
+    contact: { email: "ada@example.com" },
+    shipping: {
+      addressLines: ["1 Main St"],
+      locality: "Springfield",
+      administrativeAreaCode: "US-IL",
+      postalCode: "62701",
+      countryCode: "US",
+    },
+  };
+
+  it("starts every checkout with the newest saved profile", async () => {
+    const { handlers, calls } = makeServer([
+      createRoute,
+      {
+        method: "GET",
+        path: "/unstable/agent-checkouts/buyer-profiles",
+        reply: {
+          body: {
+            data: [
+              { id: "byp_old", ...details, createdAt: "2026-01-01T00:00:00.000Z" },
+              { id: "byp_new", ...details, label: "New flat", createdAt: "2026-06-01T00:00:00.000Z" },
+            ],
+            nextCursor: null,
+          },
+        },
+      },
+    ]);
+    await call(handlers, "POST", "/v1/checkouts", { body });
+    expect(findCall(calls, "POST", /\/unstable\/agent-checkouts$/)!.body).toMatchObject({
+      buyerProfileId: "byp_new",
+    });
+
+    // A caller that names its own profile keeps it.
+    await call(handlers, "POST", "/v1/checkouts", { body: { ...body, buyerProfileId: "byp_mine" } });
+    expect(calls.filter((c) => c.method === "POST" && /agent-checkouts$/.test(c.path)).at(-1)!.body).toMatchObject({
+      buyerProfileId: "byp_mine",
+    });
+  });
+
+  it("uses details saved mid-conversation on the next checkout, without asking Crossmint again", async () => {
+    const { handlers, calls } = makeServer([
+      createRoute,
+      {
+        method: "GET",
+        path: "/unstable/agent-checkouts/buyer-profiles",
+        reply: { body: { data: [], nextCursor: null } },
+      },
+      {
+        method: "POST",
+        path: "/unstable/agent-checkouts/buyer-profiles",
+        reply: { status: 201, body: { id: "byp_saved" } },
+      },
+    ]);
+    const none = await call(handlers, "GET", "/v1/buyer-profile");
+    expect(await none.json()).toEqual({ buyerProfile: null });
+
+    const saved = await call(handlers, "POST", "/v1/buyer-profiles", { body: details });
+    expect(saved.status).toBe(201);
+
+    calls.length = 0;
+    await call(handlers, "POST", "/v1/checkouts", { body });
+    expect(findCall(calls, "GET", "/buyer-profiles")).toBeUndefined();
+    expect(findCall(calls, "POST", /\/unstable\/agent-checkouts$/)!.body).toMatchObject({
+      buyerProfileId: "byp_saved",
+    });
+    const read = await call(handlers, "GET", "/v1/buyer-profile");
+    expect(await read.json()).toMatchObject({
+      buyerProfile: { id: "byp_saved", name: { first: "Ada", last: "Lovelace" } },
+    });
   });
 });
 

@@ -2,6 +2,7 @@
 
 import {
   useCallback,
+  useMemo,
   useRef,
   useState,
   type FormEvent,
@@ -27,7 +28,6 @@ import {
   Badge,
   Button,
   CardMark,
-  CheckoutView as CheckoutViewPanel,
   SaveCard,
   Skeleton,
   Spinner,
@@ -40,21 +40,15 @@ import {
   type AgentCardGroup,
   type ApproveOutcome,
 } from "@agent-commerce/ui";
-import type { CheckoutView } from "@agent-commerce/server";
 import { AGENT_NAME, AgentAvatar, PLATFORM_NAME } from "@/components/brand";
 import { DeviceFrame } from "@/components/frame/device-frame";
-import {
-  PAGE_SHEET_TRANSITION_MS,
-  PhonePageSheet,
-  PhoneSheet,
-} from "@/components/frame/phone-sheet";
+import { PhoneSheet } from "@/components/frame/phone-sheet";
 import { PhoneStatusBar } from "@/components/frame/phone-status-bar";
 import { LoginForm } from "@/components/login-form";
 import {
   approvalLabel,
   checkoutOf,
   checkoutStatusLine,
-  checkoutBadgeVariant,
   findPaymentStep,
   findRequest,
   isCheckoutPart,
@@ -62,11 +56,15 @@ import {
   toApprovalOutcome,
   toolBusy,
   toolTitle,
+  watchIndex,
+  watchedHere,
+  type WatchIndex,
 } from "@/components/chat/parts";
+import { LiveCheckoutUpdates } from "@/components/chat/checkout-card";
 import { Text } from "@/components/chat/text";
 import { SUGGESTIONS, type AgentChat } from "@/components/chat/use-agent-chat";
 import { useScrollToBottom } from "@/components/chat/use-scroll-to-bottom";
-import type { ApprovalOutcome } from "@/lib/chat/tools";
+import type { ApprovalOutcome, CheckoutOutcome } from "@/lib/chat/tools";
 import type { ChatMessage, ChatMessagePart } from "@/lib/chat/types";
 import { cn } from "@/lib/cn";
 import { brandAttr, initialOf, loginNext, type ExperienceProps } from "./types";
@@ -77,8 +75,8 @@ const DONE_LINGER_MS = 800;
 /**
  * The app as a phone: one chat screen with two round buttons, Cards and
  * Account, that open bottom sheets. An approval opens as a sheet over the
- * chat; a checkout opens as a full page that slides up. Everything stays
- * inside the phone.
+ * chat; a checkout runs in the thread itself, its steps and its questions
+ * inline. Everything stays inside the phone.
  */
 export function MobileApp(props: ExperienceProps) {
   // The sheets portal into the screen so they stay inside the frame.
@@ -126,18 +124,6 @@ function Home({
   const [cardsOpen, setCardsOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
   const [approval, setApproval] = useState<Approval | null>(null);
-  // The checkout page keeps its id through the slide-out, so it does not go blank while leaving.
-  const [checkoutId, setCheckoutId] = useState<string | null>(null);
-  const [checkoutOpen, setCheckoutOpen] = useState(false);
-
-  const openCheckout = useCallback((id: string) => {
-    setCheckoutId(id);
-    setCheckoutOpen(true);
-  }, []);
-  const closeCheckout = useCallback(() => {
-    setCheckoutOpen(false);
-    setTimeout(() => setCheckoutId(null), PAGE_SHEET_TRANSITION_MS);
-  }, []);
 
   const onApprovalDone = useCallback(
     (o: ApproveOutcome) => {
@@ -165,7 +151,6 @@ function Home({
         loading={thread.loading}
         chatEnabled={chatEnabled}
         onReview={setApproval}
-        onOpenCheckout={openCheckout}
       />
       <Composer chat={chat} disabled={!chatEnabled} />
 
@@ -200,24 +185,6 @@ function Home({
           />
         ) : null}
       </PhoneSheet>
-
-      <PhonePageSheet open={checkoutOpen} ariaLabel="Checkout">
-        <div className="flex items-center gap-3 px-5 pt-6 pb-2 md:pt-14">
-          <RoundButton label="Back" onClick={closeCheckout}>
-            <ArrowLeft className="size-4.5" />
-          </RoundButton>
-          <h2 className="text-lg font-medium tracking-[-0.02em]">Checkout</h2>
-        </div>
-        <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-8 scrollbar-none">
-          {checkoutId ? (
-            <CheckoutViewPanel
-              checkoutId={checkoutId}
-              frameHeight={420}
-              platformName={PLATFORM_NAME}
-            />
-          ) : null}
-        </div>
-      </PhonePageSheet>
     </>
   );
 }
@@ -252,17 +219,16 @@ function Thread({
   loading,
   chatEnabled,
   onReview,
-  onOpenCheckout,
 }: {
   chat: AgentChat;
   loading: boolean;
   chatEnabled: boolean;
   onReview: (approval: Approval) => void;
-  onOpenCheckout: (checkoutId: string) => void;
 }) {
   const { containerRef } = useScrollToBottom();
   const last = chat.messages.at(-1);
   const waiting = chat.status === "submitted" && last?.role !== "assistant";
+  const watches = useMemo(() => watchIndex(chat.messages), [chat.messages]);
 
   if (loading) {
     return (
@@ -320,7 +286,8 @@ function Thread({
               message={m}
               streaming={chat.status === "streaming" && i === chat.messages.length - 1}
               onReview={onReview}
-              onOpenCheckout={onOpenCheckout}
+              onCheckoutOutcome={chat.onCheckoutOutcome}
+              watches={watches}
             />
           ))}
           {waiting ? <ActivityLine busy>Thinking</ActivityLine> : null}
@@ -339,12 +306,14 @@ function CompactMessage({
   message,
   streaming,
   onReview,
-  onOpenCheckout,
+  onCheckoutOutcome,
+  watches,
 }: {
   message: ChatMessage;
   streaming: boolean;
   onReview: (a: Approval) => void;
-  onOpenCheckout: (id: string) => void;
+  onCheckoutOutcome: (toolCallId: string, outcome: CheckoutOutcome) => void;
+  watches: WatchIndex;
 }) {
   if (message.role === "user") {
     const text = messageText(message);
@@ -361,7 +330,8 @@ function CompactMessage({
       part={part}
       message={message}
       onReview={onReview}
-      onOpenCheckout={onOpenCheckout}
+      onCheckoutOutcome={onCheckoutOutcome}
+      watches={watches}
     />
   ));
   const empty = parts.every((p) => p === null) && streaming;
@@ -377,12 +347,14 @@ function CompactPart({
   part,
   message,
   onReview,
-  onOpenCheckout,
+  onCheckoutOutcome,
+  watches,
 }: {
   part: ChatMessagePart;
   message: ChatMessage;
   onReview: (a: Approval) => void;
-  onOpenCheckout: (id: string) => void;
+  onCheckoutOutcome: (toolCallId: string, outcome: CheckoutOutcome) => void;
+  watches: WatchIndex;
 }) {
   switch (part.type) {
     case "text":
@@ -395,7 +367,8 @@ function CompactPart({
       const request = findRequest(message, requestId);
       // A checkout waiting on this is the user choosing how to pay for
       // something already underway, not an agent asking for a budget.
-      const paying = Boolean(findPaymentStep(message, requestId));
+      const paying =
+        watches.paymentRequests.has(requestId) || Boolean(findPaymentStep(message, requestId));
       if (part.state === "input-available") {
         return (
           <ApprovalCard
@@ -440,13 +413,38 @@ function CompactPart({
       );
     }
 
+    // The store's agent speaks through the watch: each update is a line of
+    // the agent's own, live while the run goes, from the output after.
+    case "tool-watch_checkout":
+      if (part.state === "output-available") {
+        return (part.output.updates ?? []).map((u) => <UpdateLine key={u.id} text={u.text} />);
+      }
+      if (part.state === "input-available") {
+        return (
+          <LiveCheckoutUpdates
+            toolCallId={part.toolCallId}
+            checkoutId={part.input.checkoutId}
+            watches={watches}
+            onOutcome={onCheckoutOutcome}
+            renderUpdate={(u) => <UpdateLine key={u.id} text={u.text} />}
+            working={<ActivityLine busy>Working on it</ActivityLine>}
+          />
+        );
+      }
+      return part.state === "output-error" ? (
+        <ActivityLine failed>{toolTitle(part.type)}</ActivityLine>
+      ) : null;
+
     default: {
       if (isCheckoutPart(part)) {
+        if (watchedHere(message, part)) return null;
         const view = checkoutOf(part);
-        if (view) return <CheckoutCardCompact view={view} onOpen={() => onOpenCheckout(view.id)} />;
         return (
-          <ActivityLine busy={toolBusy(part.state)} failed={part.state === "output-error"}>
-            {toolTitle(part.type)}
+          <ActivityLine
+            busy={toolBusy(part.state)}
+            failed={part.state === "output-error" || Boolean(view?.failure)}
+          >
+            {view ? checkoutStatusLine(view) : toolTitle(part.type)}
           </ActivityLine>
         );
       }
@@ -465,6 +463,11 @@ function CompactPart({
       return null;
     }
   }
+}
+
+/** One update from the store's agent, drawn like any line the agent writes. */
+function UpdateLine({ text }: { text: string }) {
+  return <Text text={text} className="max-w-[92%] text-[15px] leading-snug" />;
 }
 
 /** "Looking at your saved cards", with a spinner while it runs and a check when it is done. */
@@ -525,23 +528,6 @@ function ApprovalCard({
       </div>
       {outcome ? <p className="text-xs text-muted-foreground">{approvalLabel(outcome)}</p> : null}
       {action}
-    </div>
-  );
-}
-
-function CheckoutCardCompact({ view, onOpen }: { view: CheckoutView; onOpen: () => void }) {
-  return (
-    <div className="flex flex-col gap-3 rounded-2xl bg-card p-4 ring-1 ring-foreground/10">
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex min-w-0 flex-col gap-0.5">
-          <p className="text-sm font-medium">Checkout</p>
-          <p className="truncate text-xs text-muted-foreground">{checkoutStatusLine(view)}</p>
-        </div>
-        <Badge variant={checkoutBadgeVariant(view.status)}>{view.status.replace(/_/g, " ")}</Badge>
-      </div>
-      <Button type="button" size="xl" variant="secondary" className="w-full" onClick={onOpen}>
-        Open checkout
-      </Button>
     </div>
   );
 }

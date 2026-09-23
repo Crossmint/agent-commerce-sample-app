@@ -2,6 +2,7 @@
 
 import {
   useCallback,
+  useMemo,
   useRef,
   useState,
   type ChangeEvent,
@@ -11,7 +12,6 @@ import {
 } from "react";
 import {
   ApproveAgentCard,
-  CheckoutView as CheckoutViewPanel,
   formatAmount,
   PAYMENT_STEP_ASK,
   type ApproveOutcome,
@@ -24,19 +24,21 @@ import {
   PLATFORM_NAME,
 } from "@/components/brand";
 import {
-  checkoutHost,
-  checkoutOf,
   findPaymentStep,
   findRequest,
-  isCheckoutPart,
+  pendingWatches,
   toApprovalOutcome,
+  watchIndex,
+  type WatchIndex,
 } from "@/components/chat/parts";
+import { CheckoutWatcher } from "@/components/chat/checkout-card";
 import { useScrollToBottom } from "@/components/chat/use-scroll-to-bottom";
 import { DeviceFrame } from "@/components/frame/device-frame";
 import { PAGE_SHEET_TRANSITION_MS, PhonePageSheet } from "@/components/frame/phone-sheet";
 import { PhoneStatusBar } from "@/components/frame/phone-status-bar";
 import type { MessagingApp as MessagingAppId } from "@/components/frame/views";
 import { LoginForm } from "@/components/login-form";
+import type { CheckoutUpdate } from "@/lib/chat/tools";
 import type { ChatMessage } from "@/lib/chat/types";
 import { cn } from "@/lib/cn";
 import {
@@ -57,6 +59,7 @@ import { brandAttr, loginNext, type ExperienceProps } from "./types";
 import "./messaging.css";
 
 const DONE_LINGER_MS = 800;
+
 /** The first bubble of every thread. It stays when the conversation starts. */
 const WELCOME = `Hi, I am ${AGENT_NAME}. What should I buy for you? Send me a link and you can choose how to pay at the checkout.`;
 
@@ -120,8 +123,9 @@ type Approval = {
 /** The thread as a flat list of bubbles. A message with two text parts is two bubbles; a tool call is none. */
 function toBubbles(
   messages: ChatMessage[],
+  watches: WatchIndex,
+  live: ReadonlyMap<string, CheckoutUpdate[]>,
   onReview: (a: Approval) => void,
-  onOpenCheckout: (id: string) => void,
 ): Bubble[] {
   const out: Bubble[] = [];
   for (const m of messages) {
@@ -148,7 +152,9 @@ function toBubbles(
         const request = findRequest(m, part.input.requestId);
         // A checkout waiting on this is the user choosing how to pay, not an
         // agent asking for a budget out of the blue.
-        const paying = Boolean(findPaymentStep(m, part.input.requestId));
+        const paying =
+          watches.paymentRequests.has(part.input.requestId) ||
+          Boolean(findPaymentStep(m, part.input.requestId));
         const title = paying
           ? "Choose how to pay"
           : request
@@ -178,19 +184,16 @@ function toBubbles(
         });
         return;
       }
-      if (isCheckoutPart(part)) {
-        const view = checkoutOf(part);
-        if (!view) return;
-        const store = checkoutHost(m, part);
-        out.push({
-          key,
-          kind: "link",
-          side: "recv",
-          title: store ? `Checkout at ${store}` : "Checkout",
-          path: `/checkouts/${view.id}`,
-          done: view.status === "succeeded" ? "Bought" : undefined,
-          onOpen: () => onOpenCheckout(view.id),
-        });
+      // The store's agent speaks through the watch: one bubble per update,
+      // live while the run goes, from the output after.
+      if (part.type === "tool-watch_checkout") {
+        const updates =
+          part.state === "output-available"
+            ? (part.output.updates ?? [])
+            : (live.get(part.toolCallId) ?? []);
+        for (const u of updates) {
+          out.push({ key: `${key}-${u.id}`, kind: "text", side: "recv", text: u.text });
+        }
       }
     });
   }
@@ -727,8 +730,13 @@ function SignedIn({
 }: ExperienceProps & { Chrome: Chrome }) {
   const [approval, setApproval] = useState<Approval | null>(null);
   const [approvalOpen, setApprovalOpen] = useState(false);
-  const [checkoutId, setCheckoutId] = useState<string | null>(null);
-  const [checkoutOpen, setCheckoutOpen] = useState(false);
+  // What pending watches have to say so far, by tool call, for the bubbles.
+  const [live, setLive] = useState<ReadonlyMap<string, CheckoutUpdate[]>>(() => new Map());
+  const onUpdates = useCallback((toolCallId: string, updates: CheckoutUpdate[]) => {
+    setLive((prev) => new Map(prev).set(toolCallId, updates));
+  }, []);
+  const watches = useMemo(() => watchIndex(chat.messages), [chat.messages]);
+  const pending = pendingWatches(chat.messages);
 
   const onReview = useCallback((a: Approval) => {
     setApproval(a);
@@ -745,14 +753,6 @@ function SignedIn({
     },
     [approval, chat, closeApproval],
   );
-  const openCheckout = useCallback((id: string) => {
-    setCheckoutId(id);
-    setCheckoutOpen(true);
-  }, []);
-  const closeCheckout = useCallback(() => {
-    setCheckoutOpen(false);
-    setTimeout(() => setCheckoutId(null), PAGE_SHEET_TRANSITION_MS);
-  }, []);
 
   const bubbles: Bubble[] = [
     chatEnabled
@@ -763,7 +763,7 @@ function SignedIn({
           side: "recv",
           text: "Chat is off. Set ANTHROPIC_API_KEY or OPENAI_API_KEY to turn it on.",
         },
-    ...toBubbles(chat.messages, onReview, openCheckout),
+    ...toBubbles(chat.messages, watches, live, onReview),
   ];
   if (thread.loading) bubbles.push({ key: "loading", kind: "status", text: "Loading…" });
   if (chat.error) bubbles.push({ key: "error", kind: "status", text: chat.error });
@@ -772,7 +772,8 @@ function SignedIn({
     <>
       <Chrome
         bubbles={bubbles}
-        working={chat.busy}
+        // A checkout in progress keeps the agent "working" between its updates.
+        working={chat.busy || pending.length > 0}
         composer={{ disabled: !chatEnabled, busy: chat.busy, onSend: chat.send }}
       />
 
@@ -795,21 +796,16 @@ function SignedIn({
         ) : null}
       </BrowserSheet>
 
-      <BrowserSheet
-        open={checkoutOpen}
-        path={`/checkouts/${checkoutId ?? ""}`}
-        brand={brand}
-        onDone={closeCheckout}
-        ariaLabel="Checkout"
-      >
-        {checkoutId ? (
-          <CheckoutViewPanel
-            checkoutId={checkoutId}
-            frameHeight={420}
-            platformName={PLATFORM_NAME}
-          />
-        ) : null}
-      </BrowserSheet>
+      {pending.map((w) => (
+        <CheckoutWatcher
+          key={w.toolCallId}
+          toolCallId={w.toolCallId}
+          checkoutId={w.checkoutId}
+          watches={watches}
+          onOutcome={chat.onCheckoutOutcome}
+          onUpdates={onUpdates}
+        />
+      ))}
     </>
   );
 }

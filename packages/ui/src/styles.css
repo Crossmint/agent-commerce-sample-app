@@ -177,21 +177,3 @@
   background-size: 28px 28px;
 }
 
-/* Small window frame with three muted dots, for product surfaces. */
-.ac-window {
-  position: relative;
-  border-radius: var(--radius-2xl);
-  background: var(--card);
-  box-shadow: 0 0 0 1px color-mix(in oklch, var(--foreground) 10%, transparent);
-  overflow: hidden;
-}
-.ac-window::before {
-  content: "";
-  display: block;
-  height: 2.25rem;
-  border-bottom: 1px solid var(--border);
-  background:
-    radial-gradient(circle at 1rem 50%, var(--muted-strong) 0.3rem, transparent 0.35rem),
-    radial-gradient(circle at 2.1rem 50%, var(--muted-strong) 0.3rem, transparent 0.35rem),
-    radial-gradient(circle at 3.2rem 50%, var(--muted-strong) 0.3rem, transparent 0.35rem);
-}

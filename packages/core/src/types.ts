@@ -511,6 +511,13 @@ export interface BuyerProfileInput {
 
 export interface BuyerProfile extends BuyerProfileInput {
   id: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface BuyerProfileList {
+  data: BuyerProfile[];
+  nextCursor?: string | null;
 }
 
 export interface BrowserProfileInput {

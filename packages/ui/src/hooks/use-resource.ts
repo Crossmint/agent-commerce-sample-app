@@ -79,13 +79,13 @@ export function useResource<T>(
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [enabled, refetch, ...deps]);
 
-  // Poll.
+  // Poll. A failed read counts as a tick too, so a blip does not stop the polling.
   React.useEffect(() => {
     if (!enabled || !pollMs) return;
     if (shouldPollRef.current && !shouldPollRef.current(data)) return;
     const t = setTimeout(() => void refetch(), pollMs);
     return () => clearTimeout(t);
-  }, [enabled, pollMs, data, refetch]);
+  }, [enabled, pollMs, data, error, refetch]);
 
   const setDataExternal = React.useCallback<React.Dispatch<React.SetStateAction<T | undefined>>>((action) => {
     setData((prev) => {

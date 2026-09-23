@@ -1,4 +1,4 @@
-import type { AgentCard, PaymentMethod } from "@agent-commerce/core";
+import type { AgentCard, BuyerProfile, BuyerProfileInput, PaymentMethod } from "@agent-commerce/core";
 import type { CheckoutView } from "@agent-commerce/server";
 import { serverEnv } from "@/lib/env";
 import { getAgentCommerceHandlers } from "@/lib/api-server";
@@ -93,6 +93,12 @@ export function apiClient(jwt: string) {
     getCheckout: (id: string) => call<CheckoutView>("GET", `/checkouts/${enc(id)}`),
     answerCheckout: (id: string, input: Record<string, unknown>) => call<CheckoutView>("POST", `/checkouts/${enc(id)}/messages`, input),
     cancelCheckout: (id: string) => call<CheckoutView>("POST", `/checkouts/${enc(id)}/cancel`, {}),
+    getBuyerProfile: async () =>
+      (await call<{ buyerProfile: BuyerProfile | null }>("GET", "/buyer-profile")).buyerProfile,
+    createBuyerProfile: (input: BuyerProfileInput) =>
+      call<{ id: string }>("POST", "/buyer-profiles", input),
+    setCheckoutAgentCard: (id: string, agentCardId: string) =>
+      call<CheckoutView>("POST", `/checkouts/${enc(id)}/agent-card`, { agentCardId }),
   };
 }
 

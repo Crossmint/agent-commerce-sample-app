@@ -12,6 +12,9 @@ export type ErrorCode =
   | "cvc_recollection_required"
   | "merchant_required"
   | "payment_handled_by_server"
+  | "checkout_finished"
+  | "agent_card_unusable"
+  | "agent_card_wrong_merchant"
   | "crossmint_error"
   | "internal";
 

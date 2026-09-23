@@ -115,7 +115,7 @@ function Workspace({ email, chat, thread, chats, chatEnabled, attachmentsEnabled
           </div>
         ) : (
           <div key={thread.id} className="flex min-h-0 flex-1 flex-col animate-in fade-in duration-200">
-            <Messages messages={chat.messages} status={chat.status} onApprovalOutcome={chat.onApprovalOutcome} suggestions={SUGGESTIONS} onPickSuggestion={(text) => chat.send(text)} />
+            <Messages messages={chat.messages} status={chat.status} onApprovalOutcome={chat.onApprovalOutcome} onCheckoutOutcome={chat.onCheckoutOutcome} suggestions={SUGGESTIONS} onPickSuggestion={(text) => chat.send(text)} />
             <div className="mx-auto w-full max-w-3xl px-4 pt-2 pb-4 sm:px-6">
               {chat.error ? (
                 <Alert variant="destructive" className="mb-3">

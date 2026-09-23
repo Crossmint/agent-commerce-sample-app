@@ -30,12 +30,14 @@ import {
   forgetBrowserProfile,
   stickyBrowserProfileId,
 } from "../browser-profile.js";
+import { currentBuyerProfile, rememberBuyerProfile } from "../buyer-profile.js";
 import { mintFromAgentCard } from "../credentials.js";
 import { forbidden, HttpError, json, noContent } from "../errors.js";
 import { agentCardRequestId } from "../ids.js";
 import type { Params } from "../router.js";
 import {
   buyerProfileSchema,
+  checkoutAgentCardSchema,
   checkoutMessageSchema,
   createCheckoutSchema,
   submitActionSchema,
@@ -123,10 +125,14 @@ export async function createCheckout(req: Request, ctx: Ctx): Promise<Response> 
     : body.freshBrowser
       ? undefined
       : await stickyBrowserProfileId(ctx, cctx, user.userId);
+  // The user's saved name, contact and address, so the store does not ask
+  // for them again. A caller that names a profile keeps its own.
+  const buyerProfileId =
+    body.buyerProfileId ?? (await currentBuyerProfile(ctx, cctx, user.userId))?.id;
   const checkout = await ctx.crossmint.checkouts.create(cctx, {
     request: { startUrl: (body.startUrl ?? body.url)!, ...(task ? { task } : {}) },
     constraints: { maxCost: body.maxCost },
-    ...(body.buyerProfileId ? { buyerProfileId: body.buyerProfileId } : {}),
+    ...(buyerProfileId ? { buyerProfileId } : {}),
     ...(browserProfileId ? { browserProfileId } : {}),
     ...(body.merchantGuidance ? { merchantGuidance: body.merchantGuidance } : {}),
   });
@@ -210,6 +216,70 @@ export async function submitCheckoutAction(
   );
 }
 
+/**
+ * POST /v1/checkouts/:id/agent-card
+ *
+ * Pay the run from an agent card the user already has, instead of minting a
+ * new one at the payment step. The user chose it; the card must be theirs,
+ * active, with money left, and not locked to another store. Once linked, the
+ * payment step is answered from it on this read, or on the first read after
+ * the run gets there.
+ */
+export async function setCheckoutAgentCard(
+  req: Request,
+  ctx: Ctx,
+  params: Params,
+): Promise<Response> {
+  const user = await requireUser(req, ctx);
+  const body = await parseBody(req, checkoutAgentCardSchema);
+  const link = await ownedLink(ctx, user, params.id!);
+  if (!link) throw new HttpError(404, "not_found", "No such checkout");
+  const cctx = checkoutContext(ctx, user);
+  const checkout = await ctx.crossmint.checkouts.get(cctx, params.id!);
+  if (isTerminalCheckout(checkout)) {
+    throw new HttpError(409, "checkout_finished", "This checkout has already ended");
+  }
+
+  // The user's JWT scopes the read: someone else's card is not found.
+  const card = await ctx.crossmint.orderIntents.get({ jwt: user.jwt }, body.agentCardId);
+  const available = Number.parseFloat(card.amount.available);
+  if (card.status !== "active" || !(available > 0)) {
+    throw new HttpError(
+      409,
+      "agent_card_unusable",
+      "That agent card is not active or has nothing left to spend",
+      {
+        agentCardId: body.agentCardId,
+        status: card.status,
+        available: card.amount.available,
+      },
+    );
+  }
+  const store = merchantFromCheckout(checkout);
+  if (card.merchant && store && hostOf(card.merchant.url) !== hostOf(store.url)) {
+    throw new HttpError(
+      409,
+      "agent_card_wrong_merchant",
+      `That agent card only pays at ${card.merchant.name}`,
+      {
+        agentCardId: body.agentCardId,
+      },
+    );
+  }
+
+  await ctx.checkouts.linkCheckout(checkout.runId, user.userId, { agentCardId: body.agentCardId });
+  const linked = (await ctx.checkouts.getCheckout(checkout.runId)) ?? undefined;
+  return json(await settlePayment(ctx, user, cctx, checkout, linked));
+}
+
+function hostOf(url: string): string {
+  try {
+    return new URL(url).hostname.replace(/^www\./, "");
+  } catch {
+    return url;
+  }
+}
+
 /** POST /v1/checkouts/:id/cancel */
 export async function cancelCheckout(req: Request, ctx: Ctx, params: Params): Promise<Response> {
   const user = await requireUser(req, ctx);
@@ -251,6 +321,12 @@ export async function deleteBrowserProfile(req: Request, ctx: Ctx): Promise<Resp
   return noContent();
 }
 
+/**
+ * POST /v1/buyer-profiles
+ *
+ * Save the user's name, contact and shipping address. The new profile is the
+ * one every later checkout starts with.
+ */
 export async function createBuyerProfile(req: Request, ctx: Ctx): Promise<Response> {
   const user = await requireUser(req, ctx);
   const body = await parseBody(req, buyerProfileSchema);
@@ -258,7 +334,20 @@ export async function createBuyerProfile(req: Request, ctx: Ctx): Promise<Respon
     checkoutContext(ctx, user),
     body,
   );
+  // Crossmint may answer with the id alone; what was saved is what was sent.
+  rememberBuyerProfile(ctx, user.userId, { ...body, ...profile });
   return json({ id: profile.id }, 201);
+}
+
+/**
+ * GET /v1/buyer-profile
+ *
+ * The saved details later checkouts start with, or null when there are none.
+ */
+export async function getBuyerProfile(req: Request, ctx: Ctx): Promise<Response> {
+  const user = await requireUser(req, ctx);
+  const profile = await currentBuyerProfile(ctx, checkoutContext(ctx, user), user.userId);
+  return json({ buyerProfile: profile ?? null });
 }
 
 // ---------------------------------------------------------------------------

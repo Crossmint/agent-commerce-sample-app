@@ -74,10 +74,9 @@ export const TOOL_DOCS = {
   await_agent_card_approval: {
     title: "Wait for approval in the chat",
     summary:
-      "Wait for the user to choose a payment method and approve an agent card, right here in the chat. Call it after request_agent_card, and whenever get_checkout returns a paymentRequest. The result carries the agentCardId when approved.",
+      "Wait for the user to choose a payment method and approve an agent card, right here in the chat. Call it after request_agent_card, or at a checkout's payment step when the user wants a new agent card, with the requestId from watch_checkout's payment. The result carries the agentCardId when approved.",
     params: {
-      requestId:
-        "The requestId from request_agent_card, or the one on a checkout's paymentRequest.",
+      requestId: "The requestId from request_agent_card, or from a checkout's payment step.",
     },
     surfaces: ["chat"],
   },
@@ -127,7 +126,8 @@ export const TOOL_DOCS = {
         "Optional. An agent card the user already approved, to pay from it without asking again. Leave it out and the user chooses a payment method when the run reaches its payment step.",
       maxCost: "Maximum total to pay, including shipping and tax. Enforced.",
       currency: PARAM_DOCS.currency,
-      buyerProfileId: "Saved buyer profile (name, contact, shipping).",
+      buyerProfileId:
+        "Rarely needed. The user's saved buyer details (name, contact, shipping) are attached for you, so the store does not ask for them. Pass this only to name a different profile.",
       browserProfileId:
         "Rarely needed. The user's saved merchant logins are attached for you, so a store they signed into once stays signed in. Pass this only to name a different profile.",
       freshBrowser:
@@ -144,6 +144,45 @@ export const TOOL_DOCS = {
       "Finished runs carry the receipt, or the blocked code or failure reason.",
     params: { checkoutId: PARAM_DOCS.checkoutId },
     surfaces: ["mcp", "chat"],
+  },
+  watch_checkout: {
+    title: "Watch a checkout",
+    summary:
+      "Follow a running checkout for the user. While it runs, the chat shows the user each update the store's agent writes, as its own message; you do not repeat them. " +
+      "Call it straight after create_checkout, and again after each answer you send; never poll get_checkout meanwhile. It returns with the updates it showed and one of three reasons. " +
+      "awaiting_input with a question: the store asks something, and you put it to the user. awaiting_payment with a payment: the run reached its payment step, and the user chooses how to pay. " +
+      "A final status (succeeded, blocked, failed, cancelled): the run ended, with the total and the order number, or why it stopped.",
+    params: { checkoutId: PARAM_DOCS.checkoutId },
+    surfaces: ["chat"],
+  },
+  save_buyer_profile: {
+    title: "Save the buyer's details",
+    summary:
+      "Save the user's name, email, phone and shipping address as their buyer profile. Every later checkout starts with it, so the store fills those fields itself instead of asking. " +
+      "Call it once the user has given you their full name and a full address, typically while answering a store's question for them. Saving again replaces what later checkouts use.",
+    params: {
+      firstName: "First name.",
+      lastName: "Last name.",
+      email: "Email address. Default: the signed-in user's.",
+      phone: "Phone number, when the user gave one.",
+      addressLines: "Street address, one line per entry.",
+      city: "City or town.",
+      region: "State or province as ISO 3166-2, e.g. US-CA, when the country has them.",
+      postalCode: "Postal or ZIP code.",
+      countryCode: "ISO 3166-1 alpha-2 country code, e.g. US.",
+      label: "What the address is, in the user's words, e.g. Home. Default Home.",
+    },
+    surfaces: ["chat"],
+  },
+  pay_checkout_with_agent_card: {
+    title: "Pay a checkout with an agent card",
+    summary:
+      "At a checkout's payment step, pay from an agent card the user already has, when they chose one, instead of making a new one. The card must be active, have money left, and not be locked to another store. Agent Commerce answers the store's card form from it; you never see the number.",
+    params: {
+      checkoutId: PARAM_DOCS.checkoutId,
+      agentCardId: "The agent card the user chose, from list_agent_cards.",
+    },
+    surfaces: ["chat"],
   },
   answer_checkout: {
     title: "Answer a checkout question",

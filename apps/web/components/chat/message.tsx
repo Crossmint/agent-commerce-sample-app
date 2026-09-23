@@ -5,11 +5,11 @@ import { Check, Copy } from "lucide-react";
 import type { CheckoutView } from "@agent-commerce/server";
 import { PAYMENT_STEP_ASK } from "@agent-commerce/ui";
 import { AgentAvatar } from "@/components/brand";
-import type { ApprovalOutcome } from "@/lib/chat/tools";
+import type { ApprovalOutcome, CheckoutOutcome } from "@/lib/chat/tools";
 import type { ChatMessage, ChatMessagePart } from "@/lib/chat/types";
 import { AgentCardApproval, AgentCardRequestCard } from "./agent-card-approval";
 import { AttachmentPreview } from "./attachment-preview";
-import { CheckoutCard } from "./checkout-card";
+import { CheckoutCard, LiveCheckoutUpdates } from "./checkout-card";
 import {
   CHECKOUT_TITLES,
   findPaymentStep,
@@ -17,7 +17,9 @@ import {
   messageText,
   toolSummary,
   toolTitle,
+  watchedHere,
   type RequestSummary,
+  type WatchIndex,
   type ToolError,
 } from "./parts";
 import { Text } from "./text";
@@ -28,13 +30,22 @@ export interface MessageProps {
   /** True while this message is still streaming in. */
   streaming: boolean;
   onApprovalOutcome: (toolCallId: string, outcome: ApprovalOutcome) => void;
+  onCheckoutOutcome: (toolCallId: string, outcome: CheckoutOutcome) => void;
+  /** The thread's watched checkouts, from `watchIndex`. */
+  watches: WatchIndex;
 }
 
 /**
  * One turn in the desktop chat. The user speaks in a grey bubble on the
  * right; the agent answers beside its avatar with plain text and tool cards.
  */
-export function Message({ message, streaming, onApprovalOutcome }: MessageProps) {
+export function Message({
+  message,
+  streaming,
+  onApprovalOutcome,
+  onCheckoutOutcome,
+  watches,
+}: MessageProps) {
   if (message.role === "user") return <UserMessage message={message} />;
   if (message.role !== "assistant") return null;
 
@@ -54,6 +65,8 @@ export function Message({ message, streaming, onApprovalOutcome }: MessageProps)
             part={part}
             streaming={streaming}
             onApprovalOutcome={onApprovalOutcome}
+            onCheckoutOutcome={onCheckoutOutcome}
+            watches={watches}
           />
         ))}
         {!streaming && hasContent ? <CopyAction message={message} /> : null}
@@ -131,11 +144,15 @@ function Part({
   part,
   streaming,
   onApprovalOutcome,
+  onCheckoutOutcome,
+  watches,
 }: {
   message: ChatMessage;
   part: ChatMessagePart;
   streaming: boolean;
   onApprovalOutcome: MessageProps["onApprovalOutcome"];
+  onCheckoutOutcome: MessageProps["onCheckoutOutcome"];
+  watches: WatchIndex;
 }) {
   switch (part.type) {
     case "text":
@@ -165,9 +182,11 @@ function Part({
     case "tool-await_agent_card_approval": {
       // A checkout waiting on this is the user choosing how to pay, not an
       // agent asking for a budget, so the screen says so.
-      const ask = findPaymentStep(message, part.input?.requestId ?? "")
-        ? PAYMENT_STEP_ASK
-        : undefined;
+      const requestId = part.input?.requestId ?? "";
+      const ask =
+        watches.paymentRequests.has(requestId) || findPaymentStep(message, requestId)
+          ? PAYMENT_STEP_ASK
+          : undefined;
       if (part.state === "input-available") {
         return (
           <AgentCardApproval
@@ -198,8 +217,31 @@ function Part({
       );
     }
 
+    // The store's agent speaks through the watch: each update is a line of
+    // the agent's own, live while the run goes, from the output after.
+    case "tool-watch_checkout":
+      if (part.state === "output-available") {
+        return (part.output.updates ?? []).map((u) => <Text key={u.id} text={u.text} />);
+      }
+      if (part.state === "input-available") {
+        return (
+          <LiveCheckoutUpdates
+            toolCallId={part.toolCallId}
+            checkoutId={part.input.checkoutId}
+            watches={watches}
+            onOutcome={onCheckoutOutcome}
+            renderUpdate={(u) => <Text key={u.id} text={u.text} />}
+            working={<Thinking />}
+          />
+        );
+      }
+      return part.state === "output-error" ? (
+        <ToolCard title={toolTitle(part.type)} state={part.state} errorText={part.errorText} />
+      ) : null;
+
     default:
       if (isCheckoutPart(part)) {
+        if (watchedHere(message, part)) return null;
         return (
           <CheckoutCard
             title={CHECKOUT_TITLES[part.type]}
