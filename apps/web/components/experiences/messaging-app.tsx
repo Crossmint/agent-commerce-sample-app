@@ -74,7 +74,7 @@ import "./messaging.css";
 const DONE_LINGER_MS = 800;
 
 /** The first bubble of every thread. It stays when the conversation starts. */
-const WELCOME = `Hi, I am ${AGENT_NAME}. What can I get you? I can set up an agent card, buy from any online store, book a table, or get you tickets. You choose how to pay at the checkout.`;
+const WELCOME = `Hi, I am ${AGENT_NAME}. What can I get you?`;
 
 /**
  * The app as a conversation in a chat app. The agent is a contact; what it

@@ -280,18 +280,18 @@ function Thread({
 
   if (chat.messages.length === 0) {
     return (
-      <div className="flex flex-1 flex-col justify-end gap-6 px-5 pb-4">
-        <div className="flex flex-col gap-3">
-          <AgentAvatar size={40} />
-          <p className="text-[24px] leading-[1.2] font-medium tracking-[-0.02em] text-balance">
-            Hi, I am {AGENT_NAME}. What can I get you?
-          </p>
-          <p className="text-sm text-muted-foreground">
-            I can set up an agent card, buy from any online store, book a table, or get you tickets.
-            You choose how to pay at the checkout.
-          </p>
+      // Scrolls inside the space it has, so on a short screen (an iPhone SE)
+      // the composer below stays on screen. Pinned to the bottom when it fits.
+      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-5 pb-4 scrollbar-none">
+        <div className="mt-auto flex flex-col gap-5 pt-4">
+          <div className="flex flex-col gap-3">
+            <AgentAvatar size={40} />
+            <p className="text-[24px] leading-[1.2] font-medium tracking-[-0.02em] text-balance">
+              Hi, I am {AGENT_NAME}. What can I get you?
+            </p>
+          </div>
+          <StarterCards onPick={chat.send} />
         </div>
-        <StarterCards onPick={chat.send} />
       </div>
     );
   }
