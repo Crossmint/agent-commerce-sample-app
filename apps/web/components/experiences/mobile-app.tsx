@@ -44,12 +44,15 @@ import { AGENT_NAME, AgentAvatar, PLATFORM_NAME } from "@/components/brand";
 import { DeviceFrame } from "@/components/frame/device-frame";
 import { PhoneSheet } from "@/components/frame/phone-sheet";
 import { PhoneStatusBar } from "@/components/frame/phone-status-bar";
+import { BuyerDetails } from "@/components/buyer-details";
 import { LoginForm } from "@/components/login-form";
 import {
   approvalLabel,
   checkoutOf,
   checkoutSiteOf,
   checkoutStatusLine,
+  productsMessageOf,
+  productsOf,
   findPaymentStep,
   findRequest,
   isCheckoutPart,
@@ -61,12 +64,14 @@ import {
   watchedHere,
   type WatchIndex,
 } from "@/components/chat/parts";
-import { LiveCheckoutUpdates } from "@/components/chat/checkout-card";
-import { CheckoutSiteCard } from "@/components/chat/checkout-site";
-import { Text } from "@/components/chat/text";
+import { WatchRun } from "@/components/chat/checkout-card";
+import { CheckoutSiteLine } from "@/components/chat/checkout-site";
+import { ProductCards, ProductDetails, pickMessage } from "@/components/chat/product-cards";
+import { AgentBubble, ENTER, ENTER_SENT } from "@/components/chat/text";
 import { StarterCards } from "@/components/chat/starters";
 import { type AgentChat } from "@/components/chat/use-agent-chat";
 import { useScrollToBottom } from "@/components/chat/use-scroll-to-bottom";
+import type { FoundProduct } from "@/lib/chat/shopify-catalog";
 import type { ApprovalOutcome, CheckoutOutcome } from "@/lib/chat/tools";
 import type { ChatMessage, ChatMessagePart } from "@/lib/chat/types";
 import { cn } from "@/lib/cn";
@@ -127,6 +132,8 @@ function Home({
   const [cardsOpen, setCardsOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
   const [approval, setApproval] = useState<Approval | null>(null);
+  // The product whose details are open, over the chat.
+  const [product, setProduct] = useState<FoundProduct | null>(null);
 
   const onApprovalDone = useCallback(
     (o: ApproveOutcome) => {
@@ -139,7 +146,8 @@ function Home({
 
   return (
     <>
-      <div className="flex items-center gap-3 px-5 pt-6 md:pt-2">
+      {/* A hairline under the header, so the thread does not run into it. */}
+      <div className="flex items-center gap-3 border-b border-border px-5 pt-6 pb-3 shadow-[0_1px_3px_rgba(0,0,0,0.04)] md:pt-2">
         <h1 className="flex-1 text-[28px] leading-[1.2] font-medium tracking-[-0.02em]">Chat</h1>
         <RoundButton label="Cards" onClick={() => setCardsOpen(true)}>
           <CreditCard className="size-4.5" />
@@ -154,6 +162,7 @@ function Home({
         loading={thread.loading}
         chatEnabled={chatEnabled}
         onReview={setApproval}
+        onOpenProduct={setProduct}
       />
       <Composer chat={chat} disabled={!chatEnabled} />
 
@@ -169,6 +178,24 @@ function Home({
         height="h-[80%]"
       >
         <AccountSheetBody email={email} onSignOut={onSignOut} />
+      </PhoneSheet>
+
+      <PhoneSheet
+        open={product !== null}
+        onOpenChange={(open) => !open && setProduct(null)}
+        container={screen}
+        title={product?.title ?? "Product"}
+        hideTitle
+      >
+        {product ? (
+          <ProductDetails
+            product={product}
+            onBuy={() => {
+              chat.send(pickMessage(product));
+              setProduct(null);
+            }}
+          />
+        ) : null}
       </PhoneSheet>
 
       <PhoneSheet
@@ -222,13 +249,15 @@ function Thread({
   loading,
   chatEnabled,
   onReview,
+  onOpenProduct,
 }: {
   chat: AgentChat;
   loading: boolean;
   chatEnabled: boolean;
   onReview: (approval: Approval) => void;
+  onOpenProduct: (product: FoundProduct) => void;
 }) {
-  const { containerRef } = useScrollToBottom();
+  const { containerRef } = useScrollToBottom(chat.messages.length);
   const last = chat.messages.at(-1);
   const waiting = chat.status === "submitted" && last?.role !== "assistant";
   const watches = useMemo(() => watchIndex(chat.messages), [chat.messages]);
@@ -258,8 +287,8 @@ function Thread({
             Hi, I am {AGENT_NAME}. What can I get you?
           </p>
           <p className="text-sm text-muted-foreground">
-            I can buy from any online store, book a table, or get you tickets. You choose how to pay
-            at the checkout.
+            I can set up an agent card, buy from any online store, book a table, or get you tickets.
+            You choose how to pay at the checkout.
           </p>
         </div>
         <StarterCards onPick={chat.send} />
@@ -279,6 +308,8 @@ function Thread({
               onReview={onReview}
               onCheckoutOutcome={chat.onCheckoutOutcome}
               watches={watches}
+              onSend={chat.send}
+              onOpenProduct={onOpenProduct}
             />
           ))}
           {waiting ? <ActivityLine busy>Thinking</ActivityLine> : null}
@@ -299,31 +330,44 @@ function CompactMessage({
   onReview,
   onCheckoutOutcome,
   watches,
+  onSend,
+  onOpenProduct,
 }: {
   message: ChatMessage;
   streaming: boolean;
   onReview: (a: Approval) => void;
   onCheckoutOutcome: (toolCallId: string, outcome: CheckoutOutcome) => void;
   watches: WatchIndex;
+  onSend: (text: string) => void;
+  onOpenProduct: (product: FoundProduct) => void;
 }) {
   if (message.role === "user") {
     const text = messageText(message);
     return text ? (
-      <div className="ml-auto max-w-[80%] rounded-2xl rounded-br-md bg-primary px-4 py-2.5 text-[15px] leading-snug break-words whitespace-pre-wrap text-primary-foreground">
+      <div
+        className={cn(
+          "ml-auto max-w-[80%] rounded-2xl rounded-br-md bg-primary px-4 py-2.5 text-[15px] leading-snug break-words whitespace-pre-wrap text-primary-foreground",
+          ENTER_SENT,
+        )}
+      >
         {text}
       </div>
     ) : null;
   }
   if (message.role !== "assistant") return null;
   const parts = message.parts.map((part, i) => (
-    <CompactPart
-      key={`${message.id}-${i}`}
-      part={part}
-      message={message}
-      onReview={onReview}
-      onCheckoutOutcome={onCheckoutOutcome}
-      watches={watches}
-    />
+    // Each part rises in as it arrives. A part that draws nothing leaves no gap.
+    <div key={`${message.id}-${i}`} className={cn("flex flex-col gap-2 empty:hidden", ENTER)}>
+      <CompactPart
+        part={part}
+        message={message}
+        onReview={onReview}
+        onCheckoutOutcome={onCheckoutOutcome}
+        watches={watches}
+        onSend={onSend}
+        onOpenProduct={onOpenProduct}
+      />
+    </div>
   ));
   const empty = parts.every((p) => p === null) && streaming;
   return (
@@ -340,17 +384,24 @@ function CompactPart({
   onReview,
   onCheckoutOutcome,
   watches,
+  onSend,
+  onOpenProduct,
 }: {
   part: ChatMessagePart;
   message: ChatMessage;
   onReview: (a: Approval) => void;
   onCheckoutOutcome: (toolCallId: string, outcome: CheckoutOutcome) => void;
   watches: WatchIndex;
+  onSend: (text: string) => void;
+  onOpenProduct: (product: FoundProduct) => void;
 }) {
   switch (part.type) {
     case "text":
       return part.text.trim() ? (
-        <Text text={part.text} className="max-w-[92%] text-[15px] leading-snug" />
+        <AgentBubble
+          text={part.text}
+          className="max-w-[85%] px-3.5 py-2 text-[15px] leading-snug"
+        />
       ) : null;
 
     case "tool-await_agent_card_approval": {
@@ -407,18 +458,17 @@ function CompactPart({
     // The store's agent speaks through the watch: each update is a line of
     // the agent's own, live while the run goes, from the output after.
     case "tool-watch_checkout":
-      if (part.state === "output-available") {
-        return (part.output.updates ?? []).map((u) => <UpdateLine key={u.id} text={u.text} />);
-      }
-      if (part.state === "input-available") {
+      // Each call is one stretch of the checkout, as a card of steps.
+      if (part.state === "input-available" || part.state === "output-available") {
         return (
-          <LiveCheckoutUpdates
+          <WatchRun
             toolCallId={part.toolCallId}
             checkoutId={part.input.checkoutId}
             watches={watches}
+            output={part.state === "output-available" ? part.output : undefined}
             onOutcome={onCheckoutOutcome}
-            renderUpdate={(u) => <UpdateLine key={u.id} text={u.text} />}
-            working={<ActivityLine busy>Working on it</ActivityLine>}
+            compact
+            className="max-w-none"
           />
         );
       }
@@ -428,17 +478,16 @@ function CompactPart({
 
     default: {
       if (isCheckoutPart(part)) {
-        // Starting a checkout shows the site it runs on, and where it stands.
+        // Starting a checkout says, once, which site the agent went to.
         const site = checkoutSiteOf(part);
         const failed =
           part.state === "output-error" ||
           (part.state === "output-available" &&
             Boolean((part.output as { error?: unknown } | undefined)?.error));
         if (site && !failed) {
-          const phase = site.checkoutId
-            ? (watches.phase.get(site.checkoutId) ?? "working")
-            : "starting";
-          return <CheckoutSiteCard site={site} phase={phase} compact className="max-w-none" />;
+          // The steps card names the site once the run is followed; until then, a line.
+          if (site.checkoutId && watches.firstWatch.has(site.checkoutId)) return null;
+          return <CheckoutSiteLine site={site} className="-mb-1 pl-1" />;
         }
         if (watchedHere(message, part)) return null;
         const view = checkoutOf(part);
@@ -450,6 +499,27 @@ function CompactPart({
             {view ? checkoutStatusLine(view) : toolTitle(part.type)}
           </ActivityLine>
         );
+      }
+      {
+        // What a search or a look-up found, as cards with pictures, under the
+        // line the agent put on the call.
+        const message = productsMessageOf(part);
+        const products = productsOf(part);
+        if (message || products?.length) {
+          return (
+            <>
+              {message ? (
+                <AgentBubble
+                  text={message}
+                  className="max-w-[85%] px-3.5 py-2 text-[15px] leading-snug"
+                />
+              ) : null}
+              {products?.length ? (
+                <ProductCards products={products} onPick={onSend} onOpen={onOpenProduct} compact />
+              ) : null}
+            </>
+          );
+        }
       }
       if (part.type.startsWith("tool-")) {
         const tool = part as { type: string; state: string; output?: unknown };
@@ -466,11 +536,6 @@ function CompactPart({
       return null;
     }
   }
-}
-
-/** One update from the store's agent, drawn like any line the agent writes. */
-function UpdateLine({ text }: { text: string }) {
-  return <Text text={text} className="max-w-[92%] text-[15px] leading-snug" />;
 }
 
 /** "Looking at your saved cards", with a spinner while it runs and a check when it is done. */
@@ -853,6 +918,13 @@ function AccountSheetBody({ email, onSignOut }: Pick<ExperienceProps, "email" | 
           {initialOf(email)}
         </span>
         <p className="text-sm font-medium">{email ?? "Signed in"}</p>
+      </div>
+      <div className="flex flex-col gap-2">
+        <p className="text-sm font-medium">Buyer details</p>
+        <p className="text-xs text-muted-foreground">
+          Every checkout starts with these, so stores do not ask. You can also tell the agent.
+        </p>
+        <BuyerDetails email={email} />
       </div>
       <Button
         type="button"

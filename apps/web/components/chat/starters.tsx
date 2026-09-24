@@ -1,12 +1,13 @@
 "use client";
 
 import type { ComponentType } from "react";
-import { ArrowUpRight, ShoppingBag, Ticket, UtensilsCrossed } from "lucide-react";
+import { ArrowUpRight, CreditCard, ShoppingBag, Ticket, UtensilsCrossed } from "lucide-react";
 import { cn } from "@agent-commerce/ui";
 
 /**
- * The three ways a new chat offers to start, so a first-time user sees what
- * the agent can do: buy a product, book a table, book an experience. Each one
+ * The ways a new chat offers to start, so a first-time user sees what the
+ * agent can do: make an agent card and see the approval, buy a product, book
+ * a table, or get event tickets. Each one
  * sends a plain message; from there the user talks to the agent, which asks
  * for what it still needs. The prompt knows these three (see `prompt.ts`).
  */
@@ -21,9 +22,16 @@ export interface Starter {
 
 export const STARTERS: Starter[] = [
   {
+    id: "card",
+    title: "Create an agent card",
+    sub: "A small budget you approve, to see how an agent spends",
+    message: "Create an agent card with a $20 budget for lunch this week",
+    icon: CreditCard,
+  },
+  {
     id: "something",
     title: "Buy me something",
-    sub: "Anything from an online store, or a snack if you cannot decide",
+    sub: "Anything from an online store, or IQBAR bars if you cannot decide",
     message: "Buy me something",
     icon: ShoppingBag,
   },
@@ -36,9 +44,9 @@ export const STARTERS: Starter[] = [
   },
   {
     id: "experience",
-    title: "Something to do",
-    sub: "Shows, concerts and more in your city, tickets booked for you",
-    message: "Suggest something to do in my city and book me tickets",
+    title: "Book event tickets",
+    sub: "Concerts, shows and experiences in your city",
+    message: "Find an event in my city and book me tickets",
     icon: Ticket,
   },
 ];
@@ -61,7 +69,7 @@ export function StarterCards({
       aria-label="Ways to start"
       className={cn(
         "grid w-full gap-2",
-        layout === "grid" ? "sm:grid-cols-3 sm:gap-3" : "grid-cols-1",
+        layout === "grid" ? "sm:grid-cols-2 sm:gap-3" : "grid-cols-1",
         className,
       )}
     >

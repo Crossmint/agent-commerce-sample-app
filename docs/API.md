@@ -138,10 +138,10 @@ Wraps [Crossmint Agent Checkouts](https://docs.crossmint.com/api-reference/agent
 `POST /v1/checkouts` (agent) body:
 
 ```json
-{ "startUrl": "https://shop.example/p/1", "task"?: "medium, black", "agentCardId"?: "…", "maxCost": { "amount": "100.00", "currency": "USD" }, "buyerProfileId"?: "…", "browserProfileId"?: "…", "freshBrowser"?: false, "merchantGuidance"?: "…" }
+{ "startUrl": "https://shop.example/p/1", "task"?: "medium, black", "purpose"?: "Black tee, medium", "agentCardId"?: "…", "maxCost": { "amount": "100.00", "currency": "USD" }, "buyerProfileId"?: "…", "browserProfileId"?: "…", "freshBrowser"?: false, "merchantGuidance"?: "…" }
 ```
 
-`url` and `request` are accepted as older names for `startUrl` and `task`. → `201 CheckoutView`.
+`url` and `request` are accepted as older names for `startUrl` and `task`. `purpose` (up to 80 characters) is what the purchase is, in a few words: the agent card raised at the payment step carries it, so the user sees it when they approve. Without one it reads "Purchase at" and the store. → `201 CheckoutView`.
 
 Sessions are sticky: the server attaches the user's browser profile to every run, so a store they signed into once stays signed in. Callers need pass nothing. `browserProfileId` names a different profile; `freshBrowser: true` starts signed out, which is the way past a login that has gone stale. If the profile cannot be resolved the run still goes ahead, in a fresh browser — the convenience never fails a purchase.
 
@@ -180,10 +180,10 @@ interface CheckoutView {
 
 `GET /v1/checkouts/:id` → `CheckoutView`. Poll it about every 1.5s; there are no webhooks.
 
-While polling, when the open input request asks for **card fields** the server never passes it on. What it does depends on the checkout:
+While polling, when the run reaches its **payment step** (a payment input request, `interaction.kind: "payment"`, stating the amount and the merchant's domain) the server never passes it on. It answers it with the id of an order intent (an agent card), as Agent Checkouts requires: `input_response` with `response: { kind: "payment", orderIntentId }`. No card number is ever sent; the checkout mints the credential itself. Which order intent depends on the checkout:
 
-- **With an `agentCardId`** (passed to `POST /v1/checkouts`, or minted earlier in this run): the server mints a credential from that agent card and answers the request itself before returning. The view reports `running` while that is in flight.
-- **Without one**: the server creates an agent card request scoped to the run — `maxCost` for the amount, the start URL's host for the merchant lock — and returns it as `paymentRequest`. The status stays `awaiting_input`. The user answers it through the ordinary `POST /v1/agent-card-requests/:id/approve`, or at `approvalUrl`; once the card is active the next poll mints from it, answers the store, and the run carries on. One request per run: it is reused on every poll, and a denial is returned as it is rather than replaced.
+- **With an `agentCardId`** (passed to `POST /v1/checkouts`, set with `POST /v1/checkouts/:id/agent-card`, or made earlier in this run): the server answers with it before returning. The view reports `running` while that is in flight.
+- **Without one**: the server creates an agent card request for the run as Agent Checkouts wants the order intent: the **exact amount** the payment request states, **no merchant** (the checkout binds the credential to the store itself), and an expiry of **two hours**. It returns it as `paymentRequest`, and the status stays `awaiting_input`. The user answers it through the ordinary `POST /v1/agent-card-requests/:id/approve`, or at `approvalUrl`; once the card is active, the next read answers the run with it. The request is reused on every read while it fits; when the run asks again after an answer (the card expired, was too small, or was cancelled), the server raises a fresh one and does not offer the card that failed.
 
 `POST /v1/checkouts/:id/messages` body, one of:
 
@@ -196,7 +196,9 @@ While polling, when the open input request asks for **card fields** the server n
 
 Optional `messageId` (≤200 chars) makes a retry idempotent. → `CheckoutView`. If the `requestId` names a payment request: `409 payment_handled_by_server`.
 
-`GET /v1/checkouts/:id/messages?cursor&limit` → Crossmint's message list (progress, activity, input requests, result, and what was sent) as is.
+`GET /v1/checkouts/:id/messages?cursor&limit` → Crossmint's message list (progress, activity, input requests, result, and what was sent) as is. Its `streamCursor` is where the stream below picks up.
+
+`GET /v1/checkouts/:id/messages/stream?after=` → `text/event-stream`, passed through from Crossmint as it comes: `message.upsert` (a message, new or changed) and `run.updated` events, each with an `id` to resume from (`after`, or the `Last-Event-ID` header). On `run.updated`, read the checkout again: that read is where the payment step is raised and answered. When the stream closes, re-read the message list and reconnect from the `streamCursor` it reports.
 
 `POST /v1/checkouts/:id/cancel` → `CheckoutView`. The run reaches `cancelled` on a later poll.
 

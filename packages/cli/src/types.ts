@@ -87,6 +87,8 @@ export interface CreateCheckoutBody {
   /** Omit to let the user choose a payment method at the run's payment step. */
   agentCardId?: string;
   maxCost: { amount: string; currency: string };
+  /** What the purchase is, in a few words: shown when the user approves the payment. */
+  purpose?: string;
   buyerProfileId?: string;
   browserProfileId?: string;
   freshBrowser?: boolean;

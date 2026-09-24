@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useChat } from "@ai-sdk/react";
 import {
@@ -10,6 +10,7 @@ import {
 } from "ai";
 import type { ApprovalOutcome, CheckoutOutcome } from "@/lib/chat/tools";
 import type { Attachment, ChatMessage } from "@/lib/chat/types";
+import { useChatSounds } from "./use-chat-sounds";
 
 export interface UseAgentChatOptions {
   id: string;
@@ -55,7 +56,13 @@ export function useAgentChat({ id, initialMessages, persist }: UseAgentChatOptio
   const [error, setError] = useState<string | null>(null);
   const transport = useMemo(() => new DefaultChatTransport({ api: "/api/chat" }), []);
 
-  const { messages, sendMessage, status, stop, addToolOutput } = useChat<ChatMessage>({
+  const {
+    messages: raw,
+    sendMessage,
+    status,
+    stop,
+    addToolOutput,
+  } = useChat<ChatMessage>({
     id,
     messages: initialMessages,
     transport,
@@ -65,6 +72,36 @@ export function useAgentChat({ id, initialMessages, persist }: UseAgentChatOptio
       if (persist) router.refresh();
     },
   });
+
+  // One message per id, whatever the stream did: two copies would share a
+  // React key and draw the turn twice.
+  const messages = useMemo(() => uniqueById(raw), [raw]);
+
+  useChatSounds(id, messages, status === "submitted" || status === "streaming");
+
+  /*
+   * Tool outputs wait for the turn to finish. A watch starts as soon as its
+   * call streams in, and a store that asks at once would otherwise hand back
+   * while the model is still talking: the SDK would send the follow-up in the
+   * middle of that turn, and the two responses would both continue the same
+   * message. Queued here, they go out one by one once the chat is idle.
+   */
+  type Output =
+    | { tool: "await_agent_card_approval"; toolCallId: string; output: ApprovalOutcome }
+    | { tool: "watch_checkout"; toolCallId: string; output: CheckoutOutcome };
+  const queue = useRef<Output[]>([]);
+  const [queued, setQueued] = useState(0);
+  const idle = status === "ready" || status === "error";
+  useEffect(() => {
+    if (!idle || !queue.current.length) return;
+    const next = queue.current.shift()!;
+    setQueued(queue.current.length);
+    void addToolOutput(next);
+  }, [idle, queued, addToolOutput]);
+  const hand = useCallback((out: Output) => {
+    queue.current.push(out);
+    setQueued(queue.current.length);
+  }, []);
 
   const urlSet = useRef(initialMessages.length > 0);
   const send = useCallback(
@@ -95,9 +132,9 @@ export function useAgentChat({ id, initialMessages, persist }: UseAgentChatOptio
 
   const onApprovalOutcome = useCallback(
     (toolCallId: string, output: ApprovalOutcome) => {
-      void addToolOutput({ tool: "await_agent_card_approval", toolCallId, output });
+      hand({ tool: "await_agent_card_approval", toolCallId, output });
     },
-    [addToolOutput],
+    [hand],
   );
 
   // A run can end in front of more than one watcher (a card and a sheet), and
@@ -107,9 +144,9 @@ export function useAgentChat({ id, initialMessages, persist }: UseAgentChatOptio
     (toolCallId: string, output: CheckoutOutcome) => {
       if (reported.current.has(toolCallId)) return;
       reported.current.add(toolCallId);
-      void addToolOutput({ tool: "watch_checkout", toolCallId, output });
+      hand({ tool: "watch_checkout", toolCallId, output });
     },
-    [addToolOutput],
+    [hand],
   );
 
   return {
@@ -124,4 +161,19 @@ export function useAgentChat({ id, initialMessages, persist }: UseAgentChatOptio
     dismissError: () => setError(null),
     reportError: setError,
   };
+}
+
+/** The thread with one message per id, each at its first place and in its newest form. */
+function uniqueById(messages: ChatMessage[]): ChatMessage[] {
+  const latest = new Map<string, ChatMessage>();
+  for (const m of messages) latest.set(m.id, m);
+  if (latest.size === messages.length) return messages;
+  const seen = new Set<string>();
+  const out: ChatMessage[] = [];
+  for (const m of messages) {
+    if (seen.has(m.id)) continue;
+    seen.add(m.id);
+    out.push(latest.get(m.id)!);
+  }
+  return out;
 }

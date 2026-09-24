@@ -32,6 +32,7 @@ interface CreateOptions extends JsonOption {
   maxCost: number;
   currency: string;
   task?: string;
+  purpose?: string;
   /** Older name for --task. */
   request?: string;
   buyerProfile?: string;
@@ -61,6 +62,7 @@ export function buildCheckoutBody(opts: CreateOptions): CreateCheckoutBody {
   if (opts.agentCard) body.agentCardId = opts.agentCard;
   const task = opts.task ?? opts.request;
   if (task) body.task = task;
+  if (opts.purpose) body.purpose = opts.purpose;
   if (opts.buyerProfile) body.buyerProfileId = opts.buyerProfile;
   if (opts.browserProfile) body.browserProfileId = opts.browserProfile;
   if (opts.freshBrowser) body.freshBrowser = true;
@@ -119,6 +121,10 @@ export function registerCheckoutCommands(program: Command, ctx: CliContext): voi
         .option("--currency <code>", "ISO currency", "USD")
         .option("--task <text>", 'what to buy and how, e.g. "medium, black, cheapest shipping"')
         .option("--request <text>", "older name for --task")
+        .option(
+          "--purpose <text>",
+          'what the purchase is, in a few words, shown when the user approves the payment, e.g. "Blue Pikachu pen"',
+        )
         .option("--buyer-profile <id>", "buyer profile with name, contact and shipping")
         .option(
           "--browser-profile <id>",

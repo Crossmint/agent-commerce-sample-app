@@ -576,29 +576,33 @@ describe("checkouts", () => {
     requiredAction: null,
     ...over,
   });
+  // The payment step as Agent Checkouts sends it: what to authorize, and where.
   const paymentRequest = {
     type: "input_response",
     requestId: "req_pay",
     messageId: "msg_pay",
     request: {
-      question: "Enter the card to pay with",
+      question: "Authorize a card payment of 28.40 USD at shop.example.",
       expiresAt: "2026-09-18T00:00:00.000Z",
       interaction: {
-        kind: "form",
-        responseSchema: {
-          type: "object",
-          properties: {
-            cardNumber: { type: "string" },
-            expirationMonth: { type: "string" },
-            expirationYear: { type: "string" },
-            cvc: { type: "string" },
-          },
-          required: ["cardNumber", "expirationMonth", "expirationYear", "cvc"],
-        },
-        uiSchema: {},
+        kind: "payment",
+        purpose: "checkout_payment",
+        method: "card",
+        amount: { kind: "exact", value: "28.40", currency: "USD" },
+        merchant: { domain: "shop.example" },
       },
     },
   };
+  const paidWith = (orderIntentId: string, requestId = "req_pay") => ({
+    parts: [
+      {
+        type: "input_response",
+        requestId,
+        action: "submit",
+        response: { kind: "payment", orderIntentId },
+      },
+    ],
+  });
 
   it("creates with the server key, Crossmint's request shape, and links the agent card", async () => {
     const { handlers, calls } = makeServer([
@@ -692,11 +696,15 @@ describe("checkouts", () => {
     const body = await res.json();
     // The run stays open and the step is the view, rather than a 409.
     expect(body.status).toBe("awaiting_input");
+    // For the exact amount the run asks for, not the max cost, and not
+    // locked to a merchant: the checkout binds the credential itself.
     expect(body.paymentRequest).toMatchObject({
       status: "pending",
-      amount: { value: "30.00", currency: "USD" },
-      merchant: { name: "shop.example" },
+      amount: { value: "28.40", currency: "USD" },
     });
+    expect(body.paymentRequest.merchant).toBeUndefined();
+    // Short and plain, not the run's task.
+    expect(body.paymentRequest.description).toBe("Purchase at shop.example");
     expect(body.paymentRequest.approvalUrl).toBe(
       `https://wallet.test/approve/${body.paymentRequest.requestId}`,
     );
@@ -712,6 +720,31 @@ describe("checkouts", () => {
 
   // Its own run id: the server remembers answered payment requests per run, in
   // module state, so two tests that answer the same run would tread on each other.
+  it("names the payment step's agent card with the purpose the checkout was given", async () => {
+    const { handlers } = makeServer([
+      {
+        method: "POST",
+        path: /\/unstable\/agent-checkouts$/,
+        reply: { status: 202, body: run({ runId: "run_named", status: "queued" }) },
+      },
+      {
+        method: "GET",
+        path: "/unstable/agent-checkouts/run_named",
+        reply: { body: run({ runId: "run_named", status: "awaiting_input", requiredAction: paymentRequest }) },
+      },
+    ]);
+    await call(handlers, "POST", "/v1/checkouts", {
+      body: {
+        startUrl: "https://shop.example/p/1",
+        task: "Buy the blue one. Use the saved buyer details. The buyer's email is ada@example.com.",
+        purpose: "Blue Pikachu erasable pen",
+        maxCost: { amount: "30.00", currency: "USD" },
+      },
+    });
+    const view = await (await call(handlers, "GET", "/v1/checkouts/run_named")).json();
+    expect(view.paymentRequest.description).toBe("Blue Pikachu erasable pen");
+  });
+
   it("pays from the agent card the payment step minted, once the user has chosen", async () => {
     vi.spyOn(console, "info").mockImplementation(() => {});
     const { handlers, calls } = makeServer([
@@ -796,19 +829,22 @@ describe("checkouts", () => {
     expect(done.agentCardId).toBe("oi_1");
     expect(done.paymentRequest).toBeUndefined();
 
-    // The card was scoped to the run: its max cost, locked to the store.
-    const mint = calls.find((c) => c.path.endsWith("/credentials"))!;
-    expect(mint.body).toMatchObject({
-      amount: { value: "30.00", currency: "USD" },
-      merchant: { name: "shop.example" },
-    });
+    // The order intent as Agent Checkouts wants it: the exact amount, no
+    // merchant, and only for the rest of the checkout.
+    const created = findCall(calls, "POST", /\/unstable\/order-intents$/)!;
+    const intent = created.body as { amount: unknown; merchant?: unknown; expiresAt: string };
+    expect(intent.amount).toEqual({ value: "28.40", currency: "USD" });
+    expect(intent.merchant).toBeUndefined();
+    const hours = (Date.parse(intent.expiresAt) - Date.now()) / 3_600_000;
+    expect(hours).toBeGreaterThan(1.5);
+    expect(hours).toBeLessThan(2.5);
+    // Answered with the order intent's id, never a card.
+    expect(calls.some((c) => c.path.endsWith("/credentials"))).toBe(false);
     const message = calls.find((c) => c.path.endsWith("/run_9/messages"))!;
-    expect(message.body).toMatchObject({
-      parts: [{ type: "input_response", requestId: "req_pay", action: "submit" }],
-    });
+    expect(message.body).toMatchObject(paidWith("oi_1"));
   });
 
-  it("answers a payment request with a minted card and hides it from the caller", async () => {
+  it("answers the payment step with the agent card it was given, and hides the step from the caller", async () => {
     vi.spyOn(console, "info").mockImplementation(() => {});
     const { handlers, calls } = makeServer([
       {
@@ -881,39 +917,18 @@ describe("checkouts", () => {
       createdAt: "2026-09-17T00:00:00.000Z",
     });
 
-    const mint = calls.find((c) => c.path.endsWith("/credentials"))!;
-    // Capped at the checkout's max cost, below the card's 50.00.
-    expect(mint.body).toMatchObject({
-      amount: { value: "30.00", currency: "USD" },
-      merchant: { name: "shop.example" },
-    });
+    // No card is minted: Agent Checkouts mints the credential from the order intent itself.
+    expect(calls.some((c) => c.path.endsWith("/credentials"))).toBe(false);
     const message = calls.find((c) => c.path.endsWith("/run_1/messages"))!;
-    expect(message.body).toMatchObject({
-      parts: [
-        {
-          type: "input_response",
-          requestId: "req_pay",
-          action: "submit",
-          response: {
-            kind: "form",
-            values: {
-              cardNumber: "4111111111111111",
-              expirationMonth: "12",
-              expirationYear: "2030",
-              cvc: "123",
-            },
-          },
-        },
-      ],
-    });
+    expect(message.body).toMatchObject(paidWith("oi_1"));
     expect(typeof (message.body as { id: string }).id).toBe("string");
     vi.restoreAllMocks();
   });
 
-  it("pays the payment step from an agent card the user already has", async () => {
-    vi.spyOn(console, "info").mockImplementation(() => {});
-    // Its own request id: the server remembers payment requests it answered, per run.
-    const payStep = { ...paymentRequest, requestId: "req_pay_existing" };
+  it("passes the message stream through, resuming from the caller's cursor", async () => {
+    const events =
+      'id: c1\nevent: message.upsert\ndata: {"id":"m1","role":"assistant","parts":[{"type":"progress","text":"Opened the store"}]}\n\n' +
+      'id: c2\nevent: run.updated\ndata: {"status":"running"}\n\n';
     const { handlers, calls } = makeServer([
       {
         method: "POST",
@@ -922,9 +937,44 @@ describe("checkouts", () => {
       },
       {
         method: "GET",
-        path: "/unstable/agent-checkouts/run_1",
+        path: "/unstable/agent-checkouts/run_1/messages/stream",
+        reply: { raw: events, contentType: "text/event-stream" },
+      },
+    ]);
+    await call(handlers, "POST", "/v1/checkouts", {
+      body: { startUrl: "https://shop.example/p/1", maxCost: { amount: "30.00", currency: "USD" } },
+    });
+
+    const res = await call(handlers, "GET", "/v1/checkouts/run_1/messages/stream?after=c0");
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toContain("text/event-stream");
+    expect(await res.text()).toBe(events);
+    const upstream = findCall(calls, "GET", "/messages/stream")!;
+    expect(upstream.url).toBe(
+      "https://www.crossmint.com/api/unstable/agent-checkouts/run_1/messages/stream?after=c0",
+    );
+    expect(upstream.headers).toMatchObject({
+      Accept: "text/event-stream",
+      "X-API-KEY": "sk_test",
+      "x-crossmint-user-id": "user-test-1",
+    });
+  });
+
+  it("pays the payment step from an agent card the user already has", async () => {
+    vi.spyOn(console, "info").mockImplementation(() => {});
+    // A run of its own: the server remembers, per run, which payment it answered and with what.
+    const payStep = { ...paymentRequest, requestId: "req_pay_existing" };
+    const { handlers, calls } = makeServer([
+      {
+        method: "POST",
+        path: /\/unstable\/agent-checkouts$/,
+        reply: { status: 202, body: run({ runId: "run_mine", status: "queued" }) },
+      },
+      {
+        method: "GET",
+        path: "/unstable/agent-checkouts/run_mine",
         once: true,
-        reply: { body: run({ status: "awaiting_input", requiredAction: payStep }) },
+        reply: { body: run({ runId: "run_mine", status: "awaiting_input", requiredAction: payStep }) },
       },
       { method: "GET", path: "/unstable/order-intents/oi_1", reply: { body: activeOrderIntent() } },
       {
@@ -934,28 +984,127 @@ describe("checkouts", () => {
       },
       {
         method: "POST",
-        path: "/unstable/agent-checkouts/run_1/messages",
+        path: "/unstable/agent-checkouts/run_mine/messages",
         reply: { status: 202, body: { messageId: "m_1", status: "accepted" } },
       },
       {
         method: "GET",
-        path: "/unstable/agent-checkouts/run_1",
-        reply: { body: run({ status: "running" }) },
+        path: "/unstable/agent-checkouts/run_mine",
+        reply: { body: run({ runId: "run_mine", status: "running" }) },
       },
     ]);
     await call(handlers, "POST", "/v1/checkouts", {
       body: { startUrl: "https://shop.example/p/1", maxCost: { amount: "30.00", currency: "USD" } },
     });
 
-    const res = await call(handlers, "POST", "/v1/checkouts/run_1/agent-card", {
+    const res = await call(handlers, "POST", "/v1/checkouts/run_mine/agent-card", {
       body: { agentCardId: "oi_1" },
     });
     expect(res.status).toBe(200);
-    expect(await res.json()).toMatchObject({ id: "run_1", status: "running", agentCardId: "oi_1" });
-    expect(calls.some((c) => c.path.endsWith("/credentials"))).toBe(true);
+    expect(await res.json()).toMatchObject({ id: "run_mine", status: "running", agentCardId: "oi_1" });
+    expect(calls.some((c) => c.path.endsWith("/credentials"))).toBe(false);
+    expect(findCall(calls, "POST", "/run_mine/messages")!.body).toMatchObject(
+      paidWith("oi_1", "req_pay_existing"),
+    );
     // No new agent card request: the user chose a card they had.
     expect(calls.some((c) => c.method === "POST" && c.path.includes("order-intents") && !c.path.endsWith("/credentials"))).toBe(false);
     vi.restoreAllMocks();
+  });
+
+  it("asks for a new authorization when the run turns an agent card down", async () => {
+    vi.spyOn(console, "info").mockImplementation(() => {});
+    const first = { ...paymentRequest, requestId: "req_first" };
+    // After the card fails (say, insufficient_allowance), the run asks again.
+    const again = { ...paymentRequest, requestId: "req_again" };
+    const { handlers, calls } = makeServer([
+      {
+        method: "POST",
+        path: /\/unstable\/agent-checkouts$/,
+        reply: { status: 202, body: run({ runId: "run_retry", status: "queued" }) },
+      },
+      {
+        method: "GET",
+        path: "/unstable/agent-checkouts/run_retry",
+        once: true,
+        reply: { body: run({ runId: "run_retry", status: "awaiting_input", requiredAction: first }) },
+      },
+      { method: "GET", path: "/unstable/order-intents/oi_1", reply: { body: activeOrderIntent() } },
+      {
+        method: "POST",
+        path: "/unstable/agent-checkouts/run_retry/messages",
+        reply: { status: 202, body: { messageId: "m_1", status: "accepted" } },
+      },
+      {
+        method: "GET",
+        path: "/unstable/agent-checkouts/run_retry",
+        reply: { body: run({ runId: "run_retry", status: "awaiting_input", requiredAction: again }) },
+      },
+    ]);
+    await call(handlers, "POST", "/v1/checkouts", {
+      body: { startUrl: "https://shop.example/p/1", maxCost: { amount: "30.00", currency: "USD" } },
+    });
+    await call(handlers, "POST", "/v1/checkouts/run_retry/agent-card", { body: { agentCardId: "oi_1" } });
+    expect(calls.filter((c) => c.path.endsWith("/run_retry/messages"))).toHaveLength(1);
+
+    const view = await (await call(handlers, "GET", "/v1/checkouts/run_retry")).json();
+    // The card that failed is not sent again; the user is asked to choose.
+    expect(calls.filter((c) => c.path.endsWith("/run_retry/messages"))).toHaveLength(1);
+    expect(view.paymentRequest).toMatchObject({
+      status: "pending",
+      amount: { value: "28.40", currency: "USD" },
+    });
+    vi.restoreAllMocks();
+  });
+
+  it("sends an answer and a note as two messages, one part each", async () => {
+    const question = {
+      type: "input_response",
+      requestId: "req_size",
+      messageId: "msg_size",
+      request: {
+        question: "Which size?",
+        expiresAt: "2026-09-18T00:00:00.000Z",
+        interaction: {
+          kind: "form",
+          responseSchema: { type: "object", properties: { size: { type: "string" } } },
+        },
+      },
+    };
+    const { handlers, calls } = makeServer([
+      {
+        method: "POST",
+        path: /\/unstable\/agent-checkouts$/,
+        reply: { status: 202, body: run({ runId: "run_note", status: "queued" }) },
+      },
+      {
+        method: "GET",
+        path: "/unstable/agent-checkouts/run_note",
+        once: true,
+        reply: { body: run({ runId: "run_note", status: "awaiting_input", requiredAction: question }) },
+      },
+      {
+        method: "POST",
+        path: "/unstable/agent-checkouts/run_note/messages",
+        reply: { status: 202, body: { messageId: "m_1", status: "accepted" } },
+      },
+      {
+        method: "GET",
+        path: "/unstable/agent-checkouts/run_note",
+        reply: { body: run({ runId: "run_note", status: "running" }) },
+      },
+    ]);
+    await call(handlers, "POST", "/v1/checkouts", {
+      body: { startUrl: "https://shop.example/p/1", maxCost: { amount: "30.00", currency: "USD" } },
+    });
+    const res = await call(handlers, "POST", "/v1/checkouts/run_note/messages", {
+      body: { requestId: "req_size", values: { size: "M" }, text: "Gift wrap it, please" },
+    });
+    expect(res.status).toBe(200);
+    const sent = calls.filter((c) => c.method === "POST" && c.path.endsWith("/run_note/messages"));
+    expect(sent.map((c) => (c.body as { parts: unknown[] }).parts)).toEqual([
+      [{ type: "input_response", requestId: "req_size", action: "submit", response: { kind: "form", values: { size: "M" } } }],
+      [{ type: "text", text: "Gift wrap it, please" }],
+    ]);
   });
 
   it("refuses an agent card that is spent or locked to another store", async () => {

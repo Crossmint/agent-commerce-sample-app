@@ -5,7 +5,11 @@ import { AlertCircle } from "lucide-react";
 import { errorMessage } from "../api/client.js";
 import type { CheckoutView as CheckoutViewData } from "../api/types.js";
 import { isTerminalCheckoutView, useCheckout } from "../hooks/use-checkout.js";
-import { useCheckoutMessages } from "../hooks/use-checkout-messages.js";
+import {
+  CHECKOUT_FALLBACK_POLL_MS,
+  checkoutChanged,
+  useCheckoutMessages,
+} from "../hooks/use-checkout-messages.js";
 import { cn } from "../lib/utils.js";
 import { Alert, AlertDescription, AlertTitle } from "./primitives/alert.js";
 import { Badge, type BadgeProps } from "./primitives/badge.js";
@@ -77,10 +81,14 @@ export function CheckoutView({
 }: CheckoutViewProps) {
   const { data, error, loading, refetch, submitAction, decline, cancel, submitting } = useCheckout(
     checkoutId,
-    { poll },
+    { poll, pollMs: CHECKOUT_FALLBACK_POLL_MS },
   );
+  // The stream says when the run moves; read the checkout then, not on a timer.
   const messages = useCheckoutMessages(checkoutId, {
     live: poll && Boolean(data) && !isTerminalCheckoutView(data),
+    onEvent: (event) => {
+      if (checkoutChanged(event)) void refetch();
+    },
   });
   const [actionError, setActionError] = React.useState<unknown>(undefined);
 

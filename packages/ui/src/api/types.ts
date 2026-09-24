@@ -150,6 +150,8 @@ export interface CreateCheckoutInput {
   task?: string;
   agentCardId: string;
   maxCost: { amount: string; currency: string };
+  /** What the purchase is, in a few words: shown when the user approves the payment. */
+  purpose?: string;
   buyerProfileId?: string;
   /** Overrides the user's own profile, which the server otherwise attaches. */
   browserProfileId?: string;

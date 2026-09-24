@@ -24,6 +24,7 @@ import {
   createCheckout,
   getCheckout,
   listCheckoutMessages,
+  streamCheckoutMessages,
   sendCheckoutMessage,
   submitCheckoutAction,
 } from "./handlers/checkouts.js";
@@ -76,6 +77,7 @@ export function buildRouter(): Router<Ctx> {
     .post("/v1/checkouts", createCheckout)
     .get("/v1/checkouts/:id", getCheckout)
     .get("/v1/checkouts/:id/messages", listCheckoutMessages)
+    .get("/v1/checkouts/:id/messages/stream", streamCheckoutMessages)
     .post("/v1/checkouts/:id/messages", sendCheckoutMessage)
     .post("/v1/checkouts/:id/cancel", cancelCheckout)
     .post("/v1/checkouts/:id/agent-card", setCheckoutAgentCard)

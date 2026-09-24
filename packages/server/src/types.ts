@@ -74,6 +74,8 @@ export interface CheckoutLink {
   agentCardId?: string;
   /** The agent card request raised at the payment step, while the user chooses a payment method. */
   agentCardRequestId?: string;
+  /** What the purchase is, in the agent's few words: the agent card's purpose at the payment step. */
+  purpose?: string;
   createdAt: string;
 }
 
@@ -81,6 +83,7 @@ export interface CheckoutLink {
 export interface CheckoutLinkPatch {
   agentCardId?: string;
   agentCardRequestId?: string;
+  purpose?: string;
 }
 
 /**

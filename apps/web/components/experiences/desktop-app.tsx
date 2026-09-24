@@ -1,9 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronsUpDown, CreditCard, LogOut, Plus, Trash2, TriangleAlert, X } from "lucide-react";
+import { ChevronsUpDown, CreditCard, LogOut, MapPin, Plus, Trash2, TriangleAlert, X } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle, Button, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger, Spinner } from "@agent-commerce/ui";
 import { AGENT_DOMAIN, AGENT_NAME, AgentMark } from "@/components/brand";
+import { BuyerDetails } from "@/components/buyer-details";
+import { ScreenHeading } from "@/components/focus-screen";
 import { Messages } from "@/components/chat/messages";
 import { MultimodalInput } from "@/components/chat/multimodal-input";
 import { DesktopFrame } from "@/components/frame/desktop-frame";
@@ -13,7 +15,7 @@ import { cn } from "@/lib/cn";
 import { CardsSection } from "./cards-section";
 import { brandAttr, initialOf, loginNext, type ExperienceProps } from "./types";
 
-type Section = "chat" | "cards";
+type Section = "chat" | "cards" | "details";
 
 /**
  * The app in a browser window: a sidebar with the conversations and the
@@ -62,6 +64,9 @@ function Workspace({ email, chat, thread, chats, chatEnabled, attachmentsEnabled
           <NavItem active={section === "cards"} onClick={() => setSection("cards")}>
             <CreditCard className="size-4" /> Saved cards
           </NavItem>
+          <NavItem active={section === "details"} onClick={() => setSection("details")}>
+            <MapPin className="size-4" /> Buyer details
+          </NavItem>
         </div>
 
         <nav aria-label="Chats" className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto px-3 pb-3">
@@ -100,6 +105,11 @@ function Workspace({ email, chat, thread, chats, chatEnabled, attachmentsEnabled
           <div key="cards" className="flex flex-1 flex-col animate-in fade-in duration-200">
             <CardsSection />
           </div>
+        ) : section === "details" ? (
+          <div key="details" className="mx-auto flex w-full max-w-2xl flex-col gap-6 px-6 py-8 animate-in fade-in duration-200 sm:px-8">
+            <ScreenHeading title="Buyer details" sub="Your name, email and shipping address. Every checkout starts with them, so stores do not ask. You can also tell the agent in the chat." />
+            <BuyerDetails email={email} />
+          </div>
         ) : thread.loading ? (
           <div className="flex flex-1 items-center justify-center text-muted-foreground">
             <Spinner />
@@ -114,7 +124,7 @@ function Workspace({ email, chat, thread, chats, chatEnabled, attachmentsEnabled
           </div>
         ) : (
           <div key={thread.id} className="flex min-h-0 flex-1 flex-col animate-in fade-in duration-200">
-            <Messages messages={chat.messages} status={chat.status} onApprovalOutcome={chat.onApprovalOutcome} onCheckoutOutcome={chat.onCheckoutOutcome} onPickStarter={(text) => chat.send(text)} />
+            <Messages messages={chat.messages} status={chat.status} onApprovalOutcome={chat.onApprovalOutcome} onCheckoutOutcome={chat.onCheckoutOutcome} onPickStarter={(text) => chat.send(text)} onSend={(text) => chat.send(text)} />
             <div className="mx-auto w-full max-w-3xl px-4 pt-2 pb-4 sm:px-6">
               {chat.error ? (
                 <Alert variant="destructive" className="mb-3">

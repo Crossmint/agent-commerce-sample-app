@@ -60,6 +60,8 @@ export const checkouts = pgTable("checkouts", {
   // it at the payment step.
   agentCardId: text("agent_card_id"),
   agentCardRequestId: text("agent_card_request_id"),
+  // What the purchase is, in the agent's few words: the agent card's purpose.
+  purpose: text("purpose"),
   createdAt: timestamp("created_at", tz).notNull().defaultNow(),
 });
 
@@ -226,6 +228,7 @@ export function drizzleRequestStore(
         userId,
         ...(patch?.agentCardId ? { agentCardId: patch.agentCardId } : {}),
         ...(patch?.agentCardRequestId ? { agentCardRequestId: patch.agentCardRequestId } : {}),
+        ...(patch?.purpose ? { purpose: patch.purpose } : {}),
       };
       await db
         .insert(checkouts)
@@ -280,6 +283,7 @@ export function drizzleRequestStore(
         userId: row.userId,
         ...(row.agentCardId ? { agentCardId: row.agentCardId } : {}),
         ...(row.agentCardRequestId ? { agentCardRequestId: row.agentCardRequestId } : {}),
+        ...(row.purpose ? { purpose: row.purpose } : {}),
         createdAt: row.createdAt.toISOString(),
       };
     },

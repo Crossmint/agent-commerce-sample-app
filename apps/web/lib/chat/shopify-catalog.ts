@@ -37,6 +37,10 @@ export interface FoundProduct {
   rating?: string;
   /** "Size: 1lb, 3lb, 5lb" */
   options?: string[];
+  /** The product's main picture, on Shopify's CDN. */
+  image?: string;
+  /** The store's own words about it, cut short, for the details sheet. */
+  description?: string;
 }
 
 interface Money {
@@ -44,8 +48,14 @@ interface Money {
   currency: string;
 }
 
+interface CatalogMedia {
+  type?: string;
+  url?: string;
+}
+
 interface CatalogVariant {
   url?: string;
+  media?: CatalogMedia[];
   price?: Money;
   availability?: { available?: boolean };
   seller?: { name?: string; url?: string };
@@ -53,6 +63,8 @@ interface CatalogVariant {
 
 interface CatalogProduct {
   title?: string;
+  description?: { plain?: string };
+  media?: CatalogMedia[];
   rating?: { value?: number; scale_max?: number; count?: number };
   price_range?: { min?: Money };
   options?: Array<{ name?: string; values?: Array<{ label?: string }> }>;
@@ -67,6 +79,23 @@ export async function searchProducts(opts: {
   shipsTo?: string;
   limit?: number;
 }): Promise<FoundProduct[]> {
+  return call("search_catalog", {
+    query: opts.query,
+    filters: {
+      available: true,
+      ships_to: { country: (opts.shipsTo ?? "US").toUpperCase() },
+      ...(opts.maxPrice ? { price: { max: Math.round(opts.maxPrice * 100) } } : {}),
+    },
+    pagination: { limit: Math.min(Math.max(opts.limit ?? 5, 1), 10) },
+  });
+}
+
+/** Products by their page URLs, as the store's own site has them. Unknown URLs are left out. */
+export async function lookUpProducts(urls: string[]): Promise<FoundProduct[]> {
+  return call("lookup_catalog", { ids: urls.slice(0, 10) });
+}
+
+async function call(tool: string, catalog: Record<string, unknown>): Promise<FoundProduct[]> {
   const res = await fetch(ENDPOINT, {
     method: "POST",
     headers: { "Content-Type": "application/json", Accept: "application/json" },
@@ -76,19 +105,8 @@ export async function searchProducts(opts: {
       method: "tools/call",
       id: 1,
       params: {
-        name: "search_catalog",
-        arguments: {
-          meta: { "ucp-agent": { profile: profileUrl() } },
-          catalog: {
-            query: opts.query,
-            filters: {
-              available: true,
-              ships_to: { country: (opts.shipsTo ?? "US").toUpperCase() },
-              ...(opts.maxPrice ? { price: { max: Math.round(opts.maxPrice * 100) } } : {}),
-            },
-            pagination: { limit: Math.min(Math.max(opts.limit ?? 5, 1), 10) },
-          },
-        },
+        name: tool,
+        arguments: { meta: { "ucp-agent": { profile: profileUrl() } }, catalog },
       },
     }),
   });
@@ -111,8 +129,19 @@ function toFound(p: CatalogProduct): FoundProduct | undefined {
   )[0];
   if (!cheapest?.url || !p.title) return undefined;
   const money = cheapest.price ?? p.price_range?.min;
+  const image = [...(p.media ?? []), ...(cheapest.media ?? [])].find(
+    (m) => (m.type ?? "image") === "image" && m.url,
+  )?.url;
+  const about = p.description?.plain?.replace(/\s+/g, " ").trim();
   return {
     title: p.title,
+    ...(image ? { image: sized(image) } : {}),
+    ...(about
+      ? {
+          description:
+            about.length > 280 ? `${about.slice(0, 277).replace(/\s+\S*$/, "")}…` : about,
+        }
+      : {}),
     ...(money ? { price: `${(money.amount / 100).toFixed(2)} ${money.currency}` } : {}),
     store: cheapest.seller?.name ?? hostOf(cheapest.url),
     url: cleanUrl(cheapest.url),
@@ -134,6 +163,21 @@ function toFound(p: CatalogProduct): FoundProduct | undefined {
         }
       : {}),
   };
+}
+
+/**
+ * A card-sized picture. Shopify's CDN resizes on `width`, and store pictures
+ * can be huge: IQBAR's main one is a 12 MB PNG, 200 KB at this size.
+ */
+function sized(raw: string): string {
+  try {
+    const url = new URL(raw);
+    if (url.hostname !== "cdn.shopify.com" && !url.pathname.includes("/cdn/shop/")) return raw;
+    url.searchParams.set("width", "400");
+    return url.toString();
+  } catch {
+    return raw;
+  }
 }
 
 /** The product page without the catalog's tracking parameters; the variant stays. */

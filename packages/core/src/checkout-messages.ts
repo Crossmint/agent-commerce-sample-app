@@ -24,6 +24,15 @@ export function submitResponse(requestId: string, values: Record<string, unknown
   return { type: "input_response", requestId, action: "submit", response: { kind: "form", values } };
 }
 
+/**
+ * The answer to a payment input request: the id of an order intent the user
+ * authorized for the amount the request states. Never card details, which
+ * Agent Checkouts refuses; the checkout mints the credential itself.
+ */
+export function paymentResponse(requestId: string, orderIntentId: string): InputResponsePart {
+  return { type: "input_response", requestId, action: "submit", response: { kind: "payment", orderIntentId } };
+}
+
 export function declineResponse(requestId: string): InputResponsePart {
   return { type: "input_response", requestId, action: "decline" };
 }
@@ -40,13 +49,23 @@ export function pendingActionOf(checkout: Pick<Checkout, "status" | "requiredAct
   const ra = checkout.requiredAction;
   if (!ra || checkout.status !== "awaiting_input") return undefined;
   const req = ra.request;
+  const interaction = req.interaction;
   return {
     id: ra.requestId,
     messageId: ra.messageId,
     question: req.question,
     expiresAt: req.expiresAt,
-    responseSchema: req.interaction?.responseSchema ?? {},
-    uiSchema: req.interaction?.uiSchema,
+    responseSchema: interaction?.responseSchema ?? {},
+    uiSchema: interaction?.uiSchema,
+    ...(interaction?.kind === "payment"
+      ? {
+          payment: {
+            method: interaction.method ?? "card",
+            ...(interaction.amount ? { amount: interaction.amount } : {}),
+            ...(interaction.merchant ? { merchant: interaction.merchant } : {}),
+          },
+        }
+      : {}),
   };
 }
 

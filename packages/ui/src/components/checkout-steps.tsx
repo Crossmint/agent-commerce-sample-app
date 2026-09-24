@@ -69,12 +69,11 @@ export function checkoutSteps(
       }
       if (part.type === "input_request" && typeof part.requestId === "string") {
         const open = part.status === "open";
-        const payment = isPaymentAction({
-          id: part.requestId,
-          question: String(part.question ?? ""),
-          responseSchema:
-            (part.interaction as { responseSchema?: JsonSchema } | undefined)?.responseSchema ?? {},
-        });
+        const interaction = part.interaction as
+          { kind?: string; responseSchema?: JsonSchema } | undefined;
+        const payment =
+          interaction?.kind === "payment" ||
+          isPaymentAction({ responseSchema: interaction?.responseSchema ?? {} });
         const step: CheckoutStep = {
           key: part.requestId,
           label: payment

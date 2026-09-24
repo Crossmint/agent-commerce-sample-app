@@ -1,4 +1,4 @@
-import { newMessageId, submitResponse } from "./checkout-messages.js";
+import { newMessageId, paymentResponse, submitResponse } from "./checkout-messages.js";
 import { CrossmintApiError } from "./errors.js";
 import type {
   BrowserProfile,
@@ -229,6 +229,44 @@ export class CrossmintClient {
         { auth: this.checkoutAuth(ctx), baseUrl: this.checkoutsBaseUrl },
       ),
 
+    /**
+     * The run's transcript as it happens: a `text/event-stream` of
+     * `message.upsert` (a message, new or changed) and `run.updated` events.
+     * Each event's `id` is a cursor: pass it back as `after` (or
+     * `lastEventId`) to resume. A stale cursor closes the stream at once;
+     * Crossmint's advice is to re-read `listMessages` and reconnect from the
+     * `streamCursor` it reports. Returns the raw Response for the caller to
+     * read or pass on; a failed open throws like any other call.
+     */
+    streamMessages: async (
+      ctx: CheckoutContext,
+      runId: string,
+      opts: { after?: string; lastEventId?: string; signal?: AbortSignal } = {},
+    ): Promise<Response> => {
+      const q = opts.after ? `?after=${encodeURIComponent(opts.after)}` : "";
+      const url = `${this.checkoutsBaseUrl}/unstable/agent-checkouts/${encodeURIComponent(runId)}/messages/stream${q}`;
+      const res = await this.fetchImpl(url, {
+        method: "GET",
+        headers: {
+          Accept: "text/event-stream",
+          ...this.checkoutAuth(ctx),
+          ...(opts.lastEventId ? { "Last-Event-ID": opts.lastEventId } : {}),
+        },
+        signal: opts.signal,
+      });
+      if (!res.ok) {
+        const text = await res.text().catch(() => "");
+        let body: unknown = text;
+        try {
+          body = JSON.parse(text);
+        } catch {
+          // keep the text
+        }
+        throw new CrossmintApiError({ status: res.status, url, body });
+      }
+      return res;
+    },
+
     /** Send input responses or free text. Returns as soon as the message is accepted. */
     sendMessage: (ctx: CheckoutContext, runId: string, input: SendCheckoutMessageInput): Promise<SendCheckoutMessageResult> =>
       this.request<SendCheckoutMessageResult>(
@@ -248,6 +286,19 @@ export class CrossmintClient {
       this.checkouts.sendMessage(ctx, runId, {
         id: messageId ?? newMessageId(),
         parts: [submitResponse(requestId, values)],
+      }),
+
+    /** Answer the payment step with an order intent the user authorized. */
+    payWithOrderIntent: (
+      ctx: CheckoutContext,
+      runId: string,
+      requestId: string,
+      orderIntentId: string,
+      messageId?: string,
+    ): Promise<SendCheckoutMessageResult> =>
+      this.checkouts.sendMessage(ctx, runId, {
+        id: messageId ?? newMessageId(),
+        parts: [paymentResponse(requestId, orderIntentId)],
       }),
 
     cancel: (ctx: CheckoutContext, runId: string): Promise<CancelCheckoutResult> =>

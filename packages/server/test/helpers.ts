@@ -18,8 +18,9 @@ export interface FakeCall {
   body: unknown;
 }
 
-type Reply =
-  { status?: number; body?: unknown } | ((call: FakeCall) => { status?: number; body?: unknown });
+/** A JSON body, or `raw` text with its own content type (an event stream, say). */
+type ReplyValue = { status?: number; body?: unknown; raw?: string; contentType?: string };
+type Reply = ReplyValue | ((call: FakeCall) => ReplyValue);
 
 export interface FakeRoute {
   method: string;
@@ -54,6 +55,12 @@ export function fakeCrossmint(routes: FakeRoute[]) {
       used.add(route);
       const r = typeof route.reply === "function" ? route.reply(call) : route.reply;
       const status = r.status ?? 200;
+      if (r.raw !== undefined) {
+        return new Response(r.raw, {
+          status,
+          headers: { "content-type": r.contentType ?? "text/plain" },
+        });
+      }
       return new Response(r.body === undefined ? null : JSON.stringify(r.body), {
         status,
         headers: { "content-type": "application/json" },

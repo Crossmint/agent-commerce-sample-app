@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { declineResponse, pendingActionOf, receiptOf, submitResponse } from "../src/checkout-messages.js";
-import { fillPaymentAction, isPaymentAction, renderPendingAction } from "../src/pending-action.js";
+import { isPaymentAction, renderPendingAction } from "../src/pending-action.js";
 import type { Checkout } from "../src/types.js";
 
 const shipping = {
@@ -45,11 +45,14 @@ describe("renderPendingAction", () => {
       },
     };
     expect(isPaymentAction(pay)).toBe(true);
-    expect(
-      fillPaymentAction(pay, { number: "4111", expirationMonth: "12", expirationYear: "2030", cvc: "123" }),
-    ).toEqual({ cardNumber: "4111", expMonth: "12", expYear: "2030", cvc: "123" });
-    const camel = { id: "a", question: "Card", responseSchema: { type: "object", properties: { number: {}, expiryMonth: {}, expiryYear: {}, cvv: {} } } };
-    expect(fillPaymentAction(camel, { number: "4", expirationMonth: "01", expirationYear: "2031", cvc: "9" })).toEqual({ number: "4", expiryMonth: "01", expiryYear: "2031", cvv: "9" });
+    // The payment step as Agent Checkouts sends it now: no fields, an amount to authorize.
+    const step = {
+      id: "p",
+      question: "Authorize a card payment of 42.50 USD at shop.example.com.",
+      responseSchema: {},
+      payment: { method: "card", amount: { kind: "exact", value: "42.50", currency: "USD" }, merchant: { domain: "shop.example.com" } },
+    };
+    expect(isPaymentAction(step)).toBe(true);
   });
   it("does not call a card choice a payment form", () => {
     const pick = { id: "r", question: "Which saved card should I use?", responseSchema: { type: "object", properties: { card: { type: "string", enum: ["visa-4242", "amex-0005"] } } } };

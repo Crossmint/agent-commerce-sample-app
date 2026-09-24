@@ -3,7 +3,7 @@ import { describeTool, PARAM_DOCS, paramDoc, type ToolNameFor } from "@agent-com
 import { z } from "zod";
 import { CHAT_REQUESTER } from "./config";
 import { AgentCommerceToolError, type AgentCommerceClient } from "./api-client";
-import { searchProducts } from "./shopify-catalog";
+import { lookUpProducts, searchProducts } from "./shopify-catalog";
 
 /**
  * Agent Commerce tools for the chat model. Every tool runs in process against the Agent Commerce
@@ -81,6 +81,9 @@ export const checkoutOutcomeSchema = z.object({
     "awaiting_payment",
   ]),
   updates: z.array(checkoutUpdateSchema),
+  /** When the chat started and stopped following this stretch, ISO 8601: its card shows how long it took. */
+  startedAt: z.string().optional(),
+  endedAt: z.string().optional(),
   /** On `awaiting_input`: what the store asks, and the JSON Schema the answer must fit. */
   question: z
     .object({
@@ -93,7 +96,7 @@ export const checkoutOutcomeSchema = z.object({
   /**
    * On `awaiting_payment`: the payment step. `requestId` is what
    * await_agent_card_approval takes when the user wants a new agent card;
-   * `amount` is the checkout's ceiling, not the price.
+   * `amount` is what the run asks to be paid: the payable total, or the run's ceiling when it cannot tell yet.
    */
   payment: z
     .object({
@@ -310,10 +313,17 @@ export function createChatTools(api: AgentCommerceClient, opts: { userEmail?: st
           .min(1)
           .optional()
           .describe(paramDoc("create_checkout", "buyerProfileId")),
+        purpose: z.string().min(1).max(80).describe(paramDoc("create_checkout", "purpose")),
       }),
       execute: ({ action, ...input }) => {
         void action; // for the site card only
-        return guard(() => api.createCheckout(input));
+        // The store's agent asks for an email on most checkouts. Give it the
+        // user's up front, so nobody is asked for what the app already knows.
+        const task =
+          opts.userEmail && !input.task?.includes(opts.userEmail)
+            ? [input.task, `The buyer's email is ${opts.userEmail}.`].filter(Boolean).join(" ")
+            : input.task;
+        return guard(() => api.createCheckout({ ...input, ...(task ? { task } : {}) }));
       },
     }),
 
@@ -338,7 +348,10 @@ export function createChatTools(api: AgentCommerceClient, opts: { userEmail?: st
     }),
 
     search_products: tool({
-      description: describeTool("search_products"),
+      description: describeTool(
+        "search_products",
+        "The chat shows the results as cards with pictures; the user can open one for its details, and buy it with its Buy button. Do not repeat every detail in text.",
+      ),
       inputSchema: z.object({
         query: z.string().min(2).max(200).describe(paramDoc("search_products", "query")),
         maxPrice: z
@@ -357,13 +370,47 @@ export function createChatTools(api: AgentCommerceClient, opts: { userEmail?: st
         }),
     }),
 
+    look_up_products: tool({
+      description: describeTool(
+        "look_up_products",
+        "The chat shows them as cards with pictures, under your message; do not repeat every detail in text.",
+      ),
+      inputSchema: z.object({
+        urls: z
+          .array(z.string().url())
+          .min(1)
+          .max(5)
+          .describe(paramDoc("look_up_products", "urls")),
+        // Chat only: the line above the cards. It is part of the call, so it
+        // always shows first, whatever order the model writes in.
+        message: z
+          .string()
+          .min(1)
+          .max(300)
+          .optional()
+          .describe(
+            "What to say to the user about these products, shown right above them, e.g. a question about whether they want them. When you pass it, write no other text for them.",
+          ),
+      }),
+      execute: ({ urls }) =>
+        guard(async () => {
+          const products = await lookUpProducts(urls);
+          return products.length
+            ? { products }
+            : {
+                products,
+                note: "Not found in the catalog. Describe the product in words instead.",
+              };
+        }),
+    }),
+
     save_buyer_profile: tool({
       description: describeTool("save_buyer_profile"),
       inputSchema: z.object({
         firstName: z.string().min(1).describe(paramDoc("save_buyer_profile", "firstName")),
         lastName: z.string().min(1).describe(paramDoc("save_buyer_profile", "lastName")),
         email: z.string().email().optional().describe(paramDoc("save_buyer_profile", "email")),
-        phone: z.string().min(3).optional().describe(paramDoc("save_buyer_profile", "phone")),
+        phone: z.string().min(3).describe(paramDoc("save_buyer_profile", "phone")),
         addressLines: z
           .array(z.string().min(1))
           .min(1)
@@ -388,7 +435,7 @@ export function createChatTools(api: AgentCommerceClient, opts: { userEmail?: st
           const saved = await api.createBuyerProfile({
             label: input.label ?? "Home",
             name: { first: input.firstName, last: input.lastName },
-            contact: { email, ...(input.phone ? { phone: input.phone } : {}) },
+            contact: { email, phone: input.phone },
             shipping: {
               addressLines: input.addressLines,
               locality: input.city,

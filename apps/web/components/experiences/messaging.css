@@ -62,6 +62,10 @@
 }
 
 /* Bubbles. The tail is drawn by two blobs: one in the bubble colour, one in the canvas colour that cuts it back into a curve. */
+.im-quick {
+  color: var(--im-sent);
+  border-color: var(--im-sent);
+}
 .im-bubble {
   position: relative;
 }
@@ -233,6 +237,10 @@
 }
 .ig-field {
   background: var(--ig-field);
+}
+.ig-quick {
+  color: var(--ig-send);
+  border-color: var(--ig-send);
 }
 .ig-send {
   color: var(--ig-send);

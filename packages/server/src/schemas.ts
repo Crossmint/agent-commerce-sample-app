@@ -58,6 +58,8 @@ export const createCheckoutSchema = z
     // Optional: a checkout can start without a card and get one at its
     // payment step, when the user chooses a payment method.
     agentCardId: z.string().min(1).optional(),
+    // What the purchase is, in a few words: shown when the user approves the payment.
+    purpose: z.string().trim().min(1).max(80).optional(),
     maxCost: z.object({
       amount: decimalAmount,
       currency: z.string().length(3),

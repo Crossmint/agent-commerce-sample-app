@@ -14,6 +14,7 @@ import {
   ApproveAgentCard,
   formatAmount,
   PAYMENT_STEP_ASK,
+  type CheckoutStep,
   type ApproveOutcome,
 } from "@agent-commerce/ui";
 import {
@@ -28,14 +29,19 @@ import {
   findPaymentStep,
   findRequest,
   pendingWatches,
+  productsMessageOf,
+  productsOf,
+  runSteps,
+  stoppedForUser,
   toApprovalOutcome,
   watchIndex,
-  type CheckoutPhase,
   type CheckoutSite,
   type WatchIndex,
 } from "@/components/chat/parts";
-import { PHASE_LABEL, SiteIcon } from "@/components/chat/checkout-site";
-import { CheckoutWatcher } from "@/components/chat/checkout-card";
+import { CheckoutRunCard, SiteIcon, siteLine } from "@/components/chat/checkout-site";
+import { ENTER, ENTER_SENT } from "@/components/chat/text";
+import { pickMessage, ProductDetails, ProductImage } from "@/components/chat/product-cards";
+import { CheckoutWatcher, runTitle, type LiveWatch } from "@/components/chat/checkout-card";
 import { STARTERS } from "@/components/chat/starters";
 import { useScrollToBottom } from "@/components/chat/use-scroll-to-bottom";
 import { DeviceFrame } from "@/components/frame/device-frame";
@@ -43,7 +49,7 @@ import { PAGE_SHEET_TRANSITION_MS, PhonePageSheet } from "@/components/frame/pho
 import { PhoneStatusBar } from "@/components/frame/phone-status-bar";
 import type { MessagingApp as MessagingAppId } from "@/components/frame/views";
 import { LoginForm } from "@/components/login-form";
-import type { CheckoutUpdate } from "@/lib/chat/tools";
+import type { FoundProduct } from "@/lib/chat/shopify-catalog";
 import type { ChatMessage } from "@/lib/chat/types";
 import { cn } from "@/lib/cn";
 import {
@@ -56,7 +62,9 @@ import {
   LockIcon,
   MicIcon,
   PhoneIcon,
+  ListIcon,
   PlusIcon,
+  ReplyIcon,
   StickerIcon,
   VideoIcon,
 } from "./messaging-icons";
@@ -66,7 +74,7 @@ import "./messaging.css";
 const DONE_LINGER_MS = 800;
 
 /** The first bubble of every thread. It stays when the conversation starts. */
-const WELCOME = `Hi, I am ${AGENT_NAME}. What can I get you? I can buy from any online store, book a table, or get you tickets. You choose how to pay at the checkout.`;
+const WELCOME = `Hi, I am ${AGENT_NAME}. What can I get you? I can set up an agent card, buy from any online store, book a table, or get you tickets. You choose how to pay at the checkout.`;
 
 /**
  * The app as a conversation in a chat app. The agent is a contact; what it
@@ -117,15 +125,43 @@ type Bubble =
       onOpen?: () => void;
     }
   | { key: string; kind: "status"; text: string }
-  /** The site a checkout runs on, as a link preview: its icon, the action, where it stands. */
-  | { key: string; kind: "site"; site: CheckoutSite; phase: CheckoutPhase }
-  /** Quick replies under a message, like the buttons a business chat offers. A tap sends one. */
+  /** Products the agent found or suggests, as picture bubbles. A tap picks one. */
   | {
       key: string;
-      kind: "choices";
-      choices: Array<{ label: string; message: string }>;
+      kind: "products";
+      products: FoundProduct[];
       onPick: (message: string) => void;
-    };
+      onOpen: (product: FoundProduct) => void;
+    }
+  /** One stretch of a checkout: the task and its steps, ticking off. */
+  | {
+      key: string;
+      kind: "run";
+      site: CheckoutSite;
+      title: string;
+      steps: CheckoutStep[];
+      startedAt?: string;
+      endedAt?: string;
+      folded: "latest" | "title";
+    }
+  /** Where the agent went, said once: the site's icon and a small line over the next bubble. */
+  | { key: string; kind: "site"; site: CheckoutSite }
+  /** Quick replies under a message, like the buttons a business chat offers. A tap sends one. */
+  | ChoicesBubble;
+
+/**
+ * Quick replies under the welcome, drawn the way each app draws the ones a
+ * business can send: WhatsApp's reply buttons, iMessage's quick replies,
+ * Instagram's quick-reply pills. A tap sends the choice as the user's message.
+ */
+interface ChoicesBubble {
+  key: string;
+  kind: "choices";
+  choices: Array<{ label: string; message: string; description?: string }>;
+  onPick: (message: string) => void;
+  /** Once the chat has started. WhatsApp keeps its buttons, spent; the others take theirs away. */
+  used: boolean;
+}
 
 type Approval = {
   toolCallId: string;
@@ -138,8 +174,10 @@ type Approval = {
 function toBubbles(
   messages: ChatMessage[],
   watches: WatchIndex,
-  live: ReadonlyMap<string, CheckoutUpdate[]>,
+  live: ReadonlyMap<string, LiveWatch>,
   onReview: (a: Approval) => void,
+  onPick: (message: string) => void,
+  onOpen: (product: FoundProduct) => void,
 ): Bubble[] {
   const out: Bubble[] = [];
   for (const m of messages) {
@@ -198,6 +236,15 @@ function toBubbles(
         });
         return;
       }
+      // What a search or a look-up found, as picture bubbles, under the line
+      // the agent put on the call.
+      const message = productsMessageOf(part);
+      const products = productsOf(part);
+      if (message || products?.length) {
+        if (message) out.push({ key: `${key}-text`, kind: "text", side: "recv", text: message });
+        if (products?.length) out.push({ key, kind: "products", products, onPick, onOpen });
+        return;
+      }
       // Starting a checkout shows the site it runs on, and where it stands.
       const site = part.type === "tool-create_checkout" ? checkoutSiteOf(part) : undefined;
       if (part.type === "tool-create_checkout" && site) {
@@ -205,24 +252,39 @@ function toBubbles(
           part.state === "output-error" ||
           (part.state === "output-available" &&
             Boolean((part.output as { error?: unknown } | undefined)?.error));
-        if (!failed) {
-          const phase = site.checkoutId
-            ? (watches.phase.get(site.checkoutId) ?? "working")
-            : "starting";
-          out.push({ key, kind: "site", site, phase });
-        }
+        // The steps card names the site once the run is followed; until then, a line.
+        const followed = site.checkoutId && watches.firstWatch.has(site.checkoutId);
+        if (!failed && !followed) out.push({ key, kind: "site", site });
         return;
       }
-      // The store's agent speaks through the watch: one bubble per update,
-      // live while the run goes, from the output after.
-      if (part.type === "tool-watch_checkout") {
-        const updates =
-          part.state === "output-available"
-            ? (part.output.updates ?? [])
-            : (live.get(part.toolCallId) ?? []);
-        for (const u of updates) {
-          out.push({ key: `${key}-${u.id}`, kind: "text", side: "recv", text: u.text });
-        }
+      // Each watch is one stretch of the checkout, as a card of steps: live
+      // while the run goes, from the output after.
+      if (
+        part.type === "tool-watch_checkout" &&
+        (part.state === "input-available" || part.state === "output-available")
+      ) {
+        const checkoutId = part.input.checkoutId;
+        const site = watches.sites.get(checkoutId) ?? { host: "the store" };
+        const done = part.state === "output-available";
+        const now = live.get(part.toolCallId);
+        const continuing = watches.firstWatch.get(checkoutId) !== part.toolCallId;
+        const steps = runSteps({
+          host: site.host,
+          continuing,
+          updates: done ? (part.output.updates ?? []) : (now?.updates ?? []),
+          live: !done,
+          outcome: done ? part.output : undefined,
+        });
+        out.push({
+          key,
+          kind: "run",
+          site,
+          title: runTitle(site, continuing),
+          steps,
+          startedAt: done ? part.output.startedAt : now?.startedAt,
+          endedAt: done ? (part.output.endedAt ?? part.output.startedAt) : undefined,
+          folded: done && stoppedForUser(part.output) ? "title" : "latest",
+        });
       }
     });
   }
@@ -257,6 +319,7 @@ function Thread({
   dateLine,
   statusClassName,
   renderBubble,
+  renderChoices,
 }: {
   bubbles: Bubble[];
   working: boolean;
@@ -264,8 +327,10 @@ function Thread({
   dateLine: (opened: string) => ReactNode;
   statusClassName: string;
   renderBubble: (placed: Placed) => ReactNode;
+  /** Quick replies in the thread, the app's way. Leave it out for an app that shows them elsewhere. */
+  renderChoices?: (bubble: ChoicesBubble) => ReactNode;
 }) {
-  const { containerRef } = useScrollToBottom();
+  const { containerRef } = useScrollToBottom(bubbles.length);
   const [opened] = useState(clock);
   // Each bubble keeps the time it first appeared.
   const [times] = useState(() => new Map<string, string>());
@@ -298,46 +363,98 @@ function Thread({
                 </p>
               );
             }
-            if (b.kind === "site") {
+            if (b.kind === "products") {
+              // A product message: the picture on top, the name and price under it.
               return (
                 <div
                   key={b.key}
-                  className="mr-auto mb-2 flex w-[78%] items-center gap-2.5 rounded-2xl border border-current/15 px-3 py-2.5"
+                  className={cn("mr-auto mb-2 flex w-[70%] flex-col gap-1.5", ENTER)}
                 >
-                  <SiteIcon host={b.site.host} size={32} />
-                  <div className="flex min-w-0 flex-col">
-                    <span className="truncate text-[13px] leading-tight font-semibold">
-                      {b.site.action ?? `Visiting ${b.site.host}`}
-                    </span>
-                    <span className="truncate text-[11px] opacity-60">
-                      {b.site.host} · {PHASE_LABEL[b.phase]}
-                    </span>
-                  </div>
-                </div>
-              );
-            }
-            if (b.kind === "choices") {
-              // Neutral pills in the thread's own text colour, so they sit in
-              // any of the three chromes.
-              return (
-                <div key={b.key} className="mb-2 flex max-w-[78%] flex-col gap-1.5">
-                  {b.choices.map((c) => (
-                    <button
-                      key={c.label}
-                      type="button"
-                      onClick={() => b.onPick(c.message)}
-                      className="rounded-full border border-current/25 px-3.5 py-1.5 text-left text-[13px] font-medium transition-colors hover:bg-current/5"
+                  {b.products.map((p) => (
+                    // A tap on the product opens its details; only Buy picks it.
+                    <div
+                      key={p.url}
+                      className="overflow-hidden rounded-2xl border border-current/15 bg-white text-black"
                     >
-                      {c.label}
-                    </button>
+                      <button
+                        type="button"
+                        aria-label={`Details: ${p.title}`}
+                        onClick={() => b.onOpen(p)}
+                        className="block w-full text-left transition-opacity active:opacity-70"
+                      >
+                        <ProductImage
+                          src={p.image}
+                          alt={p.title}
+                          className="aspect-[4/3] bg-white"
+                        />
+                        <span className="flex flex-col gap-0.5 border-t border-black/10 px-3 py-2">
+                          <span className="line-clamp-2 text-[13px] leading-snug font-semibold">
+                            {p.title}
+                          </span>
+                          <span className="truncate text-[12px] opacity-60">
+                            {[p.price, p.store].filter(Boolean).join(" · ")}
+                          </span>
+                        </span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => b.onPick(pickMessage(p))}
+                        className="flex h-10 w-full items-center justify-center border-t border-black/10 text-[15px] font-semibold text-[#027eb5] transition-colors active:bg-black/5"
+                      >
+                        Buy
+                      </button>
+                    </div>
                   ))}
                 </div>
               );
             }
+            if (b.kind === "run") {
+              return (
+                <div key={b.key} className={cn("mr-auto mb-2 w-[82%]", ENTER)}>
+                  <CheckoutRunCard
+                    site={b.site}
+                    title={b.title}
+                    steps={b.steps}
+                    startedAt={b.startedAt}
+                    endedAt={b.endedAt}
+                    folded={b.folded}
+                    compact
+                  />
+                </div>
+              );
+            }
+            if (b.kind === "site") {
+              return (
+                <div
+                  key={b.key}
+                  className={cn(
+                    "mb-1 flex items-center gap-1.5 pl-1 text-[11px] opacity-60",
+                    ENTER,
+                  )}
+                >
+                  <SiteIcon host={b.site.host} size={13} />
+                  <span className="min-w-0 truncate">{siteLine(b.site)}</span>
+                </div>
+              );
+            }
+            if (b.kind === "choices") {
+              return renderChoices ? (
+                <div key={b.key} className={ENTER}>
+                  {renderChoices(b)}
+                </div>
+              ) : null;
+            }
             const first = sideOf(bubbles[i - 1]) !== b.side;
             const last = sideOf(bubbles[i + 1]) !== b.side;
             return (
-              <div key={b.key} className={cn("flex flex-col", last ? "mb-2" : "mb-[3px]")}>
+              <div
+                key={b.key}
+                className={cn(
+                  "flex flex-col",
+                  last ? "mb-2" : "mb-[3px]",
+                  b.side === "sent" ? ENTER_SENT : ENTER,
+                )}
+              >
                 {renderBubble({
                   bubble: b,
                   first,
@@ -469,10 +586,35 @@ function IMessageChrome({ bubbles, working, composer }: ChromeProps) {
         )}
         statusClassName="im-gray my-1 text-center text-[11px] font-medium"
         renderBubble={(p) => <IMessageBubble {...p} />}
+        renderChoices={(b) => <IMessageQuickReplies bubble={b} />}
       />
 
       <IMessageComposer {...composer} />
     </>
+  );
+}
+
+/**
+ * iMessage's quick replies: capsules under the message, gone once one is
+ * picked. Outlined in iMessage blue on white, so they read as buttons and not
+ * as more grey bubbles.
+ */
+function IMessageQuickReplies({ bubble }: { bubble: ChoicesBubble }) {
+  const { choices, onPick, used } = bubble;
+  if (used) return null;
+  return (
+    <div className="mb-2 flex max-w-[85%] flex-wrap gap-1.5">
+      {choices.map((c) => (
+        <button
+          key={c.label}
+          type="button"
+          onClick={() => onPick(c.message)}
+          className="im-quick rounded-full border-[1.5px] bg-white px-3.5 py-[7px] text-[15px] leading-tight font-medium shadow-[0_1px_2px_rgba(0,0,0,0.08)] transition-colors active:bg-[#0a84ff]/10"
+        >
+          {c.label}
+        </button>
+      ))}
+    </div>
   );
 }
 
@@ -544,7 +686,12 @@ function IMessageComposer(props: ComposerProps) {
 
 // WhatsApp -----------------------------------------------------------------
 
+/** WhatsApp takes three reply buttons at most; past that a business sends a list message. */
+const WA_MAX_BUTTONS = 3;
+
 function WhatsAppChrome({ bubbles, working, composer }: ChromeProps) {
+  // The list message whose options are open, over the whole chat.
+  const [list, setList] = useState<ChoicesBubble | null>(null);
   return (
     <>
       <div className="wa-bar flex items-center gap-2 border-b px-2 pt-1 pb-2">
@@ -571,10 +718,151 @@ function WhatsAppChrome({ bubbles, working, composer }: ChromeProps) {
         )}
         statusClassName="wa-date wa-status mx-auto my-1 rounded-[8px] px-2.5 py-1 text-center text-[12px] font-medium shadow-[0_1px_0.5px_rgba(0,0,0,0.13)]"
         renderBubble={(p) => <WhatsAppBubble {...p} />}
+        renderChoices={(b) =>
+          b.choices.length > WA_MAX_BUTTONS ? (
+            <WhatsAppListButton bubble={b} onOpen={() => setList(b)} />
+          ) : (
+            <WhatsAppReplyButtons bubble={b} />
+          )
+        }
       />
 
       <WhatsAppComposer {...composer} />
+
+      {list ? <WhatsAppListSheet bubble={list} onClose={() => setList(null)} /> : null}
     </>
+  );
+}
+
+/**
+ * WhatsApp's reply buttons: one white strip per option under the message, as
+ * wide as it, the label in link blue beside a reply arrow. They stay in the
+ * thread after the chat has started, spent.
+ */
+function WhatsAppReplyButtons({ bubble }: { bubble: ChoicesBubble }) {
+  const { choices, onPick, used } = bubble;
+  return (
+    <div className="-mt-1 mb-2 flex w-[80%] flex-col gap-[2px]">
+      {choices.map((c) => (
+        <button
+          key={c.label}
+          type="button"
+          disabled={used}
+          onClick={() => onPick(c.message)}
+          className="wa-recv wa-bubble flex h-10 items-center justify-center rounded-[8px] text-[15px] font-medium transition-colors enabled:active:bg-black/5 disabled:cursor-default"
+        >
+          {/* The bubble's own colour is black; the label wears the link blue. */}
+          <span className="wa-link flex items-center gap-1.5">
+            <ReplyIcon width={16} height={16} />
+            {c.label}
+          </span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/**
+ * A WhatsApp list message's button: one strip under the message, like a reply
+ * button, that opens the options. Spent once the chat has started.
+ */
+function WhatsAppListButton({ bubble, onOpen }: { bubble: ChoicesBubble; onOpen: () => void }) {
+  return (
+    <div className="-mt-1 mb-2 flex w-[80%] flex-col">
+      <button
+        type="button"
+        disabled={bubble.used}
+        onClick={onOpen}
+        className="wa-recv wa-bubble flex h-10 items-center justify-center rounded-[8px] text-[15px] font-medium transition-colors enabled:active:bg-black/5 disabled:cursor-default"
+      >
+        <span className="wa-link flex items-center gap-1.5">
+          <ListIcon width={16} height={16} />
+          Choose an option
+        </span>
+      </button>
+    </div>
+  );
+}
+
+/**
+ * The options of a WhatsApp list message: a sheet up from the bottom of the
+ * chat, one row per option with a radio on the right, and Send to reply with
+ * the one picked.
+ */
+function WhatsAppListSheet({ bubble, onClose }: { bubble: ChoicesBubble; onClose: () => void }) {
+  const [picked, setPicked] = useState<string | null>(null);
+  const choice = bubble.choices.find((c) => c.label === picked);
+  return (
+    <div className="absolute inset-0 z-20 flex flex-col justify-end">
+      <button
+        type="button"
+        aria-label="Close"
+        onClick={onClose}
+        className="absolute inset-0 bg-black/30 duration-200 animate-in fade-in-0"
+      />
+      <div
+        role="dialog"
+        aria-label="Choose an option"
+        className="relative flex max-h-[80%] flex-col rounded-t-[14px] bg-white pb-7 duration-300 animate-in slide-in-from-bottom"
+      >
+        <span className="mx-auto mt-2 h-1 w-9 rounded-full bg-black/15" />
+        <div className="grid grid-cols-[1fr_auto_1fr] items-center px-4 pt-2 pb-3">
+          <button
+            type="button"
+            onClick={onClose}
+            className="wa-gray justify-self-start text-[22px] leading-none"
+            aria-label="Close"
+          >
+            ×
+          </button>
+          <p className="text-[16px] font-semibold">Choose an option</p>
+        </div>
+        <ul className="min-h-0 overflow-y-auto border-t border-black/10">
+          {bubble.choices.map((c) => {
+            const on = c.label === picked;
+            return (
+              <li key={c.label} className="border-b border-black/10">
+                <button
+                  type="button"
+                  onClick={() => setPicked(c.label)}
+                  className="flex w-full items-center gap-3 px-4 py-3 text-left active:bg-black/5"
+                >
+                  <span className="flex min-w-0 flex-1 flex-col">
+                    <span className="text-[15px] leading-snug">{c.label}</span>
+                    {c.description ? (
+                      <span className="wa-time text-[13px] leading-snug">{c.description}</span>
+                    ) : null}
+                  </span>
+                  <span
+                    aria-hidden
+                    className={cn(
+                      "flex size-5 shrink-0 items-center justify-center rounded-full border-2",
+                      on ? "border-[#00a884]" : "border-black/25",
+                    )}
+                  >
+                    {on ? <span className="size-2.5 rounded-full bg-[#00a884]" /> : null}
+                  </span>
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+        <div className="px-4 pt-3">
+          <button
+            type="button"
+            disabled={!choice}
+            onClick={() => {
+              if (!choice) return;
+              bubble.onPick(choice.message);
+              onClose();
+            }}
+            className="h-11 w-full rounded-full bg-[#00a884] text-[15px] font-semibold text-white transition-opacity disabled:opacity-40"
+          >
+            Send
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -681,6 +969,7 @@ function InstagramChrome({ bubbles, working, composer }: ChromeProps) {
         )}
         statusClassName="ig-gray my-1 text-center text-[11px] font-medium"
         renderBubble={(p) => <InstagramBubble {...p} />}
+        renderChoices={(b) => <InstagramQuickReplies bubble={b} />}
       />
 
       <InstagramComposer {...composer} />
@@ -742,6 +1031,30 @@ function InstagramBubble({ bubble, first, last, seen }: Placed) {
   );
 }
 
+/**
+ * Instagram's quick replies: pills under the message, lined up with its
+ * bubbles past the avatar, wrapping so every one shows. Outlined and lettered
+ * in Instagram's blue so they read as buttons; gone once one is picked.
+ */
+function InstagramQuickReplies({ bubble }: { bubble: ChoicesBubble }) {
+  const { choices, onPick, used } = bubble;
+  if (used) return null;
+  return (
+    <div className="mb-2 flex max-w-[85%] flex-wrap gap-1.5 pl-[30px]">
+      {choices.map((c) => (
+        <button
+          key={c.label}
+          type="button"
+          onClick={() => onPick(c.message)}
+          className="ig-quick rounded-full border-[1.5px] bg-white px-3.5 py-[7px] text-[14px] leading-tight font-semibold shadow-[0_1px_2px_rgba(0,0,0,0.08)] transition-colors active:bg-[#0095f6]/10"
+        >
+          {c.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function InstagramComposer(props: ComposerProps) {
   const { typing, canSend, onSubmit, inputProps } = useComposer(props);
   return (
@@ -795,10 +1108,22 @@ function SignedIn({
 }: ExperienceProps & { Chrome: Chrome }) {
   const [approval, setApproval] = useState<Approval | null>(null);
   const [approvalOpen, setApprovalOpen] = useState(false);
+  // The product whose details are open. It keeps its value through the
+  // slide-out, so the page does not go blank while leaving.
+  const [product, setProduct] = useState<FoundProduct | null>(null);
+  const [productOpen, setProductOpen] = useState(false);
+  const openProduct = useCallback((p: FoundProduct) => {
+    setProduct(p);
+    setProductOpen(true);
+  }, []);
+  const closeProduct = useCallback(() => {
+    setProductOpen(false);
+    setTimeout(() => setProduct(null), PAGE_SHEET_TRANSITION_MS);
+  }, []);
   // What pending watches have to say so far, by tool call, for the bubbles.
-  const [live, setLive] = useState<ReadonlyMap<string, CheckoutUpdate[]>>(() => new Map());
-  const onUpdates = useCallback((toolCallId: string, updates: CheckoutUpdate[]) => {
-    setLive((prev) => new Map(prev).set(toolCallId, updates));
+  const [live, setLive] = useState<ReadonlyMap<string, LiveWatch>>(() => new Map());
+  const onUpdates = useCallback((toolCallId: string, watch: LiveWatch) => {
+    setLive((prev) => new Map(prev).set(toolCallId, watch));
   }, []);
   const watches = useMemo(() => watchIndex(chat.messages), [chat.messages]);
   const pending = pendingWatches(chat.messages);
@@ -828,17 +1153,24 @@ function SignedIn({
           side: "recv",
           text: "Chat is off. Set ANTHROPIC_API_KEY or OPENAI_API_KEY to turn it on.",
         },
-    ...toBubbles(chat.messages, watches, live, onReview),
+    // The three ways to start, as quick replies under the welcome.
+    ...(chatEnabled && !thread.loading
+      ? [
+          {
+            key: "starters",
+            kind: "choices" as const,
+            choices: STARTERS.map((s) => ({
+              label: s.title,
+              message: s.message,
+              description: s.sub,
+            })),
+            onPick: chat.send,
+            used: chat.messages.length > 0,
+          },
+        ]
+      : []),
+    ...toBubbles(chat.messages, watches, live, onReview, chat.send, openProduct),
   ];
-  // A new chat offers the three ways to start, as quick replies under the welcome.
-  if (chatEnabled && !thread.loading && chat.messages.length === 0) {
-    bubbles.push({
-      key: "starters",
-      kind: "choices",
-      choices: STARTERS.map((s) => ({ label: s.title, message: s.message })),
-      onPick: chat.send,
-    });
-  }
   if (thread.loading) bubbles.push({ key: "loading", kind: "status", text: "Loading…" });
   if (chat.error) bubbles.push({ key: "error", kind: "status", text: chat.error });
 
@@ -850,6 +1182,24 @@ function SignedIn({
         working={chat.busy || pending.length > 0}
         composer={{ disabled: !chatEnabled, busy: chat.busy, onSend: chat.send }}
       />
+
+      <BrowserSheet
+        open={productOpen}
+        path="/products"
+        brand={brand}
+        onDone={closeProduct}
+        ariaLabel="Product"
+      >
+        {product ? (
+          <ProductDetails
+            product={product}
+            onBuy={() => {
+              chat.send(pickMessage(product));
+              closeProduct();
+            }}
+          />
+        ) : null}
+      </BrowserSheet>
 
       <BrowserSheet
         open={approvalOpen}

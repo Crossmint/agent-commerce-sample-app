@@ -3,18 +3,21 @@
 import { useState } from "react";
 import { Check, Copy } from "lucide-react";
 import type { CheckoutView } from "@agent-commerce/server";
-import { PAYMENT_STEP_ASK } from "@agent-commerce/ui";
+import { PAYMENT_STEP_ASK, cn } from "@agent-commerce/ui";
 import { AgentAvatar } from "@/components/brand";
 import type { ApprovalOutcome, CheckoutOutcome } from "@/lib/chat/tools";
 import type { ChatMessage, ChatMessagePart } from "@/lib/chat/types";
 import { AgentCardApproval, AgentCardRequestCard } from "./agent-card-approval";
 import { AttachmentPreview } from "./attachment-preview";
-import { CheckoutCard, LiveCheckoutUpdates } from "./checkout-card";
-import { CheckoutSiteCard } from "./checkout-site";
+import { CheckoutCard, WatchRun } from "./checkout-card";
+import { CheckoutSiteLine } from "./checkout-site";
+import { ProductCards } from "./product-cards";
 import {
   CHECKOUT_TITLES,
   checkoutSiteOf,
   findPaymentStep,
+  productsMessageOf,
+  productsOf,
   isToolError,
   isCheckoutPart,
   messageText,
@@ -25,7 +28,7 @@ import {
   type WatchIndex,
   type ToolError,
 } from "./parts";
-import { Text } from "./text";
+import { AgentBubble, ENTER, ENTER_SENT } from "./text";
 import { ToolCard, type ToolState } from "./tool-card";
 
 export interface MessageProps {
@@ -36,6 +39,8 @@ export interface MessageProps {
   onCheckoutOutcome: (toolCallId: string, outcome: CheckoutOutcome) => void;
   /** The thread's watched checkouts, from `watchIndex`. */
   watches: WatchIndex;
+  /** Send a message as the user: what a tap on a product card does. */
+  onSend: (text: string) => void;
 }
 
 /**
@@ -48,6 +53,7 @@ export function Message({
   onApprovalOutcome,
   onCheckoutOutcome,
   watches,
+  onSend,
 }: MessageProps) {
   if (message.role === "user") return <UserMessage message={message} />;
   if (message.role !== "assistant") return null;
@@ -62,15 +68,18 @@ export function Message({
       <div className="flex min-w-0 flex-1 flex-col gap-3">
         {!hasContent && streaming ? <Thinking /> : null}
         {message.parts.map((part, i) => (
-          <Part
-            key={`${message.id}-${i}`}
-            message={message}
-            part={part}
-            streaming={streaming}
-            onApprovalOutcome={onApprovalOutcome}
-            onCheckoutOutcome={onCheckoutOutcome}
-            watches={watches}
-          />
+          // Each part rises in as it arrives. A part that draws nothing leaves no gap.
+          <div key={`${message.id}-${i}`} className={cn("flex flex-col gap-3 empty:hidden", ENTER)}>
+            <Part
+              message={message}
+              part={part}
+              streaming={streaming}
+              onApprovalOutcome={onApprovalOutcome}
+              onCheckoutOutcome={onCheckoutOutcome}
+              watches={watches}
+              onSend={onSend}
+            />
+          </div>
         ))}
         {!streaming && hasContent ? <CopyAction message={message} /> : null}
       </div>
@@ -108,7 +117,12 @@ function UserMessage({ message }: { message: ChatMessage }) {
         </div>
       ) : null}
       {text ? (
-        <div className="max-w-[min(85%,42rem)] rounded-2xl rounded-br-md bg-muted px-4 py-2.5 text-[15px] leading-relaxed break-words whitespace-pre-wrap text-foreground">
+        <div
+          className={cn(
+            "max-w-[min(85%,42rem)] rounded-2xl rounded-br-md bg-primary px-4 py-2.5 text-[15px] leading-relaxed break-words whitespace-pre-wrap text-primary-foreground",
+            ENTER_SENT,
+          )}
+        >
           {text}
         </div>
       ) : null}
@@ -149,6 +163,7 @@ function Part({
   onApprovalOutcome,
   onCheckoutOutcome,
   watches,
+  onSend,
 }: {
   message: ChatMessage;
   part: ChatMessagePart;
@@ -156,10 +171,11 @@ function Part({
   onApprovalOutcome: MessageProps["onApprovalOutcome"];
   onCheckoutOutcome: MessageProps["onCheckoutOutcome"];
   watches: WatchIndex;
+  onSend: MessageProps["onSend"];
 }) {
   switch (part.type) {
     case "text":
-      return part.text.trim() ? <Text text={part.text} /> : null;
+      return part.text.trim() ? <AgentBubble text={part.text} /> : null;
 
     case "file":
       return (
@@ -223,18 +239,15 @@ function Part({
     // The store's agent speaks through the watch: each update is a line of
     // the agent's own, live while the run goes, from the output after.
     case "tool-watch_checkout":
-      if (part.state === "output-available") {
-        return (part.output.updates ?? []).map((u) => <Text key={u.id} text={u.text} />);
-      }
-      if (part.state === "input-available") {
+      // Each call is one stretch of the checkout, as a card of steps.
+      if (part.state === "input-available" || part.state === "output-available") {
         return (
-          <LiveCheckoutUpdates
+          <WatchRun
             toolCallId={part.toolCallId}
             checkoutId={part.input.checkoutId}
             watches={watches}
+            output={part.state === "output-available" ? part.output : undefined}
             onOutcome={onCheckoutOutcome}
-            renderUpdate={(u) => <Text key={u.id} text={u.text} />}
-            working={<Thinking />}
           />
         );
       }
@@ -244,16 +257,15 @@ function Part({
 
     default:
       if (isCheckoutPart(part)) {
-        // Starting a checkout shows the site it runs on, and where it stands.
+        // Starting a checkout says, once, which site the agent went to.
         const site = checkoutSiteOf(part);
         const failed =
           part.state === "output-error" ||
           (part.state === "output-available" && isToolError(part.output));
         if (site && !failed) {
-          const phase = site.checkoutId
-            ? (watches.phase.get(site.checkoutId) ?? "working")
-            : "starting";
-          return <CheckoutSiteCard site={site} phase={phase} />;
+          // The steps card names the site once the run is followed; until then, a line.
+          if (site.checkoutId && watches.firstWatch.has(site.checkoutId)) return null;
+          return <CheckoutSiteLine site={site} className="-mb-1.5 pl-1" />;
         }
         if (watchedHere(message, part)) return null;
         return (
@@ -269,6 +281,20 @@ function Part({
             errorText={part.state === "output-error" ? part.errorText : undefined}
           />
         );
+      }
+      {
+        // What a search or a look-up found, as cards with pictures, under the
+        // line the agent put on the call.
+        const message = productsMessageOf(part);
+        const products = productsOf(part);
+        if (message || products?.length) {
+          return (
+            <>
+              {message ? <AgentBubble text={message} /> : null}
+              {products?.length ? <ProductCards products={products} onPick={onSend} /> : null}
+            </>
+          );
+        }
       }
       if (part.type.startsWith("tool-")) {
         const tool = part as Extract<ChatMessagePart, { type: `tool-${string}`; state: ToolState }>;

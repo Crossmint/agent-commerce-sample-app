@@ -121,6 +121,8 @@ export const TOOL_DOCS = {
       "maxCost is a hard cap: the run stops as blocked instead of paying more. Returns the checkoutId. Poll get_checkout every few seconds until it is done or asks a question.",
     params: {
       startUrl: "Product or cart page URL to start from.",
+      purpose:
+        "What the purchase is, in a few words, as the user would say it: Blue Pikachu erasable pen, Dinner for 2 at Nopa, 2 tickets to Coldplay. The user sees it when they approve the payment. Under 40 characters, no instructions.",
       task: "What to buy and how, e.g. medium, black, cheapest shipping, pay by card. The more you say here, the fewer questions the agent stops to ask.",
       agentCardId:
         "Optional. An agent card the user already approved, to pay from it without asking again. Leave it out and the user chooses a payment method when the run reaches its payment step.",
@@ -158,7 +160,7 @@ export const TOOL_DOCS = {
   search_products: {
     title: "Search products",
     summary:
-      "Search products across every Shopify store, for when the user wants something but has no link. Returns a few in-stock products, each with its price, store, rating, options and the product page URL to pass to create_checkout.",
+      "Search products across every Shopify store, for when the user wants something but has no link. Returns a few in-stock products, each with its picture, price, store, rating, options and the product page URL to pass to create_checkout.",
     params: {
       query: "What to look for, in plain words, e.g. sour gummy candy or a black wool beanie.",
       maxPrice: "Most the user wants to pay per item, in major units, when they said so.",
@@ -166,16 +168,26 @@ export const TOOL_DOCS = {
     },
     surfaces: ["chat"],
   },
+  look_up_products: {
+    title: "Show products",
+    summary:
+      "Look products up by their page URLs on Shopify stores, and show them to the user with their pictures, prices and stores. Use it to put a product you are about to suggest in front of the user. Returns the same shape as search_products; URLs it cannot find are left out.",
+    params: {
+      urls: "Product page URLs, 1 to 5.",
+    },
+    surfaces: ["chat"],
+  },
   save_buyer_profile: {
     title: "Save the buyer's details",
     summary:
-      "Save the user's name, email, phone and shipping address as their buyer profile. Every later checkout starts with it, so the store fills those fields itself instead of asking. " +
+      "Save the user's name, email, phone number and shipping address as their buyer profile. Every later checkout starts with it, so the store fills those fields itself instead of asking. " +
       "Call it once the user has given you their full name and a full address, typically while answering a store's question for them. Saving again replaces what later checkouts use.",
     params: {
       firstName: "First name.",
       lastName: "Last name.",
       email: "Email address. Default: the signed-in user's.",
-      phone: "Phone number, when the user gave one.",
+      phone:
+        "Phone number, for the delivery. Stores ask for one on most checkouts, so ask the user for it if they have not said.",
       addressLines: "Street address, one line per entry.",
       city: "City or town.",
       region: "State or province as ISO 3166-2, e.g. US-CA, when the country has them.",

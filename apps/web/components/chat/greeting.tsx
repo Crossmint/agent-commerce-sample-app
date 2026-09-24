@@ -15,8 +15,8 @@ export function Greeting({ onPick }: { onPick?: (text: string) => void }) {
             Hi, I am {AGENT_NAME}. What can I get you?
           </h1>
           <p className="max-w-prose text-base text-muted-foreground">
-            I can buy from any online store, book a table, or get you tickets. You choose how to pay
-            when I get to the checkout. I never see your card number.
+            I can set up an agent card, buy from any online store, book a table, or get you tickets.
+            You choose how to pay when I get to the checkout. I never see your card number.
           </p>
         </div>
         {onPick ? <StarterCards layout="grid" onPick={onPick} /> : null}

@@ -79,3 +79,19 @@ export const DoubleCheckIcon = (p: P) => (
     <path d="m10.5 16.5 1 1L21 9" />
   </svg>
 );
+
+/** WhatsApp's quick-reply arrow: a curve back to the left. */
+export const ReplyIcon = (p: P) => (
+  <svg {...base({ strokeWidth: 2, ...p })}>
+    <path d="M9 14 4 9l5-5" />
+    <path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11" />
+  </svg>
+);
+
+/** WhatsApp's list-message glyph: three lines with bullets. */
+export const ListIcon = (p: P) => (
+  <svg {...base({ strokeWidth: 2, ...p })}>
+    <path d="M9 6h11M9 12h11M9 18h11" />
+    <path d="M4.5 6h.01M4.5 12h.01M4.5 18h.01" strokeWidth={3} />
+  </svg>
+);

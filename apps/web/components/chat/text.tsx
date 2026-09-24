@@ -2,6 +2,35 @@ import type { ReactNode } from "react";
 import { cn } from "@agent-commerce/ui";
 
 /**
+ * How anything new in a thread arrives: it pops out of its corner, a little
+ * past full size and back, the way a chat app delivers a bubble. The agent's
+ * side grows from the bottom left; the user's bubble swaps the origin.
+ */
+export const ENTER =
+  "animate-in fade-in-0 zoom-in-75 duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] origin-bottom-left motion-reduce:animate-none";
+
+/** ENTER for the user's own bubble, which grows from the bottom right. */
+export const ENTER_SENT = `${ENTER} origin-bottom-right`;
+
+/**
+ * A line from the agent, in its bubble: grey, on the left, the corner by the
+ * avatar squared off. The user's bubble is its mirror.
+ */
+export function AgentBubble({ text, className }: { text: string; className?: string }) {
+  return (
+    <div
+      className={cn(
+        "w-fit max-w-[min(85%,42rem)] rounded-2xl rounded-bl-md bg-muted px-4 py-2.5 text-foreground",
+        ENTER,
+        className,
+      )}
+    >
+      <Text text={text} />
+    </div>
+  );
+}
+
+/**
  * Renders assistant text without a markdown library. Handles what the model
  * emits after the system prompt asks for plain text: paragraphs, "- " lists,
  * **bold**, `code`, and bare URLs. Everything else prints as written.

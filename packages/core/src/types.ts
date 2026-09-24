@@ -343,10 +343,33 @@ export interface JsonSchema {
   [key: string]: unknown;
 }
 
+/** What a payment input request asks the caller to authorize. */
+export interface CheckoutPaymentAmount {
+  /** `exact` is the verified payable total; `maximum` is the run's cost ceiling. */
+  kind: "exact" | "maximum" | (string & {});
+  /** Decimal string, e.g. "42.50". */
+  value: string;
+  currency: string;
+}
+
 export interface CheckoutInteraction {
-  kind: "form" | (string & {});
-  responseSchema: JsonSchema;
+  /**
+   * `form`: answer with values that fit `responseSchema`. `payment`: the
+   * payment step; answer with an order intent (`paymentResponse`), never
+   * with card details.
+   */
+  kind: "form" | "payment" | (string & {});
+  /** On a form. */
+  responseSchema?: JsonSchema;
   uiSchema?: Record<string, unknown>;
+  /** On a payment request, e.g. "checkout_payment". */
+  purpose?: string;
+  /** On a payment request: what the checkout accepts. Today always "card". */
+  method?: "card" | (string & {});
+  /** On a payment request: the total to authorize, which the order intent must match. */
+  amount?: CheckoutPaymentAmount;
+  /** On a payment request: the merchant the credential will be bound to. */
+  merchant?: { domain: string };
 }
 
 /** What the agent is asking, as it appears in `requiredAction.request` and in `input_request` message parts. */
@@ -376,6 +399,12 @@ export interface PendingUserAction {
   expiresAt?: string;
   responseSchema: JsonSchema;
   uiSchema?: Record<string, unknown>;
+  /** Set when this is the payment step: what to authorize, and where. */
+  payment?: {
+    method: string;
+    amount?: CheckoutPaymentAmount;
+    merchant?: { domain: string };
+  };
 }
 
 export interface CheckoutReceipt {
@@ -423,6 +452,7 @@ export interface CheckoutList {
 
 export type InputResponsePart =
   | { type: "input_response"; requestId: string; action: "submit"; response: { kind: "form"; values: Record<string, unknown> } }
+  | { type: "input_response"; requestId: string; action: "submit"; response: { kind: "payment"; orderIntentId: string } }
   | { type: "input_response"; requestId: string; action: "decline" }
   | { type: "input_response"; requestId: string; action: "alternative"; text: string };
 

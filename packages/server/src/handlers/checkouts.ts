@@ -3,7 +3,6 @@ import {
   alternativeResponse,
   declineResponse,
   expiresInHours,
-  fillPaymentAction,
   isPaymentAction,
   isTerminalCheckout,
   newMessageId,
@@ -19,7 +18,6 @@ import {
   type CheckoutResult,
   type CheckoutStatus,
   type Merchant,
-  type OrderIntent,
   type OutboundMessagePart,
   type PendingUserAction,
   type RenderedAction,
@@ -31,7 +29,6 @@ import {
   stickyBrowserProfileId,
 } from "../browser-profile.js";
 import { currentBuyerProfile, rememberBuyerProfile } from "../buyer-profile.js";
-import { mintFromAgentCard } from "../credentials.js";
 import { forbidden, HttpError, json, noContent } from "../errors.js";
 import { agentCardRequestId } from "../ids.js";
 import type { Params } from "../router.js";
@@ -136,11 +133,10 @@ export async function createCheckout(req: Request, ctx: Ctx): Promise<Response> 
     ...(browserProfileId ? { browserProfileId } : {}),
     ...(body.merchantGuidance ? { merchantGuidance: body.merchantGuidance } : {}),
   });
-  await ctx.checkouts.linkCheckout(
-    checkout.runId,
-    user.userId,
-    body.agentCardId ? { agentCardId: body.agentCardId } : undefined,
-  );
+  await ctx.checkouts.linkCheckout(checkout.runId, user.userId, {
+    ...(body.agentCardId ? { agentCardId: body.agentCardId } : {}),
+    ...(body.purpose ? { purpose: body.purpose } : {}),
+  });
   const link = (await ctx.checkouts.getCheckout(checkout.runId)) ?? undefined;
   const view = await settlePayment(ctx, user, cctx, checkout, link);
   return json(view, 201);
@@ -177,6 +173,46 @@ export async function listCheckoutMessages(
 }
 
 /**
+ * GET /v1/checkouts/:id/messages/stream?after=
+ *
+ * The run's transcript as server-sent events, passed through from Crossmint
+ * as they come: `message.upsert` and `run.updated`, each with an `id` to
+ * resume from (`after`, or the `Last-Event-ID` header). The browser cannot
+ * call Crossmint itself, because the server key stays here. Closing the
+ * request closes the upstream stream.
+ *
+ * A `run.updated` is the caller's cue to read the checkout again: that read
+ * is where the payment step is raised and answered.
+ */
+export async function streamCheckoutMessages(
+  req: Request,
+  ctx: Ctx,
+  params: Params,
+): Promise<Response> {
+  const user = await requireUser(req, ctx);
+  await ownedLink(ctx, user, params.id!);
+  const url = new URL(req.url);
+  const upstream = await ctx.crossmint.checkouts.streamMessages(
+    checkoutContext(ctx, user),
+    params.id!,
+    {
+      after: url.searchParams.get("after") ?? undefined,
+      lastEventId: req.headers.get("last-event-id") ?? undefined,
+      signal: req.signal,
+    },
+  );
+  return new Response(upstream.body, {
+    headers: {
+      "Content-Type": "text/event-stream; charset=utf-8",
+      "Cache-Control": "no-cache, no-transform",
+      Connection: "keep-alive",
+      // Proxies that buffer would hold the events back.
+      "X-Accel-Buffering": "no",
+    },
+  });
+}
+
+/**
  * POST /v1/checkouts/:id/messages
  * Answer the open input request, or send the agent a note. Card fields are
  * refused: the server answers payment requests itself from the agent card.
@@ -188,17 +224,19 @@ export async function sendCheckoutMessage(
 ): Promise<Response> {
   const user = await requireUser(req, ctx);
   const body = await parseBody(req, checkoutMessageSchema);
-  const parts: OutboundMessagePart[] = [];
+  // Crossmint takes one part per message, so an answer with a note is two messages.
+  let part: OutboundMessagePart;
+  let note: string | undefined;
   if (body.requestId) {
     const action = body.action ?? "submit";
-    if (action === "submit") parts.push(submitResponse(body.requestId, body.values ?? {}));
-    else if (action === "decline") parts.push(declineResponse(body.requestId));
-    else parts.push(alternativeResponse(body.requestId, body.text!));
-    if (body.text && action !== "alternative") parts.push({ type: "text", text: body.text });
+    if (action === "submit") part = submitResponse(body.requestId, body.values ?? {});
+    else if (action === "decline") part = declineResponse(body.requestId);
+    else part = alternativeResponse(body.requestId, body.text!);
+    if (body.text && action !== "alternative") note = body.text;
   } else {
-    parts.push({ type: "text", text: body.text! });
+    part = { type: "text", text: body.text! };
   }
-  return json(await answer(ctx, user, params.id!, body.requestId, parts, body.messageId));
+  return json(await answer(ctx, user, params.id!, body.requestId, part, body.messageId, note));
 }
 
 /** POST /v1/checkouts/:id/actions/:actionId. The older answer route; same as a `submit` message. */
@@ -210,9 +248,13 @@ export async function submitCheckoutAction(
   const user = await requireUser(req, ctx);
   const body = await parseBody(req, submitActionSchema);
   return json(
-    await answer(ctx, user, params.id!, params.actionId!, [
+    await answer(
+      ctx,
+      user,
+      params.id!,
+      params.actionId!,
       submitResponse(params.actionId!, body.values),
-    ]),
+    ),
   );
 }
 
@@ -255,8 +297,24 @@ export async function setCheckoutAgentCard(
       },
     );
   }
-  const store = merchantFromCheckout(checkout);
-  if (card.merchant && store && hostOf(card.merchant.url) !== hostOf(store.url)) {
+  // At the payment step the run says what it needs; a card with less would
+  // come back as insufficient_allowance.
+  const action = pendingActionOf(checkout);
+  const asked = action?.payment?.amount;
+  if (
+    asked &&
+    card.amount.currency.toUpperCase() === asked.currency.toUpperCase() &&
+    available < Number.parseFloat(asked.value)
+  ) {
+    throw new HttpError(
+      409,
+      "agent_card_unusable",
+      `That agent card has ${card.amount.available} ${card.amount.currency} left; this checkout needs ${asked.value} ${asked.currency}`,
+      { agentCardId: body.agentCardId, available: card.amount.available, needed: asked.value },
+    );
+  }
+  const storeHost = action?.payment?.merchant?.domain ?? merchantFromCheckout(checkout)?.url;
+  if (card.merchant && storeHost && hostOf(card.merchant.url) !== hostOf(storeHost)) {
     throw new HttpError(
       409,
       "agent_card_wrong_merchant",
@@ -272,9 +330,10 @@ export async function setCheckoutAgentCard(
   return json(await settlePayment(ctx, user, cctx, checkout, linked));
 }
 
+/** "shop.example" from a URL or a bare domain. */
 function hostOf(url: string): string {
   try {
-    return new URL(url).hostname.replace(/^www\./, "");
+    return new URL(url.includes("://") ? url : `https://${url}`).hostname.replace(/^www\./, "");
   } catch {
     return url;
   }
@@ -357,8 +416,10 @@ async function answer(
   user: AuthenticatedUser,
   runId: string,
   requestId: string | undefined,
-  parts: OutboundMessagePart[],
+  part: OutboundMessagePart,
   messageId?: string,
+  /** Free text sent after the answer, as a message of its own. */
+  note?: string,
 ): Promise<CheckoutView> {
   const link = await ownedLink(ctx, user, runId);
   const cctx = checkoutContext(ctx, user);
@@ -369,15 +430,21 @@ async function answer(
       throw new HttpError(
         409,
         "payment_handled_by_server",
-        "This request asks for card details. Answer the checkout's payment step instead: the user picks a payment method and Agent Commerce answers from the agent card it mints. Do not send card fields.",
+        "This is the checkout's payment step. It is not answered here: the user picks a payment method, and Agent Commerce answers the run with the agent card that makes. Do not send card fields.",
         { checkoutId: runId, requestId },
       );
     }
   }
   await ctx.crossmint.checkouts.sendMessage(cctx, runId, {
     id: messageId ?? newMessageId(),
-    parts,
+    parts: [part],
   });
+  if (note) {
+    await ctx.crossmint.checkouts.sendMessage(cctx, runId, {
+      id: newMessageId(),
+      parts: [{ type: "text", text: note }],
+    });
+  }
   checkout = await waitForConsumption(ctx, cctx, runId, requestId);
   return settlePayment(ctx, user, cctx, checkout, link);
 }
@@ -395,32 +462,52 @@ async function ownedLink(
 }
 
 /**
- * Payment requests Agent Commerce already answered, by run. A poll right after an
- * answer can still show the same request open; this stops a second card
- * from being minted for it. Per process; bounded.
+ * The payment request Agent Commerce last answered, by run, and the order
+ * intent it answered with. A poll right after an answer can still show the
+ * same request open; this stops a second answer. And when the run asks
+ * again, with a new request, the order intent that went before did not work
+ * (expired, too small, cancelled), so that one is not offered again. Per
+ * process; bounded.
  */
-const answeredPayments = new Map<string, string>();
-function rememberAnswered(runId: string, requestId: string): void {
+const answeredPayments = new Map<string, { requestId: string; orderIntentId: string }>();
+function rememberAnswered(runId: string, requestId: string, orderIntentId: string): void {
   if (answeredPayments.size >= 500) {
     const oldest = answeredPayments.keys().next().value;
     if (oldest !== undefined) answeredPayments.delete(oldest);
   }
-  answeredPayments.set(runId, requestId);
+  answeredPayments.set(runId, { requestId, orderIntentId });
+}
+
+/** How long an order intent made at the payment step lasts: the rest of the checkout, not an allowance. */
+const PAYMENT_ORDER_INTENT_HOURS = 2;
+
+/**
+ * What the payment step wants authorized: the amount its request states
+ * (Crossmint's verified payable total, or the run's ceiling), else the
+ * checkout's max cost for an older request that states none.
+ */
+function paymentAmount(action: PendingUserAction, checkout: Checkout): Amount {
+  const asked = action.payment?.amount;
+  if (asked) return { value: asked.value, currency: asked.currency.toUpperCase() };
+  const maxCost = checkout.input?.constraints?.maxCost;
+  return { value: maxCost?.amount ?? "0", currency: maxCost?.currency ?? "USD" };
 }
 
 /**
  * The payment step.
  *
- * Crossmint asks for card details partway through a run. Agent Commerce never
- * passes that question on: it answers with a credential minted from an agent
- * card, so no card number reaches the caller.
+ * Partway through, the run asks to be paid: a payment input request
+ * (`interaction.kind: "payment"`) stating the amount and the merchant. Agent
+ * Commerce never passes it on. It answers with the id of an order intent (an
+ * agent card) the user authorized for that amount, and Agent Checkouts mints
+ * the card credential from it itself; no card number is ever sent.
  *
- * Which agent card depends on how the checkout started. One created with an
- * `agentCardId` pays from it straight away, and the caller sees nothing. One
- * created without — the ordinary case, where the user just asked to buy
- * something — has no card yet, so this raises an agent card request scoped to
- * the purchase and hands it back on the view. The user picks a payment method
- * there, that mints the card, and the next poll pays with it.
+ * Which order intent depends on how the checkout started. One created with an
+ * `agentCardId`, or given one later, pays from it straight away. One without
+ * (the ordinary case) has none yet, so this raises an agent card request for
+ * the exact amount the run asks for, and hands it back on the view. The user
+ * picks a payment method there, that creates the order intent, and the next
+ * read answers the run with it.
  */
 async function settlePayment(
   ctx: Ctx,
@@ -431,43 +518,33 @@ async function settlePayment(
 ): Promise<CheckoutView> {
   const action = pendingActionOf(checkout);
   if (!action || !isPaymentAction(action)) return toView(checkout, link?.agentCardId);
-  if (answeredPayments.get(checkout.runId) === action.id)
+  const answered = answeredPayments.get(checkout.runId);
+  if (answered?.requestId === action.id)
     return toView(checkout, link?.agentCardId, { hidePayment: true });
+  // Asked again after an answer: that order intent did not work. Not again.
+  const spent = answered?.orderIntentId;
 
-  let agentCardId = link?.agentCardId;
-  if (!agentCardId) {
-    const request = await paymentStepRequest(ctx, user, checkout, link);
+  let orderIntentId = link?.agentCardId !== spent ? link?.agentCardId : undefined;
+  if (!orderIntentId) {
+    const request = await paymentStepRequest(ctx, user, checkout, link, action, spent);
     // Until the user has chosen and the card can pay, the payment step is
     // the view: the run stays `awaiting_input` and the UI shows the picker.
     if (request.status !== "active" || !request.agentCardId) {
       return toView(checkout, undefined, { paymentRequest: toPaymentRequest(request) });
     }
-    agentCardId = request.agentCardId;
-    await ctx.checkouts.linkCheckout(checkout.runId, user.userId, { agentCardId });
+    orderIntentId = request.agentCardId;
+    await ctx.checkouts.linkCheckout(checkout.runId, user.userId, { agentCardId: orderIntentId });
   }
 
-  const maxCost = checkout.input?.constraints?.maxCost;
-  const { card } = await mintFromAgentCard(ctx, user, agentCardId, {
-    railPreference: ctx.railPreference,
-    amount: (oi) => clampToAvailable(oi, maxCost),
-    // Card networks issue a number per merchant. The checkout knows which store it is on.
-    merchant: merchantFromCheckout(checkout),
-  });
-  if (!card) {
-    throw new HttpError(409, "no_usable_rail", "The agent card did not return card details");
-  }
-
-  const values = fillPaymentAction(action, card);
   console.info("[agent-commerce] answering checkout payment request", {
     checkoutId: checkout.runId,
     requestId: action.id,
-    agentCardId,
-    fields: Object.keys(values),
+    agentCardId: orderIntentId,
   });
-  await ctx.crossmint.checkouts.respond(cctx, checkout.runId, action.id, values);
-  rememberAnswered(checkout.runId, action.id);
+  await ctx.crossmint.checkouts.payWithOrderIntent(cctx, checkout.runId, action.id, orderIntentId);
+  rememberAnswered(checkout.runId, action.id, orderIntentId);
   const refreshed = await waitForConsumption(ctx, cctx, checkout.runId, action.id);
-  return toView(refreshed, agentCardId, { hidePayment: true });
+  return toView(refreshed, orderIntentId, { hidePayment: true });
 }
 
 /**
@@ -483,33 +560,46 @@ async function paymentStepRequest(
   user: AuthenticatedUser,
   checkout: Checkout,
   link: CheckoutLink | undefined,
+  action: PendingUserAction,
+  /** An order intent the run already turned down: a request that made it is spent. */
+  spent: string | undefined,
 ): Promise<AgentCardRequest> {
+  const amount = paymentAmount(action, checkout);
   if (link?.agentCardRequestId) {
     const existing = await ctx.store.get(link.agentCardRequestId);
     // Approved but not yet active: the card exists and verification may have
     // landed elsewhere, so settle it before deciding the step is unfinished.
-    if (existing) return reconcileRequest(ctx, user, existing);
+    // A request for another amount, or one whose card the run turned down,
+    // does not answer this one: the run wants a new authorization.
+    const fits =
+      existing &&
+      existing.amount.value === amount.value &&
+      existing.amount.currency.toUpperCase() === amount.currency &&
+      (!spent || existing.agentCardId !== spent);
+    if (existing && fits) return reconcileRequest(ctx, user, existing);
   }
 
   const now = ctx.now();
   const id = agentCardRequestId();
-  const maxCost = checkout.input?.constraints?.maxCost;
-  const merchant = merchantFromCheckout(checkout);
-  const task = checkout.input?.request?.task?.trim();
+  const domain = action.payment?.merchant?.domain ?? merchantFromCheckout(checkout)?.name;
+  // As Agent Checkouts wants it: the exact amount the run asks for, for the
+  // rest of the checkout only, and no merchant, because the checkout binds
+  // the credential to the store itself when it mints it.
   const row: NewAgentCardRequest = {
     id,
     userId: user.userId,
     requester: ctx.defaultRequester,
-    amount: { value: maxCost?.amount ?? "0", currency: maxCost?.currency ?? "USD" },
-    // What the user is about to pay for, in their own terms where we have them.
-    description: task || (merchant ? `Checkout at ${merchant.name}` : "Checkout"),
-    expiresAt: expiresInHours(24, now),
+    amount,
+    // Short, for the approval screen and the card list: the purpose the
+    // caller gave the checkout, else the store. Never the run's task, which
+    // is written for the store's agent and runs to paragraphs.
+    description:
+      link?.purpose ?? (domain ? `Purchase at ${domain.replace(/^www\./, "")}` : "Purchase"),
+    expiresAt: expiresInHours(PAYMENT_ORDER_INTENT_HOURS, now),
     requestExpiresAt: new Date(now.getTime() + ctx.requestTtlMinutes * 60_000).toISOString(),
     status: "pending",
     approvalUrl: `${ctx.config.webBaseUrl.replace(/\/$/, "")}/approve/${id}`,
   };
-  // The run is already at this store, so the card is locked to it.
-  if (merchant) row.merchant = merchant;
   const created = await ctx.store.create(row);
   await ctx.checkouts.linkCheckout(checkout.runId, user.userId, { agentCardRequestId: id });
   return created;
@@ -545,18 +635,6 @@ async function waitForConsumption(
     checkout = await ctx.crossmint.checkouts.get(cctx, runId);
   }
   return checkout;
-}
-
-/** Mint for the checkout's max cost, but never more than the card has left. */
-function clampToAvailable(oi: OrderIntent, maxCost?: { amount: string; currency: string }): Amount {
-  const available: Amount = { value: oi.amount.available, currency: oi.amount.currency };
-  if (!maxCost || maxCost.currency.toUpperCase() !== available.currency.toUpperCase()) {
-    return available;
-  }
-  const want = Number.parseFloat(maxCost.amount);
-  const have = Number.parseFloat(available.value);
-  if (!Number.isFinite(want) || !Number.isFinite(have)) return available;
-  return { value: Math.min(want, have).toFixed(2), currency: available.currency };
 }
 
 function toView(

@@ -110,33 +110,15 @@ export function humanize(key: string): string {
 }
 
 /**
- * Is this input request asking for card details? Used to let the server
- * answer it with a minted card. Decided by the field names, never by the
- * question text alone: "which card" as a choice is not a payment form.
+ * Is this the checkout's payment step? A payment input request says so
+ * (`interaction.kind: "payment"`); the server answers it with an order
+ * intent, and no caller ever sees it. A form asking for card fields counts
+ * too, so it never reaches a caller either: decided by the field names, never
+ * by the question text alone, since "which card" as a choice is not a
+ * payment form.
  */
-export function isPaymentAction(action: PendingUserAction): boolean {
+export function isPaymentAction(action: Pick<PendingUserAction, "responseSchema" | "payment">): boolean {
+  if (action.payment) return true;
   const keys = Object.keys(action.responseSchema?.properties ?? {}).map((k) => k.toLowerCase());
   return keys.some((k) => /cardnumber|card_number|^pan$|^number$|cvc|cvv|securitycode|security_code|expir/.test(k));
-}
-
-/**
- * Build the `values` for a payment action from a card credential by matching
- * common field names in the response schema.
- */
-export function fillPaymentAction(
-  action: PendingUserAction,
-  card: { number: string; expirationMonth: string; expirationYear: string; cvc: string; holderName?: string },
-): Record<string, unknown> {
-  const values: Record<string, unknown> = {};
-  const props = action.responseSchema?.properties ?? {};
-  for (const key of Object.keys(props)) {
-    const k = key.toLowerCase();
-    if (/cardnumber|card_number|^pan$|^number$/.test(k)) values[key] = card.number;
-    else if (/expmonth|expirationmonth|expirymonth|expiry_month|exp_month/.test(k)) values[key] = card.expirationMonth;
-    else if (/expyear|expirationyear|expiryyear|expiry_year|exp_year/.test(k)) values[key] = card.expirationYear;
-    else if (/^expir(y|ation)$|^exp$/.test(k)) values[key] = `${card.expirationMonth}/${card.expirationYear.slice(-2)}`;
-    else if (/cvc|cvv|securitycode|security_code/.test(k)) values[key] = card.cvc;
-    else if (/holder|nameoncard|cardholder/.test(k) && card.holderName) values[key] = card.holderName;
-  }
-  return values;
 }

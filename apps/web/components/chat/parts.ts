@@ -1,6 +1,8 @@
 import type { CheckoutView } from "@agent-commerce/server";
 import type { ApproveOutcome } from "@agent-commerce/ui";
 import type { CheckoutMessage } from "@agent-commerce/core";
+import type { CheckoutStep } from "@agent-commerce/ui";
+import type { FoundProduct } from "@/lib/chat/shopify-catalog";
 import type { ApprovalOutcome, CheckoutOutcome, CheckoutUpdate } from "@/lib/chat/tools";
 import type { ChatMessage, ChatMessagePart } from "@/lib/chat/types";
 import { humanizeToolName } from "./tool-card";
@@ -141,37 +143,39 @@ export function watchedHere(message: ChatMessage, part: ChatMessagePart): boolea
   return message.parts.some((p) => p.type === "tool-watch_checkout" && p.input?.checkoutId === id);
 }
 
-/** Where a checkout stands, in the words a site card shows. */
-export type CheckoutPhase = "starting" | "working" | "waiting" | "done" | "stopped";
-
 /** What the thread's finished watches already did, so the next one does not do it twice. */
 export interface WatchIndex {
-  /** Where each checkout stands, from its newest watch. */
-  phase: Map<string, CheckoutPhase>;
   /** Updates already posted, by checkout. A new watch posts only what came after. */
   shown: Map<string, Set<string>>;
   /** Questions already handed to the model. */
   asked: Set<string>;
   /** Agent card requests raised by a checkout's payment step: approving one is choosing how to pay. */
   paymentRequests: Set<string>;
+  /** Where each checkout runs and what the agent does there, from its `create_checkout`. */
+  sites: Map<string, CheckoutSite>;
+  /** Each checkout's first `watch_checkout`, by tool call id. */
+  firstWatch: Map<string, string>;
 }
 
 export function watchIndex(messages: ChatMessage[]): WatchIndex {
   const index: WatchIndex = {
-    phase: new Map(),
     shown: new Map(),
     asked: new Set(),
     paymentRequests: new Set(),
+    sites: new Map(),
+    firstWatch: new Map(),
   };
   for (const m of messages) {
     for (const part of m.parts) {
+      const site = checkoutSiteOf(part);
+      if (site?.checkoutId) index.sites.set(site.checkoutId, site);
       if (part.type !== "tool-watch_checkout") continue;
-      if (part.state === "input-available" && part.input?.checkoutId) {
-        index.phase.set(part.input.checkoutId, "working");
+      const id = part.input?.checkoutId;
+      if (id) {
+        if (!index.firstWatch.has(id)) index.firstWatch.set(id, part.toolCallId);
       }
       if (part.state !== "output-available") continue;
       const out = part.output;
-      index.phase.set(out.checkoutId, phaseOf(out.status));
       let shown = index.shown.get(out.checkoutId);
       if (!shown) index.shown.set(out.checkoutId, (shown = new Set()));
       for (const u of out.updates ?? []) shown.add(u.id);
@@ -182,16 +186,74 @@ export function watchIndex(messages: ChatMessage[]): WatchIndex {
   return index;
 }
 
-function phaseOf(status: CheckoutOutcome["status"]): CheckoutPhase {
-  switch (status) {
-    case "succeeded":
-      return "done";
+/**
+ * One stretch of a checkout as steps, for its card: each update the store's
+ * agent wrote, the newest still in progress while the run goes on, then how
+ * the run ended. A stretch that stopped for the user (a question, the payment
+ * step) adds nothing: the agent asks in a bubble of its own below the card.
+ */
+/** True when a stretch stopped for the user: its card folds to the title, and the agent asks below. */
+export function stoppedForUser(outcome: CheckoutOutcome | undefined): boolean {
+  return outcome?.status === "awaiting_input" || outcome?.status === "awaiting_payment";
+}
+
+export function runSteps(opts: {
+  updates: CheckoutUpdate[];
+  host: string;
+  /** The run is still going in this stretch. */
+  live: boolean;
+  /** A stretch after an answer, not the start. */
+  continuing: boolean;
+  outcome?: CheckoutOutcome;
+}): CheckoutStep[] {
+  const steps: CheckoutStep[] = opts.updates.map((u) => ({ key: u.id, label: u.text, state: "done" }));
+  if (opts.live) {
+    const last = steps.at(-1);
+    if (last) last.state = "active";
+    else
+      steps.push({
+        key: "start",
+        label: opts.continuing ? "Picking up where it left off" : `Opening ${opts.host}`,
+        state: "active",
+      });
+    return steps;
+  }
+  const out = opts.outcome;
+  if (!out) return steps;
+  switch (out.status) {
     case "awaiting_input":
     case "awaiting_payment":
-      return "waiting";
+      break;
+    case "succeeded":
+      steps.push({
+        key: "done",
+        label: out.total ? `Done: ${out.total.amount} ${out.total.currency}` : "Done",
+        state: "done",
+      });
+      break;
     default:
-      return "stopped";
+      steps.push({
+        key: "stopped",
+        label: out.status === "cancelled" ? "Cancelled" : (out.failure?.message ?? out.summary ?? "Stopped"),
+        state: "failed",
+      });
   }
+  return steps;
+}
+
+/** The line a look-up puts above its cards, once the call is streamed in. */
+export function productsMessageOf(part: ChatMessagePart): string | undefined {
+  if (part.type !== "tool-look_up_products" || part.state === "input-streaming") return undefined;
+  const message = (part.input as { message?: string } | undefined)?.message?.trim();
+  return message || undefined;
+}
+
+/** The products a search or a look-up found, once it has, for the cards. */
+export function productsOf(part: ChatMessagePart): FoundProduct[] | undefined {
+  if (part.type !== "tool-search_products" && part.type !== "tool-look_up_products") return undefined;
+  if (part.state !== "output-available") return undefined;
+  const out = part.output as { products?: FoundProduct[] } | ToolError;
+  return isToolError(out) ? undefined : out.products;
 }
 
 /** The site a `create_checkout` call visits, and what the agent does there, for its card. */
@@ -275,6 +337,7 @@ export function toolTitle(type: string): string {
     "tool-pay_checkout_with_agent_card": "Paying with your agent card",
     "tool-save_buyer_profile": "Saving your details for next time",
     "tool-search_products": "Looking through online stores",
+    "tool-look_up_products": "Looking the product up",
     "tool-reveal_agent_card": "Minting a card credential",
     "tool-revoke_agent_card": "Revoking an agent card",
     ...CHECKOUT_TITLES,

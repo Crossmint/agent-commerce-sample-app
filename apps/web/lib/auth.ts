@@ -47,6 +47,27 @@ function stytch(): StytchClient {
   return nodeClient;
 }
 
+/** Emails found through Stytch's user API, by user. Per process: an email seldom changes. */
+const emails = new Map<string, string>();
+
+/**
+ * The user's email. A Stytch session JWT carries it only after an email
+ * login; after a Google login it holds just the OAuth factor, so ask Stytch
+ * for the user's verified email instead. Without it the chat agent would ask
+ * the user for an address it already has.
+ */
+async function emailOf(
+  verifier: UserAuth,
+  user: { userId: string; email?: string },
+): Promise<string | undefined> {
+  if (user.email) return user.email;
+  const cached = emails.get(user.userId);
+  if (cached) return cached;
+  const found = await verifier.lookupEmail?.(user.userId).catch(() => undefined);
+  if (found) emails.set(user.userId, found);
+  return found;
+}
+
 function sessionIdFrom(claims: Record<string, unknown> | undefined): string | undefined {
   const s = claims?.["https://stytch.com/session"] as { id?: string } | undefined;
   return s?.id;
@@ -76,7 +97,7 @@ export async function getSession(): Promise<ServerSession | null> {
     if (user)
       return {
         userId: user.userId,
-        email: user.email,
+        email: await emailOf(verifier, user),
         sessionId: sessionIdFrom(user.claims),
         sessionJwt: jwt,
       };
@@ -89,7 +110,7 @@ export async function getSession(): Promise<ServerSession | null> {
       if (user) {
         return {
           userId: user.userId,
-          email: user.email,
+          email: await emailOf(verifier, user),
           sessionId: sessionIdFrom(user.claims),
           sessionJwt: fresh.jwt,
         };

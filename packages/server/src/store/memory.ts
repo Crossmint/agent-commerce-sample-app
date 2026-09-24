@@ -103,6 +103,7 @@ export function memoryCheckoutStore(): CheckoutStore {
         // does not drop the card, and vice versa.
         ...(patch?.agentCardId ? { agentCardId: patch.agentCardId } : {}),
         ...(patch?.agentCardRequestId ? { agentCardRequestId: patch.agentCardRequestId } : {}),
+        ...(patch?.purpose ? { purpose: patch.purpose } : {}),
       });
     },
     async getCheckout(checkoutId) {

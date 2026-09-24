@@ -18,11 +18,13 @@ export interface MessagesProps {
   onApprovalOutcome: (toolCallId: string, outcome: ApprovalOutcome) => void;
   onCheckoutOutcome: (toolCallId: string, outcome: CheckoutOutcome) => void;
   onPickStarter: (text: string) => void;
+  /** Send a message as the user, for a tap on a product card. */
+  onSend: (text: string) => void;
 }
 
 /** The desktop transcript: a centered column that follows the newest message. */
-export function Messages({ messages, status, onApprovalOutcome, onCheckoutOutcome, onPickStarter }: MessagesProps) {
-  const { containerRef, isAtBottom, scrollToBottom } = useScrollToBottom();
+export function Messages({ messages, status, onApprovalOutcome, onCheckoutOutcome, onPickStarter, onSend }: MessagesProps) {
+  const { containerRef, isAtBottom, scrollToBottom } = useScrollToBottom(messages.length);
   const last = messages.at(-1);
   const waiting = status === "submitted" && last?.role !== "assistant";
   const watches = useMemo(() => watchIndex(messages), [messages]);
@@ -37,7 +39,7 @@ export function Messages({ messages, status, onApprovalOutcome, onCheckoutOutcom
         <div className="mx-auto flex w-full max-w-3xl flex-col gap-6 px-4 py-6 sm:px-6">
           {messages.map((m, i) => (
             <div key={m.id} className="group/message">
-              <Message message={m} streaming={status === "streaming" && i === messages.length - 1} onApprovalOutcome={onApprovalOutcome} onCheckoutOutcome={onCheckoutOutcome} watches={watches} />
+              <Message message={m} streaming={status === "streaming" && i === messages.length - 1} onApprovalOutcome={onApprovalOutcome} onCheckoutOutcome={onCheckoutOutcome} watches={watches} onSend={onSend} />
             </div>
           ))}
           {waiting ? (

@@ -1,4 +1,4 @@
-import type { AgentCard, BuyerProfileInput, PaymentMethod, RegisterCardInput, RegisterCardResult } from "@agent-commerce/core";
+import type { AgentCard, BuyerProfile, BuyerProfileInput, PaymentMethod, RegisterCardInput, RegisterCardResult } from "@agent-commerce/core";
 import type {
   AgentCardRequest,
   ApproveAgentCardRequestInput,
@@ -146,9 +146,40 @@ export function createAgentCommerceApi(opts: AgentCommerceApiOptions) {
       const query = q.toString();
       return request<CheckoutMessageList>("GET", `/checkouts/${enc(id)}/messages${query ? `?${query}` : ""}`);
     },
+    /**
+     * The run's transcript as server-sent events, from `after` on. The raw
+     * Response: `useCheckoutMessages` reads it. Throws like any call when the
+     * stream cannot open.
+     */
+    streamCheckoutMessages: async (id: string, options: { after?: string; signal?: AbortSignal } = {}) => {
+      const jwt = await opts.getJwt();
+      if (!jwt) throw new AgentCommerceApiError(401, { code: "unauthorized", message: "Not signed in." });
+      const q = options.after ? `?after=${encodeURIComponent(options.after)}` : "";
+      const res = await doFetch(`${baseUrl}/v1/checkouts/${enc(id)}/messages/stream${q}`, {
+        headers: { Accept: "text/event-stream", Authorization: `Bearer ${jwt}` },
+        credentials: "same-origin",
+        signal: options.signal,
+      });
+      if (!res.ok) {
+        const text = await res.text().catch(() => "");
+        let json: unknown;
+        try {
+          json = JSON.parse(text);
+        } catch {
+          json = undefined;
+        }
+        throw new AgentCommerceApiError(
+          res.status,
+          isEnvelope(json) ? json.error : { code: "internal", message: text || `Request failed with ${res.status}` },
+        );
+      }
+      return res;
+    },
     answerCheckout: (id: string, input: CheckoutMessageInput) => request<CheckoutView>("POST", `/checkouts/${enc(id)}/messages`, input),
     cancelCheckout: (id: string) => request<CheckoutView>("POST", `/checkouts/${enc(id)}/cancel`, {}),
     createBuyerProfile: (input: BuyerProfileInput) => request<{ id: string }>("POST", "/buyer-profiles", input),
+    /** The saved details checkouts start with, or null when there are none. */
+    getBuyerProfile: async () => (await request<{ buyerProfile: BuyerProfile | null }>("GET", "/buyer-profile")).buyerProfile,
   };
 }
 

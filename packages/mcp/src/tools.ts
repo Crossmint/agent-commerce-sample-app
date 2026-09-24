@@ -250,6 +250,7 @@ export function registerAgentCommerceTools(
       inputSchema: {
         startUrl: z.string().url().describe(paramDoc("create_checkout", "startUrl")),
         task: z.string().max(20000).optional().describe(paramDoc("create_checkout", "task")),
+        purpose: z.string().max(80).optional().describe(paramDoc("create_checkout", "purpose")),
         agentCardId: z.string().optional().describe(paramDoc("create_checkout", "agentCardId")),
         maxCost: amountSchema.describe(paramDoc("create_checkout", "maxCost")),
         currency: currencySchema.optional(),
@@ -274,6 +275,7 @@ export function registerAgentCommerceTools(
       const checkout = await api.createCheckout({
         startUrl: args.startUrl,
         task: args.task,
+        purpose: args.purpose,
         agentCardId: args.agentCardId,
         maxCost: {
           amount: toDecimalString(args.maxCost),
