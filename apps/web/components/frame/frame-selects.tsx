@@ -56,7 +56,6 @@ export function FrameControls({
   onView,
   onApp,
   onBrand,
-  hideViews,
   animate = false,
   className,
 }: {
@@ -66,14 +65,7 @@ export function FrameControls({
   onView: (view: View) => void;
   onApp: (app: MessagingApp) => void;
   onBrand: (brand: BrandTheme) => void;
-  /**
-   * Platforms to leave out, for a phone that should not offer the desktop
-   * frame. A hidden platform still lists while it is the current one, so the
-   * menu always has a row that answers the button. The menu contents portal
-   * to the body, so this cannot be done by hiding rows with CSS.
-   */
-  hideViews?: readonly View[];
-  /** Enter from the top with the logo card. False in the phone's foot bar, which is not up there. */
+  /** Enter from the top with the logo card. */
   animate?: boolean;
   className?: string;
 }) {
@@ -82,7 +74,7 @@ export function FrameControls({
       className={cn(CARD, animate && "enter-down enter-down-far", className)}
       style={animate ? { animationDelay: `${HEADER_ENTER_DELAY_MS}ms` } : undefined}
     >
-      <PlatformMenu view={view} app={app} onView={onView} onApp={onApp} hideViews={hideViews} />
+      <PlatformMenu view={view} app={app} onView={onView} onApp={onApp} />
       <TemplateMenu brand={brand} onBrand={onBrand} />
     </div>
   );
@@ -93,18 +85,15 @@ function PlatformMenu({
   app,
   onView,
   onApp,
-  hideViews,
 }: {
   view: View;
   app: MessagingApp;
   onView: (view: View) => void;
   onApp: (app: MessagingApp) => void;
-  hideViews?: readonly View[];
 }) {
   const messaging = view === "messaging";
   const { label, icon: Icon } = VIEW_META[view];
   const current = messaging ? MESSAGING_APP_META[app] : null;
-  const shown = VIEWS.filter((v) => v === view || !hideViews?.includes(v));
   return (
     <DropdownMenu>
       <DropdownMenuTrigger aria-label="Platform" className={BUTTON}>
@@ -118,7 +107,7 @@ function PlatformMenu({
         <ChevronDown aria-hidden className="size-4 shrink-0 text-muted-foreground" />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="min-w-52">
-        {shown.map((v) => {
+        {VIEWS.map((v) => {
           const meta = VIEW_META[v];
           const ItemIcon = meta.icon;
           if (v === "messaging") {

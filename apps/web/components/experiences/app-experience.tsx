@@ -58,9 +58,6 @@ interface ThreadState {
  */
 const RESERVE_TOP = 24 + 52 + 8 + 26 + 16;
 
-/** A phone does not offer the desktop frame: there is no desktop to show it on. */
-const PHONE_HIDES_VIEWS = ["desktop"] as const;
-
 /**
  * The client half of the app page: the switchers, the frame they name, and
  * the one conversation every frame shows.
@@ -310,10 +307,11 @@ export function AppExperience({
         shared={shared}
       />
 
-      {/* Phone: the same controls in a bar at the foot, in the flow so the frame above shrinks to fit. */}
-      <div className="flex w-full shrink-0 items-center justify-center px-3 pt-2 pb-[max(env(safe-area-inset-bottom),0.75rem)] md:hidden">
-        <FrameControls {...controls} hideViews={PHONE_HIDES_VIEWS} />
-      </div>
+      {/*
+        Phone: no controls; the app fills the screen as the app it is. Only
+        the home indicator's strip is kept clear, so the composer is not under it.
+      */}
+      <div aria-hidden className="h-[env(safe-area-inset-bottom)] w-full shrink-0 md:hidden" />
     </>
   );
 }

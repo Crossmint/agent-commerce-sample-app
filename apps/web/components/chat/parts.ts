@@ -46,19 +46,6 @@ export function toApprovalOutcome(o: ApproveOutcome): ApprovalOutcome {
   return { status: o.status, agentCardId: o.agentCard?.orderIntentId ?? o.request.agentCardId };
 }
 
-export function approvalLabel(outcome: ApprovalOutcome): string {
-  switch (outcome.status) {
-    case "active":
-      return "Approved. The agent card is active.";
-    case "denied":
-      return "Denied.";
-    case "expired":
-      return "The request expired.";
-    default:
-      return "The card could not be set up.";
-  }
-}
-
 const ENDINGS = ["succeeded", "blocked", "failed", "cancelled"] as const;
 
 /**

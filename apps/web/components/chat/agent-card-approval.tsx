@@ -1,10 +1,21 @@
 "use client";
 
 import { useCallback } from "react";
-import { ApproveAgentCard, Badge, formatAmount, type ApproveOutcome } from "@agent-commerce/ui";
+import {
+  ApproveAgentCard,
+  Badge,
+  CardMark,
+  Skeleton,
+  cn,
+  formatAmount,
+  paymentMethodLabel,
+  useAgentCardRequest,
+  usePaymentMethods,
+  type ApproveOutcome,
+} from "@agent-commerce/ui";
 import { PLATFORM_NAME } from "@/components/brand";
 import type { ApprovalOutcome } from "@/lib/chat/tools";
-import { approvalLabel, toApprovalOutcome, type RequestSummary, type ToolError } from "./parts";
+import { toApprovalOutcome, type RequestSummary, type ToolError } from "./parts";
 import { ToolCard, type ToolState } from "./tool-card";
 
 /**
@@ -34,7 +45,7 @@ export function AgentCardApproval({
     [onOutcome, toolCallId],
   );
 
-  if (output) return <ApprovalResult outcome={output} />;
+  if (output) return <AgentCardSummary requestId={requestId} outcome={output} />;
 
   return (
     <div className="w-full max-w-lg">
@@ -50,38 +61,83 @@ export function AgentCardApproval({
   );
 }
 
-/** What the user decided, as one quiet row. */
-export function ApprovalResult({
+const OUTCOME_LABEL: Record<ApprovalOutcome["status"], string> = {
+  active: "Approved",
+  denied: "Denied",
+  expired: "Expired",
+  failed: "Failed",
+};
+
+/**
+ * An approval once it is settled: what the agent card is for, the limit, the
+ * saved card behind it, and the store when it is locked to one. Read once
+ * from the request, which holds all of it; the card's name comes from the
+ * user's saved cards.
+ */
+export function AgentCardSummary({
+  requestId,
   outcome,
   className,
 }: {
+  requestId: string;
   outcome: ApprovalOutcome;
   className?: string;
 }) {
+  // No polling: a settled request does not change.
+  const request = useAgentCardRequest(requestId, { pollMs: 0 });
+  const methods = usePaymentMethods({ enabled: Boolean(request.data?.paymentMethodId) });
+  const req = request.data;
+  const card = methods.data?.find((m) => m.paymentMethodId === req?.paymentMethodId);
+  const tone =
+    outcome.status === "active" ? "success" : outcome.status === "denied" ? "destructive" : "muted";
+
   return (
     <div
-      className={
-        className ??
-        "flex w-full max-w-lg items-center gap-3 rounded-2xl bg-card px-4 py-3 text-sm ring-1 ring-foreground/10"
-      }
+      className={cn(
+        "flex w-full max-w-lg flex-col gap-3 rounded-2xl bg-card p-4 ring-1 ring-foreground/10",
+        className,
+      )}
     >
-      <Badge
-        variant={
-          outcome.status === "active"
-            ? "success"
-            : outcome.status === "denied"
-              ? "destructive"
-              : "muted"
-        }
-      >
-        {outcome.status}
-      </Badge>
-      <span className="min-w-0 flex-1 truncate">{approvalLabel(outcome)}</span>
-      {outcome.agentCardId ? (
-        <span className="hidden font-mono text-xs text-muted-foreground sm:inline">
-          {outcome.agentCardId.slice(0, 12)}…
-        </span>
-      ) : null}
+      <div className="flex items-start justify-between gap-3">
+        {req ? (
+          <p className="min-w-0 text-sm leading-snug font-medium text-balance">{req.description}</p>
+        ) : (
+          <Skeleton className="h-4 w-40" />
+        )}
+        <Badge variant={tone}>{OUTCOME_LABEL[outcome.status]}</Badge>
+      </div>
+      {req ? (
+        <dl className="grid grid-cols-[auto_1fr] items-center gap-x-4 gap-y-2 text-sm">
+          <dt className="text-muted-foreground">Limit</dt>
+          <dd className="text-right font-medium tabular-nums">
+            {formatAmount(req.amount.value, req.amount.currency)}
+          </dd>
+          {card ? (
+            <>
+              <dt className="text-muted-foreground">Card</dt>
+              <dd className="flex items-center justify-end gap-2">
+                <CardMark paymentMethod={card} />
+                <span className="truncate">{paymentMethodLabel(card)}</span>
+              </dd>
+            </>
+          ) : req.paymentMethodId ? (
+            <>
+              <dt className="text-muted-foreground">Card</dt>
+              <dd className="flex justify-end">
+                <Skeleton className="h-4 w-28" />
+              </dd>
+            </>
+          ) : null}
+          {req.merchant ? (
+            <>
+              <dt className="text-muted-foreground">Store</dt>
+              <dd className="truncate text-right">{req.merchant.name}</dd>
+            </>
+          ) : null}
+        </dl>
+      ) : (
+        <Skeleton className="h-10 w-full" />
+      )}
     </div>
   );
 }

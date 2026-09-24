@@ -256,7 +256,10 @@ export function ProductImage({
   const [failed, setFailed] = useState(false);
   return (
     <span
-      className={cn("flex aspect-square w-full items-center justify-center bg-muted", className)}
+      className={cn(
+        "relative flex aspect-square w-full items-center justify-center overflow-hidden bg-muted",
+        className,
+      )}
     >
       {src && !failed ? (
         // A plain img: a store's CDN picture, not worth the image optimiser.
@@ -265,7 +268,9 @@ export function ProductImage({
           src={src}
           alt={alt}
           loading="lazy"
-          className="size-full object-contain"
+          // Pinned to the frame: a tall picture's own height would otherwise
+          // stretch the frame past its aspect ratio.
+          className="absolute inset-0 size-full object-contain"
           onError={() => setFailed(true)}
         />
       ) : (

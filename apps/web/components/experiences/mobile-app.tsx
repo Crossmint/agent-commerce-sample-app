@@ -25,7 +25,6 @@ import {
   AgentCardTable,
   ApproveAgentCard,
   PAYMENT_STEP_ASK,
-  Badge,
   Button,
   CardMark,
   SaveCard,
@@ -47,7 +46,6 @@ import { PhoneStatusBar } from "@/components/frame/phone-status-bar";
 import { BuyerDetails } from "@/components/buyer-details";
 import { LoginForm } from "@/components/login-form";
 import {
-  approvalLabel,
   checkoutOf,
   checkoutSiteOf,
   checkoutStatusLine,
@@ -64,6 +62,7 @@ import {
   watchedHere,
   type WatchIndex,
 } from "@/components/chat/parts";
+import { AgentCardSummary } from "@/components/chat/agent-card-approval";
 import { WatchRun } from "@/components/chat/checkout-card";
 import { CheckoutSiteLine } from "@/components/chat/checkout-site";
 import { ProductCards, ProductDetails, pickMessage } from "@/components/chat/product-cards";
@@ -72,7 +71,7 @@ import { StarterCards } from "@/components/chat/starters";
 import { type AgentChat } from "@/components/chat/use-agent-chat";
 import { useScrollToBottom } from "@/components/chat/use-scroll-to-bottom";
 import type { FoundProduct } from "@/lib/chat/shopify-catalog";
-import type { ApprovalOutcome, CheckoutOutcome } from "@/lib/chat/tools";
+import type { CheckoutOutcome } from "@/lib/chat/tools";
 import type { ChatMessage, ChatMessagePart } from "@/lib/chat/types";
 import { cn } from "@/lib/cn";
 import { brandAttr, initialOf, loginNext, type ExperienceProps } from "./types";
@@ -437,16 +436,7 @@ function CompactPart({
         );
       }
       if (part.state === "output-available") {
-        return (
-          <ApprovalCard
-            title={
-              request
-                ? `${formatAmount(request.amount.value, request.amount.currency)} for ${request.description}`
-                : "Budget request"
-            }
-            outcome={part.output}
-          />
-        );
+        return <AgentCardSummary requestId={part.input.requestId} outcome={part.output} />;
       }
       return (
         <ActivityLine busy={toolBusy(part.state)} failed={part.state === "output-error"}>
@@ -567,34 +557,10 @@ function ActivityLine({
   );
 }
 
-function ApprovalCard({
-  title,
-  action,
-  outcome,
-}: {
-  title: string;
-  action?: ReactNode;
-  outcome?: ApprovalOutcome;
-}) {
+function ApprovalCard({ title, action }: { title: string; action?: ReactNode }) {
   return (
     <div className="flex flex-col gap-3 rounded-2xl bg-card p-4 ring-1 ring-foreground/10">
-      <div className="flex items-start justify-between gap-3">
-        <p className="text-sm leading-snug font-medium text-balance">{title}</p>
-        {outcome ? (
-          <Badge
-            variant={
-              outcome.status === "active"
-                ? "success"
-                : outcome.status === "denied"
-                  ? "destructive"
-                  : "muted"
-            }
-          >
-            {outcome.status}
-          </Badge>
-        ) : null}
-      </div>
-      {outcome ? <p className="text-xs text-muted-foreground">{approvalLabel(outcome)}</p> : null}
+      <p className="text-sm leading-snug font-medium text-balance">{title}</p>
       {action}
     </div>
   );

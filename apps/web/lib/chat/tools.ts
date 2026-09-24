@@ -6,6 +6,13 @@ import { AgentCommerceToolError, type AgentCommerceClient } from "./api-client";
 import { lookUpProducts, searchProducts } from "./shopify-catalog";
 
 /**
+ * The max cost of a checkout when the user gave no limit. The run's payment
+ * step states the exact total, and the order intent is made for that total, so
+ * the agent does not need to guess one.
+ */
+const CHECKOUT_CEILING = "100000.00";
+
+/**
  * Agent Commerce tools for the chat model. Every tool runs in process against the Agent Commerce
  * handlers with the user's own session JWT, so the model can do exactly what
  * the user could do from the wallet page, and nothing more.
@@ -307,7 +314,15 @@ export function createChatTools(api: AgentCommerceClient, opts: { userEmail?: st
               .describe('Decimal string, e.g. "50.00".'),
             currency: z.string().length(3).describe(PARAM_DOCS.currency),
           })
-          .describe(paramDoc("create_checkout", "maxCost")),
+          .optional()
+          .describe(
+            "Only when the user gave a spending limit: the most to pay, including shipping and tax. Enforced. Otherwise leave it out and do not estimate one: the store states the exact total at the payment step, and the payment is authorized for that total only.",
+          ),
+        currency: z
+          .string()
+          .length(3)
+          .optional()
+          .describe("The store's currency, when there is no maxCost. Default USD."),
         buyerProfileId: z
           .string()
           .min(1)
@@ -315,7 +330,7 @@ export function createChatTools(api: AgentCommerceClient, opts: { userEmail?: st
           .describe(paramDoc("create_checkout", "buyerProfileId")),
         purpose: z.string().min(1).max(80).describe(paramDoc("create_checkout", "purpose")),
       }),
-      execute: ({ action, ...input }) => {
+      execute: ({ action, currency, maxCost, ...input }) => {
         void action; // for the site card only
         // The store's agent asks for an email on most checkouts. Give it the
         // user's up front, so nobody is asked for what the app already knows.
@@ -323,7 +338,16 @@ export function createChatTools(api: AgentCommerceClient, opts: { userEmail?: st
           opts.userEmail && !input.task?.includes(opts.userEmail)
             ? [input.task, `The buyer's email is ${opts.userEmail}.`].filter(Boolean).join(" ")
             : input.task;
-        return guard(() => api.createCheckout({ ...input, ...(task ? { task } : {}) }));
+        return guard(() =>
+          api.createCheckout({
+            ...input,
+            maxCost: maxCost ?? {
+              amount: CHECKOUT_CEILING,
+              currency: (currency ?? "USD").toUpperCase(),
+            },
+            ...(task ? { task } : {}),
+          }),
+        );
       },
     }),
 
