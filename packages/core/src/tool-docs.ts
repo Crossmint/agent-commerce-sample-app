@@ -155,6 +155,17 @@ export const TOOL_DOCS = {
     params: { checkoutId: PARAM_DOCS.checkoutId },
     surfaces: ["chat"],
   },
+  search_products: {
+    title: "Search products",
+    summary:
+      "Search products across every Shopify store, for when the user wants something but has no link. Returns a few in-stock products, each with its price, store, rating, options and the product page URL to pass to create_checkout.",
+    params: {
+      query: "What to look for, in plain words, e.g. sour gummy candy or a black wool beanie.",
+      maxPrice: "Most the user wants to pay per item, in major units, when they said so.",
+      shipsTo: "Two-letter country the item must ship to. Default US.",
+    },
+    surfaces: ["chat"],
+  },
   save_buyer_profile: {
     title: "Save the buyer's details",
     summary:

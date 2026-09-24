@@ -24,14 +24,19 @@ import {
   PLATFORM_NAME,
 } from "@/components/brand";
 import {
+  checkoutSiteOf,
   findPaymentStep,
   findRequest,
   pendingWatches,
   toApprovalOutcome,
   watchIndex,
+  type CheckoutPhase,
+  type CheckoutSite,
   type WatchIndex,
 } from "@/components/chat/parts";
+import { PHASE_LABEL, SiteIcon } from "@/components/chat/checkout-site";
 import { CheckoutWatcher } from "@/components/chat/checkout-card";
+import { STARTERS } from "@/components/chat/starters";
 import { useScrollToBottom } from "@/components/chat/use-scroll-to-bottom";
 import { DeviceFrame } from "@/components/frame/device-frame";
 import { PAGE_SHEET_TRANSITION_MS, PhonePageSheet } from "@/components/frame/phone-sheet";
@@ -61,7 +66,7 @@ import "./messaging.css";
 const DONE_LINGER_MS = 800;
 
 /** The first bubble of every thread. It stays when the conversation starts. */
-const WELCOME = `Hi, I am ${AGENT_NAME}. What should I buy for you? Send me a link and you can choose how to pay at the checkout.`;
+const WELCOME = `Hi, I am ${AGENT_NAME}. What can I get you? I can buy from any online store, book a table, or get you tickets. You choose how to pay at the checkout.`;
 
 /**
  * The app as a conversation in a chat app. The agent is a contact; what it
@@ -111,7 +116,16 @@ type Bubble =
       done?: string;
       onOpen?: () => void;
     }
-  | { key: string; kind: "status"; text: string };
+  | { key: string; kind: "status"; text: string }
+  /** The site a checkout runs on, as a link preview: its icon, the action, where it stands. */
+  | { key: string; kind: "site"; site: CheckoutSite; phase: CheckoutPhase }
+  /** Quick replies under a message, like the buttons a business chat offers. A tap sends one. */
+  | {
+      key: string;
+      kind: "choices";
+      choices: Array<{ label: string; message: string }>;
+      onPick: (message: string) => void;
+    };
 
 type Approval = {
   toolCallId: string;
@@ -184,6 +198,21 @@ function toBubbles(
         });
         return;
       }
+      // Starting a checkout shows the site it runs on, and where it stands.
+      const site = part.type === "tool-create_checkout" ? checkoutSiteOf(part) : undefined;
+      if (part.type === "tool-create_checkout" && site) {
+        const failed =
+          part.state === "output-error" ||
+          (part.state === "output-available" &&
+            Boolean((part.output as { error?: unknown } | undefined)?.error));
+        if (!failed) {
+          const phase = site.checkoutId
+            ? (watches.phase.get(site.checkoutId) ?? "working")
+            : "starting";
+          out.push({ key, kind: "site", site, phase });
+        }
+        return;
+      }
       // The store's agent speaks through the watch: one bubble per update,
       // live while the run goes, from the output after.
       if (part.type === "tool-watch_checkout") {
@@ -201,12 +230,12 @@ function toBubbles(
 }
 
 function sideOf(b: Bubble | undefined): Side | undefined {
-  return b && b.kind !== "status" ? b.side : undefined;
+  return b && (b.kind === "text" || b.kind === "link") ? b.side : undefined;
 }
 
 /** A bubble with its place in the thread: first or last of a run from one side, when it arrived, and whether it is the newest sent one. */
 interface Placed {
-  bubble: Exclude<Bubble, { kind: "status" }>;
+  bubble: Extract<Bubble, { kind: "text" | "link" }>;
   first: boolean;
   last: boolean;
   time: string;
@@ -250,7 +279,7 @@ function Thread({
   };
   let lastSent = -1;
   bubbles.forEach((b, i) => {
-    if (b.kind !== "status" && b.side === "sent") lastSent = i;
+    if ((b.kind === "text" || b.kind === "link") && b.side === "sent") lastSent = i;
   });
 
   return (
@@ -267,6 +296,42 @@ function Thread({
                 <p key={b.key} className={statusClassName}>
                   {b.text}
                 </p>
+              );
+            }
+            if (b.kind === "site") {
+              return (
+                <div
+                  key={b.key}
+                  className="mr-auto mb-2 flex w-[78%] items-center gap-2.5 rounded-2xl border border-current/15 px-3 py-2.5"
+                >
+                  <SiteIcon host={b.site.host} size={32} />
+                  <div className="flex min-w-0 flex-col">
+                    <span className="truncate text-[13px] leading-tight font-semibold">
+                      {b.site.action ?? `Visiting ${b.site.host}`}
+                    </span>
+                    <span className="truncate text-[11px] opacity-60">
+                      {b.site.host} · {PHASE_LABEL[b.phase]}
+                    </span>
+                  </div>
+                </div>
+              );
+            }
+            if (b.kind === "choices") {
+              // Neutral pills in the thread's own text colour, so they sit in
+              // any of the three chromes.
+              return (
+                <div key={b.key} className="mb-2 flex max-w-[78%] flex-col gap-1.5">
+                  {b.choices.map((c) => (
+                    <button
+                      key={c.label}
+                      type="button"
+                      onClick={() => b.onPick(c.message)}
+                      className="rounded-full border border-current/25 px-3.5 py-1.5 text-left text-[13px] font-medium transition-colors hover:bg-current/5"
+                    >
+                      {c.label}
+                    </button>
+                  ))}
+                </div>
               );
             }
             const first = sideOf(bubbles[i - 1]) !== b.side;
@@ -765,6 +830,15 @@ function SignedIn({
         },
     ...toBubbles(chat.messages, watches, live, onReview),
   ];
+  // A new chat offers the three ways to start, as quick replies under the welcome.
+  if (chatEnabled && !thread.loading && chat.messages.length === 0) {
+    bubbles.push({
+      key: "starters",
+      kind: "choices",
+      choices: STARTERS.map((s) => ({ label: s.title, message: s.message })),
+      onPick: chat.send,
+    });
+  }
   if (thread.loading) bubbles.push({ key: "loading", kind: "status", text: "Loading…" });
   if (chat.error) bubbles.push({ key: "error", kind: "status", text: chat.error });
 

@@ -54,9 +54,9 @@ const STEPS: Step[] = [
     ],
   },
   {
-    title: "Check out at any store with one API call",
-    summary: "A product URL and the agent card. Crossmint does the rest.",
-    body: "Crossmint's Agent Checkouts API figures out the best way to purchase from a website.",
+    title: "Buy anything online with one API call",
+    summary: "A product, a table, a flight or a ticket. Crossmint does the rest.",
+    body: "Crossmint's Agent Checkouts API finds the best way to complete a purchase on any website: order from a store, book a table, book a flight, or get tickets for an event.",
     facts: [
       "Supports UCP and any browser checkout.",
       "Works with any payment method, from agent cards to saved cards on the merchant to Shop Pay.",

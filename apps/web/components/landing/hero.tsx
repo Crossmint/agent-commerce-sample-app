@@ -15,7 +15,7 @@ const rise = (ms: number) => ({ "--delay": `${ms}ms` }) as CSSProperties;
 const WHAT_IT_SHOWS = [
   "Save your users’ cards",
   "Create secure spending limits",
-  "Check out at any store",
+  "Buy anything online: products, tables, flights and tickets",
 ];
 
 /**

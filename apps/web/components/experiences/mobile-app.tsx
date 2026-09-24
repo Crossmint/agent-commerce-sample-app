@@ -48,6 +48,7 @@ import { LoginForm } from "@/components/login-form";
 import {
   approvalLabel,
   checkoutOf,
+  checkoutSiteOf,
   checkoutStatusLine,
   findPaymentStep,
   findRequest,
@@ -61,8 +62,10 @@ import {
   type WatchIndex,
 } from "@/components/chat/parts";
 import { LiveCheckoutUpdates } from "@/components/chat/checkout-card";
+import { CheckoutSiteCard } from "@/components/chat/checkout-site";
 import { Text } from "@/components/chat/text";
-import { SUGGESTIONS, type AgentChat } from "@/components/chat/use-agent-chat";
+import { StarterCards } from "@/components/chat/starters";
+import { type AgentChat } from "@/components/chat/use-agent-chat";
 import { useScrollToBottom } from "@/components/chat/use-scroll-to-bottom";
 import type { ApprovalOutcome, CheckoutOutcome } from "@/lib/chat/tools";
 import type { ChatMessage, ChatMessagePart } from "@/lib/chat/types";
@@ -252,26 +255,14 @@ function Thread({
         <div className="flex flex-col gap-3">
           <AgentAvatar size={40} />
           <p className="text-[24px] leading-[1.2] font-medium tracking-[-0.02em] text-balance">
-            Hi, I am {AGENT_NAME}. What should I buy for you?
+            Hi, I am {AGENT_NAME}. What can I get you?
           </p>
           <p className="text-sm text-muted-foreground">
-            Send me a link and I will go buy it. You choose how to pay at the checkout.
+            I can buy from any online store, book a table, or get you tickets. You choose how to pay
+            at the checkout.
           </p>
         </div>
-        <ul className="flex flex-col gap-2" aria-label="Suggestions">
-          {SUGGESTIONS.map((s) => (
-            <li key={s}>
-              <button
-                type="button"
-                onClick={() => chat.send(s)}
-                className="flex w-full items-center justify-between gap-3 rounded-2xl bg-muted px-4 py-3 text-left text-sm transition-colors hover:bg-muted-strong"
-              >
-                <span className="min-w-0 truncate">{s}</span>
-                <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
-              </button>
-            </li>
-          ))}
-        </ul>
+        <StarterCards onPick={chat.send} />
       </div>
     );
   }
@@ -437,6 +428,18 @@ function CompactPart({
 
     default: {
       if (isCheckoutPart(part)) {
+        // Starting a checkout shows the site it runs on, and where it stands.
+        const site = checkoutSiteOf(part);
+        const failed =
+          part.state === "output-error" ||
+          (part.state === "output-available" &&
+            Boolean((part.output as { error?: unknown } | undefined)?.error));
+        if (site && !failed) {
+          const phase = site.checkoutId
+            ? (watches.phase.get(site.checkoutId) ?? "working")
+            : "starting";
+          return <CheckoutSiteCard site={site} phase={phase} compact className="max-w-none" />;
+        }
         if (watchedHere(message, part)) return null;
         const view = checkoutOf(part);
         return (

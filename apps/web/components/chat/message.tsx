@@ -10,9 +10,12 @@ import type { ChatMessage, ChatMessagePart } from "@/lib/chat/types";
 import { AgentCardApproval, AgentCardRequestCard } from "./agent-card-approval";
 import { AttachmentPreview } from "./attachment-preview";
 import { CheckoutCard, LiveCheckoutUpdates } from "./checkout-card";
+import { CheckoutSiteCard } from "./checkout-site";
 import {
   CHECKOUT_TITLES,
+  checkoutSiteOf,
   findPaymentStep,
+  isToolError,
   isCheckoutPart,
   messageText,
   toolSummary,
@@ -241,6 +244,17 @@ function Part({
 
     default:
       if (isCheckoutPart(part)) {
+        // Starting a checkout shows the site it runs on, and where it stands.
+        const site = checkoutSiteOf(part);
+        const failed =
+          part.state === "output-error" ||
+          (part.state === "output-available" && isToolError(part.output));
+        if (site && !failed) {
+          const phase = site.checkoutId
+            ? (watches.phase.get(site.checkoutId) ?? "working")
+            : "starting";
+          return <CheckoutSiteCard site={site} phase={phase} />;
+        }
         if (watchedHere(message, part)) return null;
         return (
           <CheckoutCard

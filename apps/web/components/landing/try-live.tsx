@@ -14,8 +14,8 @@ export function TryLive() {
               Try it live
             </h2>
             <p className="text-base text-muted-foreground sm:text-lg">
-              Log in, save a card, and let the agent buy something. All purchases are real
-              purchases. Every experience runs on the same APIs.
+              Log in, save a card, and let the agent buy a snack, book a table, or get tickets for
+              an event. All purchases are real purchases. Every experience runs on the same APIs.
             </p>
           </div>
           <Button asChild size="xl" className="w-full shrink-0 sm:w-auto sm:min-w-[14rem]">

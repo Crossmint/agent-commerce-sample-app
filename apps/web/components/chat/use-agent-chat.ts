@@ -125,6 +125,3 @@ export function useAgentChat({ id, initialMessages, persist }: UseAgentChatOptio
     reportError: setError,
   };
 }
-
-/** The three openers a new chat offers. */
-export const SUGGESTIONS = ["Buy this for me: https://", "Give me a $50 card for lunch this week"];

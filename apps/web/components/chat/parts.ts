@@ -141,8 +141,13 @@ export function watchedHere(message: ChatMessage, part: ChatMessagePart): boolea
   return message.parts.some((p) => p.type === "tool-watch_checkout" && p.input?.checkoutId === id);
 }
 
+/** Where a checkout stands, in the words a site card shows. */
+export type CheckoutPhase = "starting" | "working" | "waiting" | "done" | "stopped";
+
 /** What the thread's finished watches already did, so the next one does not do it twice. */
 export interface WatchIndex {
+  /** Where each checkout stands, from its newest watch. */
+  phase: Map<string, CheckoutPhase>;
   /** Updates already posted, by checkout. A new watch posts only what came after. */
   shown: Map<string, Set<string>>;
   /** Questions already handed to the model. */
@@ -152,11 +157,21 @@ export interface WatchIndex {
 }
 
 export function watchIndex(messages: ChatMessage[]): WatchIndex {
-  const index: WatchIndex = { shown: new Map(), asked: new Set(), paymentRequests: new Set() };
+  const index: WatchIndex = {
+    phase: new Map(),
+    shown: new Map(),
+    asked: new Set(),
+    paymentRequests: new Set(),
+  };
   for (const m of messages) {
     for (const part of m.parts) {
-      if (part.type !== "tool-watch_checkout" || part.state !== "output-available") continue;
+      if (part.type !== "tool-watch_checkout") continue;
+      if (part.state === "input-available" && part.input?.checkoutId) {
+        index.phase.set(part.input.checkoutId, "working");
+      }
+      if (part.state !== "output-available") continue;
       const out = part.output;
+      index.phase.set(out.checkoutId, phaseOf(out.status));
       let shown = index.shown.get(out.checkoutId);
       if (!shown) index.shown.set(out.checkoutId, (shown = new Set()));
       for (const u of out.updates ?? []) shown.add(u.id);
@@ -165,6 +180,40 @@ export function watchIndex(messages: ChatMessage[]): WatchIndex {
     }
   }
   return index;
+}
+
+function phaseOf(status: CheckoutOutcome["status"]): CheckoutPhase {
+  switch (status) {
+    case "succeeded":
+      return "done";
+    case "awaiting_input":
+    case "awaiting_payment":
+      return "waiting";
+    default:
+      return "stopped";
+  }
+}
+
+/** The site a `create_checkout` call visits, and what the agent does there, for its card. */
+export interface CheckoutSite {
+  checkoutId?: string;
+  /** "smartsweets.com" */
+  host: string;
+  /** "Buying a pouch of Sweet Fish", as the model put it. */
+  action?: string;
+}
+
+export function checkoutSiteOf(part: ChatMessagePart): CheckoutSite | undefined {
+  if (part.type !== "tool-create_checkout") return undefined;
+  const input = part.input as { startUrl?: string; action?: string } | undefined;
+  if (!input?.startUrl) return undefined;
+  let host: string;
+  try {
+    host = new URL(input.startUrl).hostname.replace(/^www\./, "");
+  } catch {
+    return undefined;
+  }
+  return { checkoutId: checkoutOf(part)?.id, host, action: input.action?.trim() || undefined };
 }
 
 /** The pending `watch_checkout` calls in a thread, for a surface that watches them out of sight. */
@@ -225,6 +274,7 @@ export function toolTitle(type: string): string {
     "tool-watch_checkout": "Following the checkout",
     "tool-pay_checkout_with_agent_card": "Paying with your agent card",
     "tool-save_buyer_profile": "Saving your details for next time",
+    "tool-search_products": "Looking through online stores",
     "tool-reveal_agent_card": "Minting a card credential",
     "tool-revoke_agent_card": "Revoking an agent card",
     ...CHECKOUT_TITLES,

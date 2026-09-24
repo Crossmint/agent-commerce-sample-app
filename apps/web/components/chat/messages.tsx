@@ -17,19 +17,18 @@ export interface MessagesProps {
   status: ChatStatus;
   onApprovalOutcome: (toolCallId: string, outcome: ApprovalOutcome) => void;
   onCheckoutOutcome: (toolCallId: string, outcome: CheckoutOutcome) => void;
-  suggestions: string[];
-  onPickSuggestion: (text: string) => void;
+  onPickStarter: (text: string) => void;
 }
 
 /** The desktop transcript: a centered column that follows the newest message. */
-export function Messages({ messages, status, onApprovalOutcome, onCheckoutOutcome, suggestions, onPickSuggestion }: MessagesProps) {
+export function Messages({ messages, status, onApprovalOutcome, onCheckoutOutcome, onPickStarter }: MessagesProps) {
   const { containerRef, isAtBottom, scrollToBottom } = useScrollToBottom();
   const last = messages.at(-1);
   const waiting = status === "submitted" && last?.role !== "assistant";
   const watches = useMemo(() => watchIndex(messages), [messages]);
 
   if (messages.length === 0) {
-    return <Greeting suggestions={suggestions} onPick={onPickSuggestion} />;
+    return <Greeting onPick={onPickStarter} />;
   }
 
   return (

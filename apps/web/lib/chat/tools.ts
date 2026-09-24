@@ -3,6 +3,7 @@ import { describeTool, PARAM_DOCS, paramDoc, type ToolNameFor } from "@agent-com
 import { z } from "zod";
 import { CHAT_REQUESTER } from "./config";
 import { AgentCommerceToolError, type AgentCommerceClient } from "./api-client";
+import { searchProducts } from "./shopify-catalog";
 
 /**
  * Agent Commerce tools for the chat model. Every tool runs in process against the Agent Commerce
@@ -280,6 +281,15 @@ export function createChatTools(api: AgentCommerceClient, opts: { userEmail?: st
       ),
       inputSchema: z.object({
         startUrl: z.string().url().describe(paramDoc("create_checkout", "startUrl")),
+        // Chat only, and never sent to the API: the line the site card shows.
+        action: z
+          .string()
+          .min(1)
+          .max(60)
+          .optional()
+          .describe(
+            "What you are doing on the site, in a few words, shown to the user on the site card. Start with a verb. E.g. Buying a pouch of Sweet Fish, Booking a table for 2 at Nopa, Getting tickets for a show in Madrid.",
+          ),
         task: z.string().max(20000).optional().describe(paramDoc("create_checkout", "task")),
         agentCardId: z
           .string()
@@ -301,7 +311,10 @@ export function createChatTools(api: AgentCommerceClient, opts: { userEmail?: st
           .optional()
           .describe(paramDoc("create_checkout", "buyerProfileId")),
       }),
-      execute: (input) => guard(() => api.createCheckout(input)),
+      execute: ({ action, ...input }) => {
+        void action; // for the site card only
+        return guard(() => api.createCheckout(input));
+      },
     }),
 
     // Client-side tool: no `execute`. The chat UI shows the run live and supplies the output when it ends.
@@ -322,6 +335,26 @@ export function createChatTools(api: AgentCommerceClient, opts: { userEmail?: st
         checkoutId: z.string().min(1).describe(paramDoc("get_checkout", "checkoutId")),
       }),
       execute: ({ checkoutId }) => guard(() => api.getCheckout(checkoutId)),
+    }),
+
+    search_products: tool({
+      description: describeTool("search_products"),
+      inputSchema: z.object({
+        query: z.string().min(2).max(200).describe(paramDoc("search_products", "query")),
+        maxPrice: z
+          .number()
+          .positive()
+          .optional()
+          .describe(paramDoc("search_products", "maxPrice")),
+        shipsTo: z.string().length(2).optional().describe(paramDoc("search_products", "shipsTo")),
+      }),
+      execute: (input) =>
+        guard(async () => {
+          const products = await searchProducts({ ...input, limit: 5 });
+          return products.length
+            ? { products }
+            : { products, note: "Nothing found. Try other words, or ask the user for a link." };
+        }),
     }),
 
     save_buyer_profile: tool({
