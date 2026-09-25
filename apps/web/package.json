@@ -23,7 +23,7 @@
     "@ai-sdk/anthropic": "^4.0.0",
     "@ai-sdk/openai": "^4.0.66",
     "@ai-sdk/react": "^4.0.0",
-    "@crossmint/client-sdk-react-ui": "^4.7.0",
+    "@crossmint/client-sdk-react-ui": "4.8.0",
     "@modelcontextprotocol/sdk": "^1.30.0",
     "@stytch/nextjs": "^22.3.0",
     "@stytch/vanilla-js": "^6.3.0",
