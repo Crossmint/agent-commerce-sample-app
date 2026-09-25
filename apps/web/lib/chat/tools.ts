@@ -3,6 +3,8 @@ import {
   describeTool,
   PARAM_DOCS,
   paramDoc,
+  type BuyerProfile,
+  type BuyerProfileInput,
   type PaymentMethod,
   type ToolNameFor,
 } from "@agent-commerce/core";
@@ -129,6 +131,74 @@ export const checkoutOutcomeSchema = z.object({
 export type CheckoutOutcome = z.infer<typeof checkoutOutcomeSchema>;
 
 /** Turn a Agent Commerce API error into a plain tool result the model can read and explain. */
+type BuyerProfileChange = {
+  firstName?: string;
+  lastName?: string;
+  email?: string;
+  phone?: string;
+  addressLines?: string[];
+  city?: string;
+  region?: string;
+  postalCode?: string;
+  countryCode?: string;
+  label?: string;
+};
+
+/**
+ * The saved buyer details with a change laid over them: what the user said
+ * now wins, and everything they did not mention is kept. Another country
+ * drops the old state or province unless one came with it, so a move abroad
+ * does not keep a region from the old country. Returns what is still missing
+ * when there is no whole profile yet.
+ */
+export function mergeBuyerProfile(
+  saved: BuyerProfile | null | undefined,
+  change: BuyerProfileChange,
+  userEmail?: string,
+): { profile: BuyerProfileInput } | { missing: string[] } {
+  const moved =
+    Boolean(change.countryCode) &&
+    change.countryCode!.toUpperCase() !== saved?.shipping.countryCode.toUpperCase();
+  const first = change.firstName ?? saved?.name.first;
+  const last = change.lastName ?? saved?.name.last;
+  const email = change.email ?? saved?.contact.email ?? userEmail;
+  const phone = change.phone ?? saved?.contact.phone;
+  const addressLines = change.addressLines ?? saved?.shipping.addressLines;
+  const city = change.city ?? saved?.shipping.locality;
+  const region = change.region ?? (moved ? undefined : saved?.shipping.administrativeAreaCode);
+  const postalCode = change.postalCode ?? saved?.shipping.postalCode;
+  const countryCode = change.countryCode ?? saved?.shipping.countryCode;
+
+  const missing = Object.entries({
+    "first name": first,
+    "last name": last,
+    email,
+    "phone number": phone,
+    street: addressLines?.length ? addressLines : undefined,
+    city,
+    "postal code": postalCode,
+    country: countryCode,
+  })
+    .filter(([, v]) => !v)
+    .map(([k]) => k);
+  if (missing.length) return { missing };
+
+  return {
+    profile: {
+      label: change.label ?? saved?.label ?? "Home",
+      name: { first: first!, last: last! },
+      contact: { email: email!, phone: phone! },
+      shipping: {
+        addressLines: addressLines!,
+        locality: city!,
+        ...(region ? { administrativeAreaCode: region.toUpperCase() } : {}),
+        postalCode: postalCode!,
+        countryCode: countryCode!.toUpperCase(),
+      },
+    },
+  };
+}
+
 /** A receipt the chat draws: what the model said, and what the checkout verified. */
 export interface ShownReceipt {
   kind: ReceiptKind;
@@ -542,19 +612,33 @@ export function createChatTools(api: AgentCommerceClient, opts: { userEmail?: st
 
     save_buyer_profile: tool({
       description: describeTool("save_buyer_profile"),
+      // Every field optional: a save adds to what is saved, it does not start over.
       inputSchema: z.object({
-        firstName: z.string().min(1).describe(paramDoc("save_buyer_profile", "firstName")),
-        lastName: z.string().min(1).describe(paramDoc("save_buyer_profile", "lastName")),
+        firstName: z
+          .string()
+          .min(1)
+          .optional()
+          .describe(paramDoc("save_buyer_profile", "firstName")),
+        lastName: z.string().min(1).optional().describe(paramDoc("save_buyer_profile", "lastName")),
         email: z.string().email().optional().describe(paramDoc("save_buyer_profile", "email")),
-        phone: z.string().min(3).describe(paramDoc("save_buyer_profile", "phone")),
+        phone: z.string().min(3).optional().describe(paramDoc("save_buyer_profile", "phone")),
         addressLines: z
           .array(z.string().min(1))
           .min(1)
+          .optional()
           .describe(paramDoc("save_buyer_profile", "addressLines")),
-        city: z.string().min(1).describe(paramDoc("save_buyer_profile", "city")),
+        city: z.string().min(1).optional().describe(paramDoc("save_buyer_profile", "city")),
         region: z.string().min(2).optional().describe(paramDoc("save_buyer_profile", "region")),
-        postalCode: z.string().min(1).describe(paramDoc("save_buyer_profile", "postalCode")),
-        countryCode: z.string().length(2).describe(paramDoc("save_buyer_profile", "countryCode")),
+        postalCode: z
+          .string()
+          .min(1)
+          .optional()
+          .describe(paramDoc("save_buyer_profile", "postalCode")),
+        countryCode: z
+          .string()
+          .length(2)
+          .optional()
+          .describe(paramDoc("save_buyer_profile", "countryCode")),
         label: z
           .string()
           .min(1)
@@ -564,25 +648,21 @@ export function createChatTools(api: AgentCommerceClient, opts: { userEmail?: st
       }),
       execute: (input) =>
         guard(async () => {
-          const email = input.email ?? opts.userEmail;
-          if (!email) {
-            return { error: "No email to save. Ask the user for one.", code: "invalid_request" };
+          const saved = await api.getBuyerProfile();
+          const merged = mergeBuyerProfile(saved, input, opts.userEmail);
+          if ("missing" in merged) {
+            return {
+              error: `Nothing saved yet: still missing ${merged.missing.join(", ")}. Ask the user for ${merged.missing.length > 1 ? "them" : "it"}, then save again with only what they give you.`,
+              code: "invalid_request",
+            };
           }
-          const saved = await api.createBuyerProfile({
-            label: input.label ?? "Home",
-            name: { first: input.firstName, last: input.lastName },
-            contact: { email, phone: input.phone },
-            shipping: {
-              addressLines: input.addressLines,
-              locality: input.city,
-              ...(input.region ? { administrativeAreaCode: input.region.toUpperCase() } : {}),
-              postalCode: input.postalCode,
-              countryCode: input.countryCode.toUpperCase(),
-            },
-          });
+          const created = await api.createBuyerProfile(merged.profile);
           return {
-            buyerProfileId: saved.id,
+            buyerProfileId: created.id,
             saved: true,
+            kept: saved
+              ? "Every field you did not pass was kept from the saved details."
+              : undefined,
             note: "Later checkouts start with these details. The one running now already has its answers from you.",
           };
         }),

@@ -45,7 +45,7 @@ export function systemPrompt(opts: { userEmail?: string; buyerProfile?: BuyerPro
     "",
     "What you know about the user:",
     "- Answer a store's question from what is here, and do not ask the user for it. Ask only for what is missing.",
-    "- When the user gives you their full name and a full address, or asks you to save or change their details, call save_buyer_profile, as well as answering the store if one asked, so later checkouts do not ask. Ask for what is missing first (the full name, a phone number, the street, the city, the postal code, the country). Say in a few words that you saved them; they can see and edit them under Buyer details. Save again only when something changed.",
+    "- When the user gives you any of their details (their name, a phone number, an address), or asks you to save or change them, call save_buyer_profile, as well as answering the store if one asked, so later checkouts do not ask. Pass only what they gave you or changed: it is added to what is saved, and the rest is kept. If nothing is saved yet and something is missing (the full name, a phone number, the street, the city, the postal code, the country), the save says what; ask for it. Say in a few words that you saved them; they can see and edit them under Buyer details. Save again only when something changed.",
     opts.userEmail
       ? `- Email: ${opts.userEmail}, the one they signed in with. Use it whenever a store asks for an email, and never ask the user for it.`
       : "- Email: not known.",

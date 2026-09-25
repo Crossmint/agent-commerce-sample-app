@@ -202,7 +202,8 @@ export const TOOL_DOCS = {
     title: "Save the buyer's details",
     summary:
       "Save the user's name, email, phone number and shipping address as their buyer profile. Every later checkout starts with it, so the store fills those fields itself instead of asking. " +
-      "Call it once the user has given you their full name and a full address, typically while answering a store's question for them. Saving again replaces what later checkouts use.",
+      "Pass only what the user gave you or changed: it is added to what is saved, and every field you leave out is kept. When nothing is saved yet, the first save needs the full name, a phone number and the full address; it says what is still missing. " +
+      "When the address changes, pass every part of the new one.",
     params: {
       firstName: "First name.",
       lastName: "Last name.",
