@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import type { ChatMessage } from "@/lib/chat/types";
-import { productsMessageOf } from "./parts";
+import { productsMessageOf, receiptMessageOf } from "./parts";
 
 /*
  * The small sounds a chat app makes: a soft two-note pop when the agent's
@@ -64,6 +64,8 @@ function counts(messages: ChatMessage[]): { sent: number; received: number } {
         if (p.type === "text" && p.text.trim()) received++;
         // A look-up carries its own line above the cards.
         else if (productsMessageOf(p)) received++;
+        // So does a receipt.
+        else if (receiptMessageOf(p)) received++;
       }
     }
   }

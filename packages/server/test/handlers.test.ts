@@ -631,6 +631,7 @@ describe("checkouts", () => {
     expect(await res.json()).toEqual({
       id: "run_1",
       status: "running",
+      startUrl: "https://www.shop.example/products/tee",
       agentCardId: "oi_1",
       embedUrl: "https://www.crossmint.com/embed/run_1",
       createdAt: "2026-09-17T00:00:00.000Z",
@@ -903,6 +904,7 @@ describe("checkouts", () => {
     expect(JSON.parse(text)).toEqual({
       id: "run_1",
       status: "succeeded",
+      startUrl: "https://www.shop.example/products/tee",
       agentCardId: "oi_1",
       result: {
         outcome: "succeeded",

@@ -3,7 +3,14 @@ import type { ApproveOutcome } from "@agent-commerce/ui";
 import type { CheckoutMessage } from "@agent-commerce/core";
 import type { CheckoutStep } from "@agent-commerce/ui";
 import type { FoundProduct } from "@/lib/chat/shopify-catalog";
-import type { ApprovalOutcome, CheckoutOutcome, CheckoutUpdate } from "@/lib/chat/tools";
+import { formatAmount, paymentMethodLabel } from "@agent-commerce/ui";
+import type { ReceiptData } from "@/components/receipt";
+import type {
+  ApprovalOutcome,
+  CheckoutOutcome,
+  CheckoutUpdate,
+  ShownReceipt,
+} from "@/lib/chat/tools";
 import type { ChatMessage, ChatMessagePart } from "@/lib/chat/types";
 import { humanizeToolName } from "./tool-card";
 
@@ -243,6 +250,46 @@ export function productsOf(part: ChatMessagePart): FoundProduct[] | undefined {
   return isToolError(out) ? undefined : out.products;
 }
 
+/** The line the agent puts above a receipt, once the call is streamed in. */
+export function receiptMessageOf(part: ChatMessagePart): string | undefined {
+  if (part.type !== "tool-show_receipt" || part.state === "input-streaming") return undefined;
+  const message = (part.input as { message?: string } | undefined)?.message?.trim();
+  return message || undefined;
+}
+
+/** The receipt a `show_receipt` call sends, once the checkout has vouched for it. */
+export function receiptOf(part: ChatMessagePart): ReceiptData | undefined {
+  if (part.type !== "tool-show_receipt" || part.state !== "output-available") return undefined;
+  const out = part.output as ShownReceipt | ToolError;
+  if (isToolError(out)) return undefined;
+  const money = (value: string) => formatAmount(value, out.currency);
+  return {
+    kind: out.kind,
+    merchant: out.merchant,
+    ...(out.host ? { host: out.host } : {}),
+    ...(out.reference ? { reference: out.reference } : {}),
+    ...(out.title ? { title: out.title } : {}),
+    ...(out.details?.length ? { details: out.details } : {}),
+    ...(out.items?.length
+      ? {
+          items: out.items.map((i) => ({
+            label: i.label,
+            ...(i.amount ? { amount: money(i.amount) } : {}),
+          })),
+        }
+      : {}),
+    ...(out.total ? { total: formatAmount(out.total.amount, out.total.currency) } : {}),
+    ...(out.paymentMethod
+      ? {
+          card: {
+            label: paymentMethodLabel(out.paymentMethod),
+            paymentMethod: out.paymentMethod,
+          },
+        }
+      : {}),
+  };
+}
+
 /** The site a `create_checkout` call visits, and what the agent does there, for its card. */
 export interface CheckoutSite {
   checkoutId?: string;
@@ -325,6 +372,7 @@ export function toolTitle(type: string): string {
     "tool-save_buyer_profile": "Saving your details for next time",
     "tool-search_products": "Looking through online stores",
     "tool-look_up_products": "Looking the product up",
+    "tool-show_receipt": "Writing up the receipt",
     "tool-reveal_agent_card": "Minting a card credential",
     "tool-revoke_agent_card": "Revoking an agent card",
     ...CHECKOUT_TITLES,

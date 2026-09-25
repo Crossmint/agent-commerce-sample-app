@@ -1,9 +1,16 @@
 import { tool } from "ai";
-import { describeTool, PARAM_DOCS, paramDoc, type ToolNameFor } from "@agent-commerce/core";
+import {
+  describeTool,
+  PARAM_DOCS,
+  paramDoc,
+  type PaymentMethod,
+  type ToolNameFor,
+} from "@agent-commerce/core";
 import { z } from "zod";
 import { CHAT_REQUESTER } from "./config";
 import { AgentCommerceToolError, type AgentCommerceClient } from "./api-client";
 import { lookUpProducts, searchProducts } from "./shopify-catalog";
+import { RECEIPT_KINDS, type ReceiptKind } from "@/lib/receipt";
 
 /**
  * The max cost of a checkout when the user gave no limit. The run's payment
@@ -122,6 +129,32 @@ export const checkoutOutcomeSchema = z.object({
 export type CheckoutOutcome = z.infer<typeof checkoutOutcomeSchema>;
 
 /** Turn a Agent Commerce API error into a plain tool result the model can read and explain. */
+/** A receipt the chat draws: what the model said, and what the checkout verified. */
+export interface ShownReceipt {
+  kind: ReceiptKind;
+  merchant: string;
+  title?: string;
+  details?: Array<{ label: string; value: string }>;
+  items?: Array<{ label: string; amount?: string }>;
+  /** The run's site: "opentable.com". */
+  host?: string;
+  reference?: string;
+  total?: { amount: string; currency: string };
+  /** The currency of the item amounts. */
+  currency: string;
+  paymentMethod?: PaymentMethod;
+}
+
+/** "www.opentable.com/r/nopa" → "opentable.com". */
+function hostOf(url: string | undefined): string | undefined {
+  if (!url) return undefined;
+  try {
+    return new URL(url).hostname.replace(/^www\./, "");
+  } catch {
+    return undefined;
+  }
+}
+
 async function guard<T>(fn: () => Promise<T>): Promise<T | { error: string; code: string }> {
   try {
     return await fn();
@@ -425,6 +458,85 @@ export function createChatTools(api: AgentCommerceClient, opts: { userEmail?: st
                 products,
                 note: "Not found in the catalog. Describe the product in words instead.",
               };
+        }),
+    }),
+
+    // Chat only: the receipt for a checkout that went through. The model says
+    // what it was; the total, the reference and the card come from the run.
+    show_receipt: tool({
+      description: describeTool(
+        "show_receipt",
+        "The chat draws it as a receipt card under your message; do not repeat it in text.",
+      ),
+      inputSchema: z.object({
+        checkoutId: z.string().min(1).describe(paramDoc("show_receipt", "checkoutId")),
+        kind: z.enum(RECEIPT_KINDS).describe(paramDoc("show_receipt", "kind")),
+        merchant: z.string().min(1).max(60).describe(paramDoc("show_receipt", "merchant")),
+        title: z.string().max(60).optional().describe(paramDoc("show_receipt", "title")),
+        details: z
+          .array(z.object({ label: z.string().min(1).max(20), value: z.string().min(1).max(60) }))
+          .max(6)
+          .optional()
+          .describe(paramDoc("show_receipt", "details")),
+        items: z
+          .array(
+            z.object({
+              label: z.string().min(1).max(60),
+              amount: z
+                .string()
+                .regex(/^\d+(\.\d{1,2})?$/)
+                .optional()
+                .describe(paramDoc("show_receipt", "itemAmount")),
+            }),
+          )
+          .max(10)
+          .optional()
+          .describe(paramDoc("show_receipt", "items")),
+        currency: z.string().length(3).optional().describe(paramDoc("show_receipt", "currency")),
+        reference: z.string().max(40).optional().describe(paramDoc("show_receipt", "reference")),
+        // Chat only: the line above the receipt, so it always shows first.
+        message: z
+          .string()
+          .min(1)
+          .max(300)
+          .optional()
+          .describe(
+            "What to say to the user, shown right above the receipt: one or two sentences on how it went. When you pass it, write no other text.",
+          ),
+      }),
+      execute: ({ checkoutId, message, currency, reference, ...shown }) =>
+        guard(async (): Promise<ShownReceipt | { error: string; code: string }> => {
+          void message; // for the chat only
+          const view = await api.getCheckout(checkoutId);
+          if (view.status !== "succeeded") {
+            return {
+              error: `The checkout has not succeeded (it is ${view.status}). Say how it went in words instead.`,
+              code: "checkout_not_succeeded",
+            };
+          }
+          // The card that paid, for its artwork and label, and what it was
+          // made for: the exact total the payment step asked for.
+          const card = view.agentCardId
+            ? await api.getAgentCard(view.agentCardId).catch(() => undefined)
+            : undefined;
+          const method = card
+            ? (await api.listPaymentMethods().catch(() => [])).find(
+                (m) => m.paymentMethodId === card.paymentMethodId,
+              )
+            : undefined;
+          const total =
+            view.receipt?.total ??
+            (card ? { amount: card.amount.total, currency: card.amount.currency } : undefined);
+          const host = hostOf(view.startUrl);
+          const ref = view.receipt?.merchantOrderId ?? reference;
+          return {
+            ...shown,
+            ...(host ? { host } : {}),
+            ...(ref ? { reference: ref } : {}),
+            ...(total ? { total } : {}),
+            currency: (total?.currency ?? currency ?? "USD").toUpperCase(),
+            ...(method ? { paymentMethod: method } : {}),
+          };
         }),
     }),
 

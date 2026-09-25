@@ -12,12 +12,15 @@ import { AttachmentPreview } from "./attachment-preview";
 import { CheckoutCard, WatchRun } from "./checkout-card";
 import { CheckoutSiteLine } from "./checkout-site";
 import { ProductCards } from "./product-cards";
+import { Receipt } from "@/components/receipt";
 import {
   CHECKOUT_TITLES,
   checkoutSiteOf,
   findPaymentStep,
   productsMessageOf,
   productsOf,
+  receiptMessageOf,
+  receiptOf,
   isToolError,
   isCheckoutPart,
   messageText,
@@ -292,6 +295,19 @@ function Part({
             <>
               {message ? <AgentBubble text={message} /> : null}
               {products?.length ? <ProductCards products={products} onPick={onSend} /> : null}
+            </>
+          );
+        }
+      }
+      {
+        // A checkout that went through: the receipt, under the agent's line on it.
+        const message = receiptMessageOf(part);
+        const receipt = receiptOf(part);
+        if (message || receipt) {
+          return (
+            <>
+              {message ? <AgentBubble text={message} /> : null}
+              {receipt ? <Receipt receipt={receipt} className="max-w-[300px]" /> : null}
             </>
           );
         }

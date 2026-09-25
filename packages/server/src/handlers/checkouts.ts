@@ -78,6 +78,8 @@ export interface CheckoutView {
   /** Crossmint's `runId`. */
   id: string;
   status: CheckoutStatus;
+  /** The page the run started from, for the site it runs on. */
+  startUrl?: string;
   agentCardId?: string;
   /**
    * The run is waiting on a payment method. Show the user their saved cards
@@ -643,6 +645,8 @@ function toView(
   opts: { hidePayment?: boolean; paymentRequest?: CheckoutPaymentRequest } = {},
 ): CheckoutView {
   const view: CheckoutView = { id: checkout.runId, status: checkout.status };
+  const startUrl = checkout.input?.request?.startUrl;
+  if (startUrl) view.startUrl = startUrl;
   if (agentCardId) view.agentCardId = agentCardId;
   if (opts.paymentRequest) view.paymentRequest = opts.paymentRequest;
   const action = pendingActionOf(checkout);

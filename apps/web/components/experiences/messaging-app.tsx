@@ -31,6 +31,8 @@ import {
   pendingWatches,
   productsMessageOf,
   productsOf,
+  receiptMessageOf,
+  receiptOf,
   runSteps,
   stoppedForUser,
   toApprovalOutcome,
@@ -43,6 +45,7 @@ import { ENTER, ENTER_SENT } from "@/components/chat/text";
 import { pickMessage, ProductDetails, ProductImage } from "@/components/chat/product-cards";
 import { CheckoutWatcher, runTitle, type LiveWatch } from "@/components/chat/checkout-card";
 import { STARTERS } from "@/components/chat/starters";
+import { Receipt, type ReceiptData } from "@/components/receipt";
 import { useScrollToBottom } from "@/components/chat/use-scroll-to-bottom";
 import { DeviceFrame } from "@/components/frame/device-frame";
 import { PAGE_SHEET_TRANSITION_MS, PhonePageSheet } from "@/components/frame/phone-sheet";
@@ -146,6 +149,8 @@ type Bubble =
     }
   /** Where the agent went, said once: the site's icon and a small line over the next bubble. */
   | { key: string; kind: "site"; site: CheckoutSite }
+  /** A checkout that went through, as the receipt card a business sends. */
+  | { key: string; kind: "receipt"; receipt: ReceiptData }
   /** Quick replies under a message, like the buttons a business chat offers. A tap sends one. */
   | ChoicesBubble;
 
@@ -243,6 +248,16 @@ function toBubbles(
       if (message || products?.length) {
         if (message) out.push({ key: `${key}-text`, kind: "text", side: "recv", text: message });
         if (products?.length) out.push({ key, kind: "products", products, onPick, onOpen });
+        return;
+      }
+      // A checkout that went through: the receipt, under the agent's line on it.
+      const receiptLine = receiptMessageOf(part);
+      const receipt = receiptOf(part);
+      if (receiptLine || receipt) {
+        if (receiptLine) {
+          out.push({ key: `${key}-text`, kind: "text", side: "recv", text: receiptLine });
+        }
+        if (receipt) out.push({ key, kind: "receipt", receipt });
         return;
       }
       // Starting a checkout shows the site it runs on, and where it stands.
@@ -420,6 +435,14 @@ function Thread({
                     folded={b.folded}
                     compact
                   />
+                </div>
+              );
+            }
+            if (b.kind === "receipt") {
+              // The card draws its own surface, as the landing's thread shows it.
+              return (
+                <div key={b.key} className={cn("mr-auto mb-2 w-[78%]", ENTER)}>
+                  <Receipt receipt={b.receipt} />
                 </div>
               );
             }

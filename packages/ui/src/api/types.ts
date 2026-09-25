@@ -188,6 +188,7 @@ export interface CheckoutPaymentRequest {
 export interface CheckoutView {
   id: string;
   status: CheckoutStatus;
+  startUrl?: string;
   agentCardId?: string;
   paymentRequest?: CheckoutPaymentRequest;
   pendingUserAction?: PendingUserAction;

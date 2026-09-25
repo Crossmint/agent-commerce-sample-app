@@ -51,6 +51,8 @@ import {
   checkoutStatusLine,
   productsMessageOf,
   productsOf,
+  receiptMessageOf,
+  receiptOf,
   findPaymentStep,
   findRequest,
   isCheckoutPart,
@@ -66,6 +68,7 @@ import { AgentCardSummary } from "@/components/chat/agent-card-approval";
 import { WatchRun } from "@/components/chat/checkout-card";
 import { CheckoutSiteLine } from "@/components/chat/checkout-site";
 import { ProductCards, ProductDetails, pickMessage } from "@/components/chat/product-cards";
+import { Receipt } from "@/components/receipt";
 import { AgentBubble, ENTER, ENTER_SENT } from "@/components/chat/text";
 import { StarterCards } from "@/components/chat/starters";
 import { type AgentChat } from "@/components/chat/use-agent-chat";
@@ -507,6 +510,24 @@ function CompactPart({
               {products?.length ? (
                 <ProductCards products={products} onPick={onSend} onOpen={onOpenProduct} compact />
               ) : null}
+            </>
+          );
+        }
+      }
+      {
+        // A checkout that went through: the receipt, under the agent's line on it.
+        const message = receiptMessageOf(part);
+        const receipt = receiptOf(part);
+        if (message || receipt) {
+          return (
+            <>
+              {message ? (
+                <AgentBubble
+                  text={message}
+                  className="max-w-[85%] px-3.5 py-2 text-[15px] leading-snug"
+                />
+              ) : null}
+              {receipt ? <Receipt receipt={receipt} className="max-w-[85%]" /> : null}
             </>
           );
         }

@@ -177,6 +177,27 @@ export const TOOL_DOCS = {
     },
     surfaces: ["chat"],
   },
+  show_receipt: {
+    title: "Send the receipt",
+    summary:
+      "Send the user the receipt for a checkout that succeeded. Call it once, right after the checkout ends as succeeded. " +
+      "The total, the order number and the card that paid are filled in from the checkout; you say what it was, from what the store reported.",
+    params: {
+      checkoutId: "The checkout that succeeded.",
+      kind: "purchase for things shipped, food for a meal or a coffee to pick up or have delivered, reservation for a table or a stay, tickets for events and experiences, travel for flights and trains, other for anything else.",
+      merchant: "Who it is from, as the user knows them: IQBAR, Nopa, Sala Apolo, Iberia.",
+      title:
+        "What it is, in a few words, when the items do not say it: Dinner for 2, 2 tickets to Coldplay. Leave it out for a purchase whose items say it.",
+      details:
+        "The facts the user needs, short, in order: Date, Time, Party, Seats, Venue, Route, Delivery, Pickup. Only what the store confirmed.",
+      items:
+        "What was bought, with quantities in the label (2 × Caffè Latte), then shipping and tax, when the store showed them. Leave it out when it would only repeat the title.",
+      itemAmount: 'Decimal string, e.g. "12.99". Only when the store showed it.',
+      currency: "The currency of the item amounts, when the checkout states no total.",
+      reference: "The order or confirmation number the store gave, when the checkout reports none.",
+    },
+    surfaces: ["chat"],
+  },
   save_buyer_profile: {
     title: "Save the buyer's details",
     summary:
