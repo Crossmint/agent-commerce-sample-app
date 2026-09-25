@@ -356,19 +356,21 @@ export interface CheckoutInteraction {
   /**
    * `form`: answer with values that fit `responseSchema`. `payment`: the
    * payment step; answer with an order intent (`paymentResponse`), never
-   * with card details.
+   * with card details. `protected`: a secret such as a password; the buyer
+   * types it into Crossmint's own field, and the answer is only the id of
+   * what they typed (`protectedResponse`). The request carries no secret.
    */
-  kind: "form" | "payment" | (string & {});
+  kind: "form" | "payment" | "protected" | (string & {});
   /** On a form. */
   responseSchema?: JsonSchema;
   uiSchema?: Record<string, unknown>;
-  /** On a payment request, e.g. "checkout_payment". */
+  /** On a payment request, e.g. "checkout_payment". On a protected one, what the secret is: "password". */
   purpose?: string;
   /** On a payment request: what the checkout accepts. Today always "card". */
   method?: "card" | (string & {});
   /** On a payment request: the total to authorize, which the order intent must match. */
   amount?: CheckoutPaymentAmount;
-  /** On a payment request: the merchant the credential will be bound to. */
+  /** On a payment or protected request: the merchant the credential or secret is bound to. */
   merchant?: { domain: string };
 }
 
@@ -403,6 +405,15 @@ export interface PendingUserAction {
   payment?: {
     method: string;
     amount?: CheckoutPaymentAmount;
+    merchant?: { domain: string };
+  };
+  /**
+   * Set when the store asks for a secret, such as the password of the
+   * buyer's account there. Never answer it with values: the buyer types it
+   * into Crossmint's protected field, which returns an id to answer with.
+   */
+  protected?: {
+    purpose: "password" | (string & {});
     merchant?: { domain: string };
   };
 }
@@ -453,6 +464,7 @@ export interface CheckoutList {
 export type InputResponsePart =
   | { type: "input_response"; requestId: string; action: "submit"; response: { kind: "form"; values: Record<string, unknown> } }
   | { type: "input_response"; requestId: string; action: "submit"; response: { kind: "payment"; orderIntentId: string } }
+  | { type: "input_response"; requestId: string; action: "submit"; response: { kind: "protected"; protectedInputId: string } }
   | { type: "input_response"; requestId: string; action: "decline" }
   | { type: "input_response"; requestId: string; action: "alternative"; text: string };
 

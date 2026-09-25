@@ -138,11 +138,22 @@ export interface CheckoutPaymentRequest {
   failureReason?: string;
 }
 
+export interface CheckoutPasswordRequest {
+  requestId: string;
+  question: string;
+  merchantDomain?: string;
+  expiresAt?: string;
+  /** The checkout's page in the app, with Crossmint's protected field. */
+  url: string;
+}
+
 export interface CheckoutView {
   id: string;
   status: CheckoutStatus;
   agentCardId?: string;
   paymentRequest?: CheckoutPaymentRequest;
+  /** The store asks for the user's password there: show them `url`, where they type it into a secure field. */
+  passwordRequest?: CheckoutPasswordRequest;
   pendingUserAction?: PendingUserAction;
   rendered?: RenderedAction;
   embedUrl?: string;

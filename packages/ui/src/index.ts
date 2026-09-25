@@ -36,6 +36,14 @@ export type {
   VerificationAppearance,
 } from "./components/verify-agent-card.js";
 export { RecollectCvc } from "./components/recollect-cvc.js";
+export { AnswerPasswordRequest, ProtectedInput } from "./components/protected-input.js";
+export type {
+  AnswerPasswordRequestProps,
+  PasswordRequestOutcome,
+  ProtectedInputAppearance,
+  ProtectedInputError,
+  ProtectedInputProps,
+} from "./components/protected-input.js";
 export type { RecollectCvcProps, CvcAppearance, CvcError } from "./components/recollect-cvc.js";
 export {
   AgentCardList,

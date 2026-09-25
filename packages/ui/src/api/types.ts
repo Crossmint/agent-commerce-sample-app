@@ -165,6 +165,8 @@ export interface CheckoutMessageInput {
   requestId?: string;
   action?: "submit" | "decline" | "alternative";
   values?: Record<string, unknown>;
+  /** A password request's answer: the id Crossmint's protected field returned, never the password. */
+  protectedInputId?: string;
   text?: string;
   messageId?: string;
 }
@@ -191,6 +193,14 @@ export interface CheckoutView {
   startUrl?: string;
   agentCardId?: string;
   paymentRequest?: CheckoutPaymentRequest;
+  /** The store asks for the user's password there; `url` is the checkout's page with the secure field. */
+  passwordRequest?: {
+    requestId: string;
+    question: string;
+    merchantDomain?: string;
+    expiresAt?: string;
+    url: string;
+  };
   pendingUserAction?: PendingUserAction;
   rendered?: RenderedAction;
   embedUrl?: string;

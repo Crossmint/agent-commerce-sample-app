@@ -11,11 +11,13 @@ import {
   type ReactNode,
 } from "react";
 import {
+  AnswerPasswordRequest,
   ApproveAgentCard,
   formatAmount,
   PAYMENT_STEP_ASK,
   type CheckoutStep,
   type ApproveOutcome,
+  type PasswordRequestOutcome,
 } from "@agent-commerce/ui";
 import {
   AGENT_DOMAIN,
@@ -28,6 +30,7 @@ import {
   checkoutSiteOf,
   findPaymentStep,
   findRequest,
+  passwordRequestOf,
   pendingWatches,
   productsMessageOf,
   productsOf,
@@ -168,6 +171,9 @@ interface ChoicesBubble {
   used: boolean;
 }
 
+/** A store's password request, open in the browser sheet. */
+type PasswordAsk = { toolCallId: string; checkoutId: string; requestId: string; domain: string };
+
 type Approval = {
   toolCallId: string;
   requestId: string;
@@ -181,6 +187,7 @@ function toBubbles(
   watches: WatchIndex,
   live: ReadonlyMap<string, LiveWatch>,
   onReview: (a: Approval) => void,
+  onEnterPassword: (ask: PasswordAsk) => void,
   onPick: (message: string) => void,
   onOpen: (product: FoundProduct) => void,
 ): Bubble[] {
@@ -241,6 +248,32 @@ function toBubbles(
         });
         return;
       }
+      // A password: a link to the checkout's page, where Crossmint's field takes it.
+      const password = passwordRequestOf(part, watches);
+      if (
+        password &&
+        part.type === "tool-await_protected_input" &&
+        (part.state === "input-available" || part.state === "output-available")
+      ) {
+        const done =
+          part.state === "output-available"
+            ? part.output.status === "submitted"
+              ? "Sent"
+              : "Skipped"
+            : undefined;
+        out.push({
+          key,
+          kind: "link",
+          side: "recv",
+          title: `Sign in to ${password.domain}`,
+          path: `/checkouts/${password.checkoutId}`,
+          done,
+          onOpen: done
+            ? undefined
+            : () => onEnterPassword({ toolCallId: part.toolCallId, ...password }),
+        });
+        return;
+      }
       // What a search or a look-up found, as picture bubbles, under the line
       // the agent put on the call.
       const message = productsMessageOf(part);
@@ -278,15 +311,22 @@ function toBubbles(
         part.type === "tool-watch_checkout" &&
         (part.state === "input-available" || part.state === "output-available")
       ) {
+        // The next stretch took this card over: the agent answered the question itself.
+        if (watches.absorbed.has(part.toolCallId)) return;
         const checkoutId = part.input.checkoutId;
+        const carried = watches.carried.get(part.toolCallId);
         const site = watches.sites.get(checkoutId) ?? { host: "the store" };
         const done = part.state === "output-available";
         const now = live.get(part.toolCallId);
-        const continuing = watches.firstWatch.get(checkoutId) !== part.toolCallId;
+        const continuing =
+          watches.firstWatch.get(checkoutId) !== (carried?.chainStart ?? part.toolCallId);
         const steps = runSteps({
           host: site.host,
           continuing,
-          updates: done ? (part.output.updates ?? []) : (now?.updates ?? []),
+          updates: [
+            ...(carried?.updates ?? []),
+            ...(done ? (part.output.updates ?? []) : (now?.updates ?? [])),
+          ],
           live: !done,
           outcome: done ? part.output : undefined,
         });
@@ -296,7 +336,7 @@ function toBubbles(
           site,
           title: runTitle(site, continuing),
           steps,
-          startedAt: done ? part.output.startedAt : now?.startedAt,
+          startedAt: carried?.startedAt ?? (done ? part.output.startedAt : now?.startedAt),
           endedAt: done ? (part.output.endedAt ?? part.output.startedAt) : undefined,
           folded: done && stoppedForUser(part.output) ? "title" : "latest",
         });
@@ -1131,6 +1171,8 @@ function SignedIn({
 }: ExperienceProps & { Chrome: Chrome }) {
   const [approval, setApproval] = useState<Approval | null>(null);
   const [approvalOpen, setApprovalOpen] = useState(false);
+  const [password, setPassword] = useState<PasswordAsk | null>(null);
+  const [passwordOpen, setPasswordOpen] = useState(false);
   // The product whose details are open. It keeps its value through the
   // slide-out, so the page does not go blank while leaving.
   const [product, setProduct] = useState<FoundProduct | null>(null);
@@ -1167,6 +1209,22 @@ function SignedIn({
     [approval, chat, closeApproval],
   );
 
+  const onEnterPassword = useCallback((ask: PasswordAsk) => {
+    setPassword(ask);
+    setPasswordOpen(true);
+  }, []);
+  const closePassword = useCallback(() => {
+    setPasswordOpen(false);
+    setTimeout(() => setPassword(null), PAGE_SHEET_TRANSITION_MS);
+  }, []);
+  const onPasswordDone = useCallback(
+    (status: PasswordRequestOutcome) => {
+      if (password) chat.onPasswordOutcome(password.toolCallId, { status });
+      setTimeout(closePassword, DONE_LINGER_MS);
+    },
+    [password, chat, closePassword],
+  );
+
   const bubbles: Bubble[] = [
     chatEnabled
       ? { key: "hello", kind: "text", side: "recv", text: WELCOME }
@@ -1192,7 +1250,7 @@ function SignedIn({
           },
         ]
       : []),
-    ...toBubbles(chat.messages, watches, live, onReview, chat.send, openProduct),
+    ...toBubbles(chat.messages, watches, live, onReview, onEnterPassword, chat.send, openProduct),
   ];
   if (thread.loading) bubbles.push({ key: "loading", kind: "status", text: "Loading…" });
   if (chat.error) bubbles.push({ key: "error", kind: "status", text: chat.error });
@@ -1239,6 +1297,24 @@ function SignedIn({
             platformName={PLATFORM_NAME}
             ask={approval.paying ? PAYMENT_STEP_ASK : undefined}
             onDone={onApprovalDone}
+          />
+        ) : null}
+      </BrowserSheet>
+
+      <BrowserSheet
+        open={passwordOpen}
+        path={`/checkouts/${password?.checkoutId ?? ""}`}
+        brand={brand}
+        onDone={closePassword}
+        ariaLabel="Sign in"
+      >
+        {password ? (
+          <AnswerPasswordRequest
+            key={password.requestId}
+            checkoutId={password.checkoutId}
+            requestId={password.requestId}
+            merchantDomain={password.domain}
+            onDone={onPasswordDone}
           />
         ) : null}
       </BrowserSheet>

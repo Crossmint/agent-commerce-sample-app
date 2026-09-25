@@ -55,7 +55,8 @@ export const TOOL_DOCS = {
       currency: PARAM_DOCS.currency,
       description:
         "What the money is for, in the user's words, e.g. Flight to SF. Shown on the approval screen.",
-      merchant: "Lock the card to one merchant when the store is known.",
+      merchant:
+        "Lock the card to one merchant, only when the user named a real store (Starbucks, united.com). Leave it out for a general budget such as lunch this week or a trip: the purpose is not a store.",
       expiresInHours: "How long the agent card stays valid. Default 24.",
       requester: "Name of the agent shown to the user.",
     },
@@ -151,10 +152,22 @@ export const TOOL_DOCS = {
     title: "Watch a checkout",
     summary:
       "Follow a running checkout for the user. While it runs, the chat shows the user each update the store's agent writes, as its own message; you do not repeat them. " +
-      "Call it straight after create_checkout, and again after each answer you send; never poll get_checkout meanwhile. It returns with the updates it showed and one of three reasons. " +
+      "Call it straight after create_checkout, and again after each answer you send; never poll get_checkout meanwhile. It returns with the updates it showed and one of four reasons. " +
       "awaiting_input with a question: the store asks something, and you put it to the user. awaiting_payment with a payment: the run reached its payment step, and the user chooses how to pay. " +
+      "awaiting_password with a password: the store asks for the password of the user's account there; call await_protected_input, and never ask for the password in words. " +
       "A final status (succeeded, blocked, failed, cancelled): the run ended, with the total and the order number, or why it stopped.",
     params: { checkoutId: PARAM_DOCS.checkoutId },
+    surfaces: ["chat"],
+  },
+  await_protected_input: {
+    title: "Wait for a password",
+    summary:
+      "When a checkout asks for the password of the user's account at the store, show the user a secure field for it and wait. The password goes straight to Crossmint's vault: neither you nor the chat ever sees it, and the app answers the checkout itself. " +
+      "Call it straight after watch_checkout returns awaiting_password, with no text in between; the chat asks the user. It returns submitted, then call watch_checkout again, or declined, when the user would rather not sign in: ask whether to check out as a guest (answer_checkout with action alternative) or stop.",
+    params: {
+      checkoutId: PARAM_DOCS.checkoutId,
+      requestId: "The password request's requestId, from watch_checkout's password.",
+    },
     surfaces: ["chat"],
   },
   search_products: {
@@ -233,7 +246,8 @@ export const TOOL_DOCS = {
     title: "Answer a checkout question",
     summary:
       "Answer the open question on a checkout. Pass requestId with values keyed by field name (as listed by get_checkout) to submit, action decline to refuse it, or action alternative with text to suggest another way (e.g. use the cheapest shipping). " +
-      "Without requestId, text is a note to the agent mid-run. Never send card fields: the payment step is answered from the agent card the user picks.",
+      "Without requestId, text is a note to the agent mid-run. Never send card fields: the payment step is answered from the agent card the user picks. " +
+      "Never send a password, and never ask the user for one: a request for the password of their account at the store (pendingUserAction.protected) is answered by the user in a secure field, on the checkout's page in the app. You may decline it, or send an alternative such as checking out as a guest.",
     params: {
       checkoutId: PARAM_DOCS.checkoutId,
       requestId: "The pending request id from get_checkout.",

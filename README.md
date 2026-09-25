@@ -43,7 +43,7 @@ Read [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the full design and [docs/
 
 ## Design
 
-The site follows the design of the [Crossmint onramp sample app](https://github.com/Crossmint/onramp-sample-app): a white ground with a dot grid, one blue accent, system sans for text and a display face for money figures only. The app is one Next.js page with a device mockup and an experience switcher at `/app`: Mobile, Desktop, iMessage, Agent MCP and CLI skill show the same flow from each side. The standalone screens (log in, approve, authorize an agent, the CLI callback) stand on the same phone mockup. Theme tokens live in `packages/ui/src/styles.css`; the frames live in `apps/web/components/frame/`.
+The site follows the design of the [Crossmint onramp sample app](https://github.com/Crossmint/onramp-sample-app): a white ground with a dot grid, one blue accent, system sans for text and a display face for money figures only. The app is one Next.js page with a device mockup and an experience switcher at `/app`: Mobile, Desktop, iMessage and Agent MCP show the same flow from each side. The CLI and its skill are in `packages/cli` and `skills/agent-commerce/`, to copy and rename. The standalone screens (log in, approve, authorize an agent, the CLI callback) stand on the same phone mockup. Theme tokens live in `packages/ui/src/styles.css`; the frames live in `apps/web/components/frame/`.
 
 ## Run it locally
 

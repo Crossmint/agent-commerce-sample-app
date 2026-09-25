@@ -118,11 +118,25 @@ export interface CheckoutPaymentRequest {
   failureReason?: string;
 }
 
+/**
+ * The store asks for the password of the user's account there. The user
+ * types it at `url`, the checkout's page, into a secure field; nothing here
+ * ever carries the password.
+ */
+export interface CheckoutPasswordRequest {
+  requestId: string;
+  question: string;
+  merchantDomain?: string;
+  expiresAt?: string;
+  url: string;
+}
+
 export interface CheckoutView {
   id: string;
   status: CheckoutStatus;
   agentCardId?: string;
   paymentRequest?: CheckoutPaymentRequest;
+  passwordRequest?: CheckoutPasswordRequest;
   pendingUserAction?: PendingUserAction;
   rendered?: RenderedAction;
   embedUrl?: string;

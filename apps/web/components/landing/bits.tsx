@@ -1,6 +1,7 @@
 import type { CSSProperties, ReactNode } from "react";
-import Image from "next/image";
 import { Check } from "lucide-react";
+import type { PaymentMethod } from "@agent-commerce/core";
+import { CardMark } from "@agent-commerce/ui";
 import { cn } from "@/lib/cn";
 
 /*
@@ -61,10 +62,27 @@ export function CheckBurst({ at = 0, size = 56, className }: { at?: number; size
   );
 }
 
+/** The story's saved cards as Crossmint sends them: the network's own artwork on `display.imageUrl`. */
+const CARD_ART: Record<"mastercard" | "visa", PaymentMethod> = {
+  mastercard: {
+    paymentMethodId: "pm_story_mastercard",
+    type: "card",
+    card: { brand: "mastercard", last4: "4444" },
+    display: { imageUrl: "https://www.crossmint.com/assets/cards/mastercard.svg" },
+  } as PaymentMethod,
+  visa: {
+    paymentMethodId: "pm_story_visa",
+    type: "card",
+    card: { brand: "visa", last4: "4242" },
+    display: { imageUrl: "https://www.crossmint.com/assets/cards/visa.svg" },
+  } as PaymentMethod,
+};
+
 /**
- * The saved card row's mark: the network's own artwork, the same files the
- * real `CardMark` shows when Crossmint sends `display.imageUrl`. The files are
- * 780x500, so the 36x24 box keeps their proportions exactly.
+ * A saved card's mark, drawn by the app's own `CardMark` with the artwork
+ * Crossmint sends, so every card on the page (the approval, the saved cards,
+ * the budget in the thread) wears the same one. `className` sizes the mark;
+ * `at` pops it in.
  */
 export function CardBadge({
   network = "mastercard",
@@ -76,19 +94,13 @@ export function CardBadge({
   className?: string;
 }) {
   return (
-    <Image
+    <span
       aria-hidden
-      alt=""
-      src={`/icons/payments/${network}.svg`}
-      width={36}
-      height={24}
-      className={cn(
-        "h-6 w-9 shrink-0 rounded-[3px] object-cover",
-        at !== undefined && "landing-pop",
-        className,
-      )}
+      className={cn("inline-flex shrink-0", at !== undefined && "landing-pop")}
       style={at !== undefined ? delay(at) : undefined}
-    />
+    >
+      <CardMark paymentMethod={CARD_ART[network]} className={className} />
+    </span>
   );
 }
 
@@ -96,24 +108,27 @@ export function CardBadge({
  * One step in a run. A hollow dot until `from`, a spinner from `from` to
  * `at`, a check from `at`. The label brightens at `at`.
  */
+/**
+ * One checkout step, drawn as the app's `CheckoutSteps` draws it at the
+ * landing phone's scale: it arrives at `from` with a spinner, and ticks off
+ * at `at`, when its label turns from muted to full.
+ */
 export function RunStep({ label, from, at }: { label: string; from: number; at: number }) {
   return (
-    <span className="flex items-start gap-2 leading-tight text-foreground">
-      <RunMark from={from} at={at} />
-      <span className="landing-bright min-w-0 truncate" style={delay(at)}>
+    <span className="flex items-start gap-2 leading-snug text-foreground">
+      <RunMark from={from} at={at} className="mt-px" />
+      <span className="landing-bright min-w-0 flex-1 break-words" style={delay(at)}>
         {label}
       </span>
     </span>
   );
 }
 
-export function RunMark({ from, at, size = "size-4", className }: { from: number; at: number; size?: string; className?: string }) {
+/** The app's step mark at the landing's scale (18px there, 15px here): a spinner from `from`, then a tick at `at`. */
+export function RunMark({ from, at, size = "size-[15px]", className }: { from: number; at: number; size?: string; className?: string }) {
   const dur = Math.max(at - from, 1);
   return (
     <span className={cn("relative inline-flex shrink-0 items-center justify-center", size, className)}>
-      <Layer className="landing-vanish" style={delay(from)}>
-        <span className="block size-[9px] rounded-full border-[1.5px] border-current opacity-40" />
-      </Layer>
       <Layer className="landing-window" style={{ ...delay(from), "--dur": `${dur}ms` } as CSSProperties}>
         <Spinner />
       </Layer>

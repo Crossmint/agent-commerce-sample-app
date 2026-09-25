@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { declineResponse, pendingActionOf, receiptOf, submitResponse } from "../src/checkout-messages.js";
-import { isPaymentAction, renderPendingAction } from "../src/pending-action.js";
-import type { Checkout } from "../src/types.js";
+import { declineResponse, pendingActionOf, protectedResponse, receiptOf, submitResponse } from "../src/checkout-messages.js";
+import { asksPasswordInForm, isPaymentAction, isProtectedAction, renderPendingAction } from "../src/pending-action.js";
+import type { Checkout, PendingUserAction } from "../src/types.js";
 
 const shipping = {
   id: "req_1",
@@ -77,6 +77,34 @@ describe("checkout run helpers", () => {
     expect(pendingActionOf({ ...awaiting, status: "running" })).toBeUndefined();
     expect(pendingActionOf({ ...base, status: "running", requiredAction: null })).toBeUndefined();
   });
+  it("marks a password request as protected, with no form to fill", () => {
+    const password: Checkout = {
+      ...base,
+      status: "awaiting_input",
+      requiredAction: {
+        type: "input_response",
+        requestId: "req_pw",
+        messageId: "msg_pw",
+        request: { question: "Enter your password for shop.example to sign in.", expiresAt: "2026-09-18T00:00:00Z", interaction: { kind: "protected", purpose: "password", merchant: { domain: "shop.example" } } },
+      },
+    };
+    const action = pendingActionOf(password)!;
+    expect(action).toMatchObject({ id: "req_pw", protected: { purpose: "password", merchant: { domain: "shop.example" } }, responseSchema: {} });
+    expect(isProtectedAction(action)).toBe(true);
+    expect(isPaymentAction(action)).toBe(false);
+    expect(action.payment).toBeUndefined();
+  });
+  it("spots a plain form that asks for a password, and nothing else", () => {
+    const form = (properties: Record<string, unknown>) => ({
+      responseSchema: { type: "object", properties } as PendingUserAction["responseSchema"],
+    });
+    expect(asksPasswordInForm(form({ amazon_password: { type: "string", title: "Amazon account password" } }))).toBe(true);
+    expect(asksPasswordInForm(form({ secret: { type: "string", title: "Contraseña" } }))).toBe(true);
+    // A choice of sign-in method is not the secret itself.
+    expect(asksPasswordInForm(form({ amazon_auth_method: { type: "string", title: "Password or passkey?", oneOf: [{ const: "password" }, { const: "passkey" }] } }))).toBe(false);
+    expect(asksPasswordInForm(form({ email: { type: "string", title: "Account email" } }))).toBe(false);
+    expect(asksPasswordInForm({ ...form({}), protected: { purpose: "password" } })).toBe(false);
+  });
   it("reads the receipt from a captured purchase", () => {
     const done: Checkout = { ...base, status: "succeeded", result: { outcome: "succeeded", summary: "Bought.", purchase: { kind: "receipt_captured", receipt: { total: { amount: "9.50", currency: "USD" }, merchantOrderId: "ord_1" } } } };
     expect(receiptOf(done)).toEqual({ total: { amount: "9.50", currency: "USD" }, merchantOrderId: "ord_1" });
@@ -85,5 +113,6 @@ describe("checkout run helpers", () => {
   it("builds input_response parts", () => {
     expect(submitResponse("req_1", { size: "m" })).toEqual({ type: "input_response", requestId: "req_1", action: "submit", response: { kind: "form", values: { size: "m" } } });
     expect(declineResponse("req_1")).toEqual({ type: "input_response", requestId: "req_1", action: "decline" });
+    expect(protectedResponse("req_pw", "pi_1")).toEqual({ type: "input_response", requestId: "req_pw", action: "submit", response: { kind: "protected", protectedInputId: "pi_1" } });
   });
 });

@@ -16,7 +16,7 @@ export const metadata: Metadata = { title: "App" };
 export const dynamic = "force-dynamic";
 
 /**
- * The product page: one agent commerce chat, shown through five frames. The
+ * The product page: one agent commerce chat, shown through four frames. The
  * page is public; a visitor signs in inside whichever frame they picked.
  *
  * The URL carries the state a link should keep: `?view=` names the frame,

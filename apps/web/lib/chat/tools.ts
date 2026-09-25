@@ -77,6 +77,12 @@ export const approvalOutcomeSchema = z.object({
 });
 export type ApprovalOutcome = z.infer<typeof approvalOutcomeSchema>;
 
+/** What `await_protected_input` hands back: whether the user gave the password. Never the password, never its id. */
+export const protectedInputOutcomeSchema = z.object({
+  status: z.enum(["submitted", "declined"]),
+});
+export type ProtectedInputOutcome = z.infer<typeof protectedInputOutcomeSchema>;
+
 /** One thing the store's agent wrote while a checkout ran, shown to the user as a chat message. */
 export const checkoutUpdateSchema = z.object({ id: z.string(), text: z.string() });
 export type CheckoutUpdate = z.infer<typeof checkoutUpdateSchema>;
@@ -95,6 +101,7 @@ export const checkoutOutcomeSchema = z.object({
     "cancelled",
     "awaiting_input",
     "awaiting_payment",
+    "awaiting_password",
   ]),
   updates: z.array(checkoutUpdateSchema),
   /** When the chat started and stopped following this stretch, ISO 8601: its card shows how long it took. */
@@ -107,6 +114,8 @@ export const checkoutOutcomeSchema = z.object({
       question: z.string(),
       expiresAt: z.string().optional(),
       responseSchema: z.record(z.string(), z.unknown()),
+      /** Set when the question asks for a password in a plain form, which is never answered with values. */
+      note: z.string().optional(),
     })
     .optional(),
   /**
@@ -121,6 +130,18 @@ export const checkoutOutcomeSchema = z.object({
       amount: z.object({ value: z.string(), currency: z.string() }),
       description: z.string(),
       merchant: z.object({ name: z.string(), url: z.string() }).optional(),
+    })
+    .optional(),
+  /**
+   * On `awaiting_password`: the store asks for the password of the user's
+   * account there. `requestId` is what await_protected_input takes. The
+   * password itself never reaches the chat.
+   */
+  password: z
+    .object({
+      requestId: z.string(),
+      question: z.string(),
+      domain: z.string().optional(),
     })
     .optional(),
   total: z.object({ amount: z.string(), currency: z.string() }).optional(),
@@ -339,6 +360,18 @@ export function createChatTools(api: AgentCommerceClient, opts: { userEmail?: st
         requestId: z.string().min(1).describe(paramDoc("await_agent_card_approval", "requestId")),
       }),
       outputSchema: approvalOutcomeSchema,
+    }),
+
+    // Client-side tool: no `execute`. The chat shows Crossmint's password
+    // field; the app answers the run with what it returns, and the model
+    // only hears whether the user did.
+    await_protected_input: tool({
+      description: describeTool("await_protected_input"),
+      inputSchema: z.object({
+        checkoutId: z.string().min(1).describe(paramDoc("await_protected_input", "checkoutId")),
+        requestId: z.string().min(1).describe(paramDoc("await_protected_input", "requestId")),
+      }),
+      outputSchema: protectedInputOutcomeSchema,
     }),
 
     reveal_agent_card: tool({

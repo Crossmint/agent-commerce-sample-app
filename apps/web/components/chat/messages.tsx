@@ -5,7 +5,7 @@ import { ArrowDown } from "lucide-react";
 import type { ChatStatus } from "ai";
 import { cn } from "@agent-commerce/ui";
 import { AgentAvatar } from "@/components/brand";
-import type { ApprovalOutcome, CheckoutOutcome } from "@/lib/chat/tools";
+import type { ApprovalOutcome, CheckoutOutcome, ProtectedInputOutcome } from "@/lib/chat/tools";
 import type { ChatMessage } from "@/lib/chat/types";
 import { Greeting } from "./greeting";
 import { Message, Thinking } from "./message";
@@ -16,6 +16,7 @@ export interface MessagesProps {
   messages: ChatMessage[];
   status: ChatStatus;
   onApprovalOutcome: (toolCallId: string, outcome: ApprovalOutcome) => void;
+  onPasswordOutcome: (toolCallId: string, outcome: ProtectedInputOutcome) => void;
   onCheckoutOutcome: (toolCallId: string, outcome: CheckoutOutcome) => void;
   onPickStarter: (text: string) => void;
   /** Send a message as the user, for a tap on a product card. */
@@ -23,7 +24,15 @@ export interface MessagesProps {
 }
 
 /** The desktop transcript: a centered column that follows the newest message. */
-export function Messages({ messages, status, onApprovalOutcome, onCheckoutOutcome, onPickStarter, onSend }: MessagesProps) {
+export function Messages({
+  messages,
+  status,
+  onApprovalOutcome,
+  onPasswordOutcome,
+  onCheckoutOutcome,
+  onPickStarter,
+  onSend,
+}: MessagesProps) {
   const { containerRef, isAtBottom, scrollToBottom } = useScrollToBottom(messages.length);
   const last = messages.at(-1);
   const waiting = status === "submitted" && last?.role !== "assistant";
@@ -39,7 +48,15 @@ export function Messages({ messages, status, onApprovalOutcome, onCheckoutOutcom
         <div className="mx-auto flex w-full max-w-3xl flex-col gap-6 px-4 py-6 sm:px-6">
           {messages.map((m, i) => (
             <div key={m.id} className="group/message">
-              <Message message={m} streaming={status === "streaming" && i === messages.length - 1} onApprovalOutcome={onApprovalOutcome} onCheckoutOutcome={onCheckoutOutcome} watches={watches} onSend={onSend} />
+              <Message
+                message={m}
+                streaming={status === "streaming" && i === messages.length - 1}
+                onApprovalOutcome={onApprovalOutcome}
+                onPasswordOutcome={onPasswordOutcome}
+                onCheckoutOutcome={onCheckoutOutcome}
+                watches={watches}
+                onSend={onSend}
+              />
             </div>
           ))}
           {waiting ? (

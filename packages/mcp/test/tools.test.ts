@@ -92,6 +92,40 @@ describe("Agent Commerce tools", () => {
     expect(result.structuredContent).toMatchObject({ enforced: false, card: { number: "4111111111111111" } });
   });
 
+  it("get_checkout hands a password request over as a link, never as a question", async () => {
+    const { client } = await connect(
+      mockAgentCommerceFetch({
+        "GET /v1/checkouts/run_pw": {
+          status: 200,
+          body: {
+          id: "run_pw",
+          status: "awaiting_input",
+          pendingUserAction: {
+            id: "req_pw",
+            question: "Enter your password for shop.example to sign in.",
+            responseSchema: {},
+            protected: { purpose: "password", merchant: { domain: "shop.example" } },
+          },
+          passwordRequest: {
+            requestId: "req_pw",
+            question: "Enter your password for shop.example to sign in.",
+            merchantDomain: "shop.example",
+            url: "https://wallet.example.com/checkouts/run_pw",
+          },
+          },
+        },
+      }),
+    );
+    const result = await client.callTool({ name: "get_checkout", arguments: { checkoutId: "run_pw" } });
+    expect(result.isError).toBeFalsy();
+    const text = (result.content as Array<{ type: string; text: string }>)[0]!.text;
+    expect(text).toContain("https://wallet.example.com/checkouts/run_pw");
+    expect(text).toContain("Never ask for the password");
+    expect(text).not.toContain("Question (requestId");
+    expect(text).not.toContain("Still running");
+    expect((result.structuredContent as { checkout: Record<string, unknown> }).checkout.rendered).toBeUndefined();
+  });
+
   it("turns Agent Commerce API errors into isError results", async () => {
     const { client } = await connect(
       mockAgentCommerceFetch({

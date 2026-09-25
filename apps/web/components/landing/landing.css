@@ -169,6 +169,52 @@ html {
 }
 
 /*
+ * A row that arrives the way the app's checkout steps do: it opens from
+ * nothing and fades in at --delay, so the card grows as each step lands.
+ * The row's only child clips while it opens.
+ */
+@keyframes landing-grow {
+  from {
+    grid-template-rows: 0fr;
+    opacity: 0;
+  }
+  to {
+    grid-template-rows: 1fr;
+    opacity: 1;
+  }
+}
+.landing-grow {
+  display: grid;
+  animation: landing-grow 0.3s ease both;
+  animation-delay: var(--delay, 0ms);
+}
+.landing-grow > * {
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* The other way: a row that folds away and fades out at --delay. */
+@keyframes landing-shrink {
+  from {
+    grid-template-rows: 1fr;
+    opacity: 1;
+  }
+  to {
+    grid-template-rows: 0fr;
+    opacity: 0;
+  }
+}
+.landing-shrink {
+  display: grid;
+  animation: landing-shrink 0.3s ease both;
+  animation-delay: var(--delay, 0ms);
+}
+.landing-shrink > * {
+  min-height: 0;
+  overflow: hidden;
+}
+
+/*
  * Typing. Characters fade in one by one (each span gets its own --delay), a
  * field shows the focus ring for --dur from --delay, a caret blinks while
  * the field is focused, and a button presses at --delay.
@@ -445,6 +491,7 @@ html {
   .landing-fade,
   .landing-pop,
   .landing-bright,
+  .landing-grow,
   .landing-type,
   .landing-press,
   .landing-ready,
@@ -474,6 +521,11 @@ html {
   .landing-vanish,
   .landing-window {
     animation: none;
+    opacity: 0;
+  }
+  .landing-shrink {
+    animation: none;
+    grid-template-rows: 0fr;
     opacity: 0;
   }
   .landing-reveal[data-reveal="hidden"] {

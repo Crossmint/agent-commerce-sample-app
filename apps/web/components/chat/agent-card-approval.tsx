@@ -1,10 +1,15 @@
 "use client";
 
-import { useCallback } from "react";
+import { useCallback, useState, type ReactNode } from "react";
 import {
   ApproveAgentCard,
   Badge,
+  Button,
   CardMark,
+  Dialog,
+  DialogContent,
+  DialogTitle,
+  PAYMENT_STEP_ASK,
   Skeleton,
   cn,
   formatAmount,
@@ -15,49 +20,122 @@ import {
 } from "@agent-commerce/ui";
 import { PLATFORM_NAME } from "@/components/brand";
 import type { ApprovalOutcome } from "@/lib/chat/tools";
-import { toApprovalOutcome, type RequestSummary, type ToolError } from "./parts";
-import { ToolCard, type ToolState } from "./tool-card";
+import { toApprovalOutcome } from "./parts";
+import { AgentBubble } from "./text";
+
+/** How long an ending stays on screen before its sheet or dialog goes away. */
+export const APPROVAL_DONE_LINGER_MS = 800;
+
+/** What the agent asks over a request: approve a budget, or choose how to pay a checkout. */
+export function approvalQuestion(paying: boolean): string {
+  return paying
+    ? "How do you want to pay for this?"
+    : "Can you approve this request to use your card?";
+}
 
 /**
- * Inline approval, for the desktop chat. The model called
- * `await_agent_card_approval({ requestId })` and the stream stopped. This
- * renders the app's own `<ApproveAgentCard>` in the tool's slot. Once the
- * request reaches a final state, `onDone` hands the outcome back as the tool
- * output and the chat resubmits itself.
+ * An approval in the thread, the same in every chat frame: the agent asks in
+ * its bubble, and the request sits under it as one small card. Waiting, the
+ * card says what it is for, the limit and the store, with Review, which
+ * opens the approval screen (the frame's own sheet or dialog). Settled, the
+ * same card carries the outcome and the saved card behind it.
+ */
+export function ApprovalInThread({
+  requestId,
+  output,
+  paying,
+  onReview,
+  bubbleClassName,
+  buttonSize = "xl",
+  className,
+}: {
+  requestId: string;
+  /** Set once the user answered. */
+  output?: ApprovalOutcome;
+  /** A checkout's payment step: the user chooses how to pay for a total, not a budget. */
+  paying: boolean;
+  onReview: () => void;
+  /** The frame's own bubble size. */
+  bubbleClassName?: string;
+  buttonSize?: "lg" | "xl";
+  className?: string;
+}) {
+  return (
+    <>
+      <AgentBubble text={approvalQuestion(paying)} className={bubbleClassName} />
+      {output ? (
+        <AgentCardSummary requestId={requestId} outcome={output} className={className} />
+      ) : (
+        <RequestCard
+          requestId={requestId}
+          paying={paying}
+          badge={<Badge variant="muted">Pending</Badge>}
+          className={className}
+          action={
+            <Button type="button" size={buttonSize} className="w-full" onClick={onReview}>
+              Review
+            </Button>
+          }
+        />
+      )}
+    </>
+  );
+}
+
+/**
+ * The desktop's approval: the request in the thread, and Review opens the
+ * app's own `<ApproveAgentCard>` in a dialog. The model called
+ * `await_agent_card_approval({ requestId })` and the stream stopped; once the
+ * request reaches a final state, `onOutcome` hands the outcome back as the
+ * tool output and the chat resubmits itself.
  */
 export function AgentCardApproval({
   toolCallId,
   requestId,
   output,
-  ask,
+  paying,
   onOutcome,
 }: {
   toolCallId: string;
   requestId: string;
-  /** Set once the user answered. Then the card shows the outcome, not the form. */
   output?: ApprovalOutcome;
-  /** `PAYMENT_STEP_ASK` when a checkout is waiting on this. Default wording otherwise. */
-  ask?: { title: string; sub: string };
+  paying: boolean;
   onOutcome: (toolCallId: string, outcome: ApprovalOutcome) => void;
 }) {
+  const [open, setOpen] = useState(false);
   const handleDone = useCallback(
-    (o: ApproveOutcome) => onOutcome(toolCallId, toApprovalOutcome(o)),
+    (o: ApproveOutcome) => {
+      onOutcome(toolCallId, toApprovalOutcome(o));
+      // The ending shows for a moment before the dialog goes.
+      setTimeout(() => setOpen(false), APPROVAL_DONE_LINGER_MS);
+    },
     [onOutcome, toolCallId],
   );
 
-  if (output) return <AgentCardSummary requestId={requestId} outcome={output} />;
-
   return (
-    <div className="w-full max-w-lg">
-      <ApproveAgentCard
+    <>
+      <ApprovalInThread
         requestId={requestId}
-        variant="card"
-        platformName={PLATFORM_NAME}
-        ask={ask}
-        onDone={handleDone}
-        className="max-w-none"
+        output={output}
+        paying={paying}
+        buttonSize="lg"
+        onReview={() => setOpen(true)}
       />
-    </div>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-md">
+          <DialogTitle className="sr-only">Approve</DialogTitle>
+          {open ? (
+            <ApproveAgentCard
+              requestId={requestId}
+              variant="plain"
+              platformName={PLATFORM_NAME}
+              ask={paying ? PAYMENT_STEP_ASK : undefined}
+              onDone={handleDone}
+            />
+          ) : null}
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
 
@@ -69,10 +147,8 @@ const OUTCOME_LABEL: Record<ApprovalOutcome["status"], string> = {
 };
 
 /**
- * An approval once it is settled: what the agent card is for, the limit, the
- * saved card behind it, and the store when it is locked to one. Read once
- * from the request, which holds all of it; the card's name comes from the
- * user's saved cards.
+ * An approval once it is settled: what the agent card is for, the outcome,
+ * the limit, the saved card behind it, and the store when it is locked to one.
  */
 export function AgentCardSummary({
   requestId,
@@ -83,13 +159,48 @@ export function AgentCardSummary({
   outcome: ApprovalOutcome;
   className?: string;
 }) {
-  // No polling: a settled request does not change.
-  const request = useAgentCardRequest(requestId, { pollMs: 0 });
-  const methods = usePaymentMethods({ enabled: Boolean(request.data?.paymentMethodId) });
-  const req = request.data;
-  const card = methods.data?.find((m) => m.paymentMethodId === req?.paymentMethodId);
   const tone =
     outcome.status === "active" ? "success" : outcome.status === "denied" ? "destructive" : "muted";
+  return (
+    <RequestCard
+      requestId={requestId}
+      paying={false}
+      withCard
+      badge={<Badge variant={tone}>{OUTCOME_LABEL[outcome.status]}</Badge>}
+      className={className}
+    />
+  );
+}
+
+/**
+ * A request as one card: what it is for with its badge, then the limit (the
+ * total, for a payment step), the saved card once one backs it, and the
+ * store. Read once from the request, which holds all of it; the card's name
+ * comes from the user's saved cards.
+ */
+function RequestCard({
+  requestId,
+  paying,
+  withCard = false,
+  badge,
+  action,
+  className,
+}: {
+  requestId: string;
+  paying: boolean;
+  /** Show the saved card behind the request, once there is one. */
+  withCard?: boolean;
+  badge: ReactNode;
+  action?: ReactNode;
+  className?: string;
+}) {
+  // No polling: the approval screen follows the request while it is open.
+  const request = useAgentCardRequest(requestId, { pollMs: 0 });
+  const req = request.data;
+  const methods = usePaymentMethods({ enabled: withCard && Boolean(req?.paymentMethodId) });
+  const card = withCard
+    ? methods.data?.find((m) => m.paymentMethodId === req?.paymentMethodId)
+    : undefined;
 
   return (
     <div
@@ -104,11 +215,11 @@ export function AgentCardSummary({
         ) : (
           <Skeleton className="h-4 w-40" />
         )}
-        <Badge variant={tone}>{OUTCOME_LABEL[outcome.status]}</Badge>
+        {badge}
       </div>
       {req ? (
         <dl className="grid grid-cols-[auto_1fr] items-center gap-x-4 gap-y-2 text-sm">
-          <dt className="text-muted-foreground">Limit</dt>
+          <dt className="text-muted-foreground">{paying ? "Total" : "Limit"}</dt>
           <dd className="text-right font-medium tabular-nums">
             {formatAmount(req.amount.value, req.amount.currency)}
           </dd>
@@ -120,7 +231,7 @@ export function AgentCardSummary({
                 <span className="truncate">{paymentMethodLabel(card)}</span>
               </dd>
             </>
-          ) : req.paymentMethodId ? (
+          ) : withCard && req.paymentMethodId ? (
             <>
               <dt className="text-muted-foreground">Card</dt>
               <dd className="flex justify-end">
@@ -138,36 +249,7 @@ export function AgentCardSummary({
       ) : (
         <Skeleton className="h-10 w-full" />
       )}
+      {action}
     </div>
-  );
-}
-
-/** The `request_agent_card` result as a small card. */
-export function AgentCardRequestCard({
-  state,
-  input,
-  output,
-  errorText,
-}: {
-  state: ToolState;
-  input?: unknown;
-  output?: RequestSummary | ToolError;
-  errorText?: string;
-}) {
-  const failed = output && "error" in output ? output : undefined;
-  const req = output && !("error" in output) ? output : undefined;
-  return (
-    <ToolCard
-      title="Requesting an agent card"
-      state={state}
-      input={input}
-      output={output}
-      errorText={errorText ?? failed?.error}
-      summary={
-        req
-          ? `${formatAmount(req.amount.value, req.amount.currency)} for ${req.description}`
-          : undefined
-      }
-    />
   );
 }

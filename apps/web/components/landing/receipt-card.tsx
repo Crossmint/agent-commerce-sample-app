@@ -27,15 +27,27 @@ export function ReceiptCard({ className }: { className?: string }) {
         total: STORY.receipt.total,
         card: { label: STORY.card },
       }}
-      mark={
-        <span
-          aria-hidden
-          className="inline-flex size-[26px] shrink-0 items-center justify-center rounded-full"
-          style={{ backgroundColor: STARBUCKS_GREEN }}
-        >
-          <Image src="/logos/starbucks.svg" alt="" width={18} height={18} className="size-[18px]" />
-        </span>
-      }
+      mark={<StarbucksMark size={26} />}
     />
+  );
+}
+
+/** Starbucks' siren in white on Starbucks green, round. The receipt's tile; the checkout card wears it too. */
+export function StarbucksMark({ size }: { size: number }) {
+  const siren = Math.round(size * 0.7);
+  return (
+    <span
+      aria-hidden
+      className="inline-flex shrink-0 items-center justify-center rounded-full"
+      style={{ backgroundColor: STARBUCKS_GREEN, width: size, height: size }}
+    >
+      <Image
+        src="/logos/starbucks.svg"
+        alt=""
+        width={siren}
+        height={siren}
+        style={{ width: siren, height: siren }}
+      />
+    </span>
   );
 }

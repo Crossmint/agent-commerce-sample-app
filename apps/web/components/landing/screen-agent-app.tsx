@@ -84,9 +84,13 @@ function Entry({ entry }: { entry: AppEntry }) {
           {entry.text}
         </div>
       );
-    /* The agent speaks on the canvas: the real app gives it no bubble. */
+    /* The real app's AgentBubble: grey, its tail corner at the bottom left. */
     case "agent":
-      return <p className="max-w-[92%] text-[12.5px] leading-snug">{entry.text}</p>;
+      return (
+        <p className="w-fit max-w-[85%] rounded-2xl rounded-bl-md bg-muted px-3 py-[7px] text-[12.5px] leading-snug text-foreground">
+          {entry.text}
+        </p>
+      );
     /* The real app's ActivityLine: a check in the success color, then the label. */
     case "activity":
       return (

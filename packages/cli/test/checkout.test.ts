@@ -128,6 +128,41 @@ describe("agent-commerce checkout", () => {
     expect(t2.stderr.join("\n")).toContain("input_expired");
   });
 
+  it("get stops at a password request with the page to open, never a question to answer", async () => {
+    const { fetch } = fakeFetch({
+      "GET /v1/checkouts/run_pw": () =>
+        json({
+          id: "run_pw",
+          status: "awaiting_input",
+          pendingUserAction: {
+            id: "req_pw",
+            question: "Enter your password for shop.example to sign in.",
+            responseSchema: {},
+            protected: { purpose: "password", merchant: { domain: "shop.example" } },
+          },
+          passwordRequest: {
+            requestId: "req_pw",
+            question: "Enter your password for shop.example to sign in.",
+            merchantDomain: "shop.example",
+            url: "https://wallet.test/checkouts/run_pw",
+          },
+        }),
+    });
+    const t = testContext({ fetch });
+    expect(await runCli(["checkout", "get", "run_pw", "--wait"], t.overrides)).toBe(
+      EXIT.NEEDS_USER_ACTION,
+    );
+    const out = t.stdout.join("\n");
+    expect(out).toContain("Password needed.");
+    expect(out).toContain("https://wallet.test/checkouts/run_pw");
+    expect(out).not.toContain("Action needed");
+    const t2 = testContext({ fetch });
+    expect(await runCli(["checkout", "get", "run_pw", "--json"], t2.overrides)).toBe(
+      EXIT.NEEDS_USER_ACTION,
+    );
+    expect(JSON.parse(t2.stderr.join("\n"))).toMatchObject({ error: { code: "password_needed" } });
+  });
+
   it("cancel posts to the cancel route", async () => {
     const { fetch, calls } = fakeFetch({
       "POST /v1/checkouts/run_1/cancel": () => json({ id: "run_1", status: "running" }),

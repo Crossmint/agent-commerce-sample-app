@@ -1,18 +1,9 @@
 "use client";
 
 import { useEffect, type ReactNode } from "react";
-import type { CheckoutView } from "@agent-commerce/server";
 import type { CheckoutOutcome, CheckoutUpdate } from "@/lib/chat/tools";
 import { CheckoutRunCard } from "./checkout-site";
-import {
-  checkoutStatusLine,
-  runSteps,
-  stoppedForUser,
-  type CheckoutSite,
-  type ToolError,
-  type WatchIndex,
-} from "./parts";
-import { ToolCard, type ToolState } from "./tool-card";
+import { runSteps, stoppedForUser, type CheckoutSite, type WatchIndex } from "./parts";
 import { useCheckoutWatch } from "./use-checkout-watch";
 
 /** What a live watch has so far: the store agent's updates, and when the stretch began. */
@@ -25,7 +16,9 @@ export interface LiveWatch {
  * One `watch_checkout` call as a card of steps. Live while the call runs,
  * from its output after. Each call is one stretch of the checkout: when the
  * store asks something, the agent asks in the thread, and the next stretch,
- * after the answer, gets a card of its own below it.
+ * after the answer, gets a card of its own below it. When the agent answered
+ * the question itself, with nothing shown in between, the next stretch takes
+ * this card over instead: one card, the earlier steps first.
  */
 export function WatchRun({
   toolCallId,
@@ -44,16 +37,20 @@ export function WatchRun({
   compact?: boolean;
   className?: string;
 }) {
+  // The next stretch took this card over.
+  if (watches.absorbed.has(toolCallId)) return null;
+  const carried = watches.carried.get(toolCallId);
   const site = watches.sites.get(checkoutId) ?? { host: "the store" };
   const shape = {
     host: site.host,
-    continuing: watches.firstWatch.get(checkoutId) !== toolCallId,
+    continuing: watches.firstWatch.get(checkoutId) !== (carried?.chainStart ?? toolCallId),
   };
   const title = runTitle(site, shape.continuing);
+  const before = carried?.updates ?? [];
   if (output) {
     const steps = runSteps({
       ...shape,
-      updates: output.updates ?? [],
+      updates: [...before, ...(output.updates ?? [])],
       live: false,
       outcome: output,
     });
@@ -62,7 +59,7 @@ export function WatchRun({
         site={site}
         title={title}
         steps={steps}
-        startedAt={output.startedAt}
+        startedAt={carried?.startedAt ?? output.startedAt}
         endedAt={output.endedAt ?? output.startedAt}
         folded={stoppedForUser(output) ? "title" : "latest"}
         compact={compact}
@@ -80,8 +77,8 @@ export function WatchRun({
         <CheckoutRunCard
           site={site}
           title={title}
-          steps={runSteps({ ...shape, updates, live: true })}
-          startedAt={startedAt}
+          steps={runSteps({ ...shape, updates: [...before, ...updates], live: true })}
+          startedAt={carried?.startedAt ?? startedAt}
           compact={compact}
           className={className}
         />
@@ -137,36 +134,4 @@ export function CheckoutWatcher({
     [onUpdates, toolCallId, updates, startedAt],
   );
   return null;
-}
-
-/**
- * A checkout tool call that no watch covers: one that failed before it had a
- * checkout, or a `get_checkout` on a run from another conversation. One line
- * of status.
- */
-export function CheckoutCard({
-  title,
-  state,
-  input,
-  checkout,
-  errorText,
-}: {
-  title: string;
-  state: ToolState;
-  input?: unknown;
-  checkout?: CheckoutView | ToolError;
-  errorText?: string;
-}) {
-  const failed = checkout && "error" in checkout ? checkout : undefined;
-  const view = checkout && !("error" in checkout) ? checkout : undefined;
-  return (
-    <ToolCard
-      title={title}
-      state={state}
-      input={input}
-      output={checkout}
-      errorText={errorText ?? failed?.error}
-      summary={view ? checkoutStatusLine(view) : undefined}
-    />
-  );
 }

@@ -42,6 +42,8 @@ Exit codes while waiting:
 
 - Exit 0: succeeded. The output shows the total and the order id. Report both to the user.
 - Exit 2, **payment step**: see step 2.
+- Exit 2, **password needed**: the store asks for the password of the user's account there. The output prints a URL: show it to the user, who types the password into a secure field on that page. Never ask for the password, never pass it to the CLI, and never put it in `--values`, `--alternative` or a message; the run refuses it anyway. Then run `agent-commerce checkout get <checkoutId> --wait`. If the user would rather not sign in, `--decline` the request or send `--alternative "check out as a guest"`.
+- Exit 2, **password asked in a form**: the store wants the user to sign in but asks in a plain form, which is never filled in. Do not ask for the password. Offer the printed guest-checkout `--alternative`, or `--decline`.
 - Exit 2: the agent asked a question (shipping address, size, a confirmation). The output shows the question, lists the fields, marks required ones with `*`, and prints a ready `agent-commerce checkout answer` command with a values template. Fill it in from what you know; ask the user for anything you do not know. Answer before the printed expiry or the checkout fails. Then run:
 
 ```sh
@@ -58,7 +60,7 @@ agent-commerce checkout cancel <checkoutId>   # if the user changes their mind
 
 Shipping details repeat across purchases. Create a buyer profile once with `agent-commerce buyer-profile create --json-file profile.json` and pass `--buyer-profile <id>` to `checkout create`.
 
-Merchant logins are kept for you. A store the user signed into on an earlier checkout has them signed in on the next one, so do not ask for merchant passwords and do not pass `--browser-profile`. If a run is stuck on a stale or half-finished login, retry it once with `--fresh-browser` and let the user sign in again.
+Merchant logins are kept for you. A store the user signed into on an earlier checkout has them signed in on the next one, so do not ask for merchant passwords and do not pass `--browser-profile`. When a store does need one, the run asks for it itself (exit 2, **password needed**, above). If a run is stuck on a stale or half-finished login, retry it once with `--fresh-browser` and let the user sign in again.
 
 Check on any checkout later with `agent-commerce checkout get <id> --wait`.
 
@@ -132,7 +134,7 @@ agent-commerce logout
 | ---- | -------------- | ------------------------------------------------------ |
 | 0    | ok             | continue                                               |
 | 1    | error          | read stderr, tell the user                             |
-| 2    | needs the user | show the payment step or approval URL, or answer the checkout question |
+| 2    | needs the user | show the payment step, password or approval URL, or answer the checkout question |
 | 3    | not logged in  | ask the user to run `agent-commerce login`                       |
 
 Errors go to stderr. With `--json`, errors are `{ "error": { "code", "message" } }`.

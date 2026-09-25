@@ -4,6 +4,7 @@ import { type ComponentType, useState } from "react";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { cn } from "@/lib/cn";
+import { GITHUB_URL } from "./links";
 import { AgentAppMock } from "./mocks/agent-app-mock";
 import { MessagingMock } from "./mocks/messaging-mock";
 import { McpMock } from "./mocks/mcp-mock";
@@ -22,7 +23,9 @@ interface Experience {
   tab: string;
   title: string;
   body: string;
-  view: string;
+  /** Where "Try it" goes: a frame of /app, or the code to build it from. */
+  href: string;
+  cta: string;
   Visual: ComponentType<{ className?: string }>;
 }
 
@@ -32,7 +35,8 @@ const EXPERIENCES: Experience[] = [
     tab: "Agent apps",
     title: "Approve inside your own app",
     body: "Your chat, your components. Create in-app components for approvals, saving cards and more.",
-    view: "desktop",
+    href: "/app?view=desktop",
+    cta: "Try it",
     Visual: AgentAppMock,
   },
   {
@@ -40,7 +44,8 @@ const EXPERIENCES: Experience[] = [
     tab: "Messaging apps",
     title: "Send a link when there is no screen",
     body: "An agent on iMessage, WhatsApp or Instagram has no UI of its own. It sends the approval link, the user taps it, approves on a page your platform hosts, and the receipt comes back as a message.",
-    view: "messaging",
+    href: "/app?view=messaging",
+    cta: "Try it",
     Visual: MessagingMock,
   },
   {
@@ -48,7 +53,8 @@ const EXPERIENCES: Experience[] = [
     tab: "MCP server",
     title: "Plug it into any MCP host",
     body: "One URL on your domain in the host's settings and the agent sees six tools: list the saved cards, request an agent card, create a checkout, answer its questions. OAuth signs the user in the first time.",
-    view: "mcp",
+    href: "/app?view=mcp",
+    cta: "Try it",
     Visual: McpMock,
   },
   {
@@ -56,7 +62,9 @@ const EXPERIENCES: Experience[] = [
     tab: "Terminal agents",
     title: "Your own CLI for agents in a shell",
     body: "Coding agents and scripts drive the same APIs from the command line, through a CLI that carries your name. Request a budget, wait for the approval, create the checkout, wait for the receipt.",
-    view: "cli",
+    // No frame in /app for this one: the CLI and its skill are code to copy and rename.
+    href: `${GITHUB_URL}/tree/main/packages/cli`,
+    cta: "See the CLI code",
     Visual: TerminalMock,
   },
 ];
@@ -116,10 +124,10 @@ export function Experiences() {
             {current.body}
           </p>
           <Link
-            href={`/app?view=${current.view}`}
+            href={current.href}
             className="group inline-flex items-center gap-1.5 text-[15px] font-medium text-primary underline-offset-4 hover:underline"
           >
-            Try it
+            {current.cta}
             <ArrowRight className="size-4 transition-transform group-hover:translate-x-0.5" />
           </Link>
         </div>

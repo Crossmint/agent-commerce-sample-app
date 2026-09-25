@@ -117,6 +117,34 @@ export function humanize(key: string): string {
  * by the question text alone, since "which card" as a choice is not a
  * payment form.
  */
+/** Field names and titles that ask for a password, in the languages stores ask in. */
+const PASSWORD_FIELD = /pass(word|code|phrase)|passwd|\bpwd\b|contraseña|mot de passe|kennwort|passwort|senha/i;
+
+/**
+ * True when a plain form asks for a password: a store agent that could not
+ * raise a protected request (the project has protected inputs off) asks in a
+ * form instead. It is never answered with values: Agent Checkouts does not
+ * fill a password from them, and the secret would pass through the app and
+ * the agent. Decline it, or suggest another way, such as a guest checkout.
+ */
+export function asksPasswordInForm(action: Pick<PendingUserAction, "responseSchema" | "protected">): boolean {
+  if (action.protected) return false;
+  const props = (action.responseSchema?.properties ?? {}) as Record<
+    string,
+    { type?: unknown; title?: unknown; enum?: unknown; oneOf?: unknown; anyOf?: unknown }
+  >;
+  return Object.entries(props).some(([key, field]) => {
+    // A choice ("password or passkey?") is fine to answer; only free text can hold the secret.
+    const freeText = field?.type === "string" && !field.enum && !field.oneOf && !field.anyOf;
+    return freeText && (PASSWORD_FIELD.test(key) || PASSWORD_FIELD.test(String(field.title ?? "")));
+  });
+}
+
+/** True when the store asks for a secret the buyer types into Crossmint's protected field, never into a form. */
+export function isProtectedAction(action: Pick<PendingUserAction, "protected">): boolean {
+  return Boolean(action.protected);
+}
+
 export function isPaymentAction(action: Pick<PendingUserAction, "responseSchema" | "payment">): boolean {
   if (action.payment) return true;
   const keys = Object.keys(action.responseSchema?.properties ?? {}).map((k) => k.toLowerCase());

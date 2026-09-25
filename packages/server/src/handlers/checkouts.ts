@@ -1,12 +1,15 @@
 import type { AuthenticatedUser } from "@agent-commerce/auth";
 import {
   alternativeResponse,
+  asksPasswordInForm,
   declineResponse,
   expiresInHours,
   isPaymentAction,
+  isProtectedAction,
   isTerminalCheckout,
   newMessageId,
   pendingActionOf,
+  protectedResponse,
   receiptOf,
   renderPendingAction,
   submitResponse,
@@ -95,11 +98,29 @@ export interface CheckoutView {
   result?: CheckoutResult;
   /** The receipt of a `succeeded` run, when the agent captured one. */
   receipt?: CheckoutReceipt;
+  /**
+   * The store asks for the password of the user's account there. It is
+   * never answered with values: show the user `url`, the checkout's page in
+   * the app, where they type it into Crossmint's protected field and the app
+   * answers the run.
+   */
+  passwordRequest?: CheckoutPasswordRequest;
   /** On `failed` (Crossmint's `reason`), `blocked` (the `code`) and `cancelled`. */
   failure?: { reason: string; message?: string };
   /** What the run has spent so far, in USD. */
   spentUsd?: string;
   createdAt?: string;
+}
+
+/** A password request, as a caller shows it: where the user types it, and for which store. */
+export interface CheckoutPasswordRequest {
+  requestId: string;
+  question: string;
+  /** The store the password is for: "shop.example.com". */
+  merchantDomain?: string;
+  expiresAt?: string;
+  /** `${webBaseUrl}/checkouts/${id}`: the checkout's page, with the secure field. */
+  url: string;
 }
 
 /** Server key + user id when we have a server key. Else the user's JWT. */
@@ -218,6 +239,8 @@ export async function streamCheckoutMessages(
  * POST /v1/checkouts/:id/messages
  * Answer the open input request, or send the agent a note. Card fields are
  * refused: the server answers payment requests itself from the agent card.
+ * A password request is answered with the id from Crossmint's protected
+ * field, which the app's own UI sends here; the secret never passes through.
  */
 export async function sendCheckoutMessage(
   req: Request,
@@ -231,7 +254,8 @@ export async function sendCheckoutMessage(
   let note: string | undefined;
   if (body.requestId) {
     const action = body.action ?? "submit";
-    if (action === "submit") part = submitResponse(body.requestId, body.values ?? {});
+    if (body.protectedInputId) part = protectedResponse(body.requestId, body.protectedInputId);
+    else if (action === "submit") part = submitResponse(body.requestId, body.values ?? {});
     else if (action === "decline") part = declineResponse(body.requestId);
     else part = alternativeResponse(body.requestId, body.text!);
     if (body.text && action !== "alternative") note = body.text;
@@ -348,7 +372,7 @@ export async function cancelCheckout(req: Request, ctx: Ctx, params: Params): Pr
   const cctx = checkoutContext(ctx, user);
   await ctx.crossmint.checkouts.cancel(cctx, params.id!);
   const checkout = await ctx.crossmint.checkouts.get(cctx, params.id!);
-  return json(toView(checkout, link?.agentCardId));
+  return json(toView(ctx.config.webBaseUrl, checkout, link?.agentCardId));
 }
 
 /** POST /v1/buyer-profiles */
@@ -436,6 +460,32 @@ async function answer(
         { checkoutId: runId, requestId },
       );
     }
+    const submit =
+      part.type === "input_response" && part.action === "submit" ? part.response.kind : undefined;
+    if (open && open.id === requestId && isProtectedAction(open) && submit === "form") {
+      throw new HttpError(
+        409,
+        "protected_input_required",
+        "The store asks for a secret, such as the password of the user's account there. It is never answered with values: the user types it into Crossmint's protected field in the app, which answers the run. Decline it, or send an alternative such as checking out as a guest.",
+        { checkoutId: runId, requestId },
+      );
+    }
+    if (open && open.id === requestId && asksPasswordInForm(open) && submit === "form") {
+      throw new HttpError(
+        409,
+        "password_in_form",
+        "The store asks for a password in a plain form. It is never answered with values: Agent Checkouts does not fill a password from them, and it would pass through the app and the agent. Decline it, or send an alternative such as checking out as a guest. Asking for a password with a secure field needs protected inputs enabled on the Crossmint project.",
+        { checkoutId: runId, requestId },
+      );
+    }
+    if (submit === "protected" && !(open && open.id === requestId && isProtectedAction(open))) {
+      throw new HttpError(
+        409,
+        "not_a_protected_request",
+        "The open request does not ask for a protected input, or it is no longer open.",
+        { checkoutId: runId, requestId },
+      );
+    }
   }
   await ctx.crossmint.checkouts.sendMessage(cctx, runId, {
     id: messageId ?? newMessageId(),
@@ -519,10 +569,11 @@ async function settlePayment(
   link: CheckoutLink | undefined,
 ): Promise<CheckoutView> {
   const action = pendingActionOf(checkout);
-  if (!action || !isPaymentAction(action)) return toView(checkout, link?.agentCardId);
+  if (!action || !isPaymentAction(action))
+    return toView(ctx.config.webBaseUrl, checkout, link?.agentCardId);
   const answered = answeredPayments.get(checkout.runId);
   if (answered?.requestId === action.id)
-    return toView(checkout, link?.agentCardId, { hidePayment: true });
+    return toView(ctx.config.webBaseUrl, checkout, link?.agentCardId, { hidePayment: true });
   // Asked again after an answer: that order intent did not work. Not again.
   const spent = answered?.orderIntentId;
 
@@ -532,7 +583,9 @@ async function settlePayment(
     // Until the user has chosen and the card can pay, the payment step is
     // the view: the run stays `awaiting_input` and the UI shows the picker.
     if (request.status !== "active" || !request.agentCardId) {
-      return toView(checkout, undefined, { paymentRequest: toPaymentRequest(request) });
+      return toView(ctx.config.webBaseUrl, checkout, undefined, {
+        paymentRequest: toPaymentRequest(request),
+      });
     }
     orderIntentId = request.agentCardId;
     await ctx.checkouts.linkCheckout(checkout.runId, user.userId, { agentCardId: orderIntentId });
@@ -546,7 +599,7 @@ async function settlePayment(
   await ctx.crossmint.checkouts.payWithOrderIntent(cctx, checkout.runId, action.id, orderIntentId);
   rememberAnswered(checkout.runId, action.id, orderIntentId);
   const refreshed = await waitForConsumption(ctx, cctx, checkout.runId, action.id);
-  return toView(refreshed, orderIntentId, { hidePayment: true });
+  return toView(ctx.config.webBaseUrl, refreshed, orderIntentId, { hidePayment: true });
 }
 
 /**
@@ -640,6 +693,8 @@ async function waitForConsumption(
 }
 
 function toView(
+  /** The app's origin, for the links a caller shows the user. */
+  webBaseUrl: string,
   checkout: Checkout,
   agentCardId: string | undefined,
   opts: { hidePayment?: boolean; paymentRequest?: CheckoutPaymentRequest } = {},
@@ -658,7 +713,21 @@ function toView(
       if (opts.hidePayment) view.status = "running";
     } else {
       view.pendingUserAction = action;
-      view.rendered = renderPendingAction(action);
+      // A secret has no form: the app shows Crossmint's protected field instead.
+      if (isProtectedAction(action)) {
+        view.passwordRequest = {
+          requestId: action.id,
+          question: action.question,
+          ...(action.protected?.merchant
+            ? { merchantDomain: action.protected.merchant.domain }
+            : {}),
+          ...(action.expiresAt ? { expiresAt: action.expiresAt } : {}),
+          url: `${webBaseUrl.replace(/\/$/, "")}/checkouts/${encodeURIComponent(checkout.runId)}`,
+        };
+      } else if (!asksPasswordInForm(action)) {
+        // A password in a plain form gets no form either: it is declined, never filled in.
+        view.rendered = renderPendingAction(action);
+      }
     }
   }
   const embed = checkout.browser?.embedUrl;
