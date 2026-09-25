@@ -4,7 +4,7 @@
 
 - Work from the latest `origin/main` on `codex/evaluate-agent-commerce-sdk`.
 - Never push to `main`. Deliver through a pull request; the user performs the merge.
-- Use production exclusively for all live component and checkout evaluations, as requested by the user. Staging is outside this evaluation's scope.
+- Use Crossmint production exclusively for component and checkout evaluations. Use the existing Stytch test credentials for local authentication, as subsequently requested by the user. Crossmint staging is outside this evaluation's scope.
 - Integrate and evaluate one component at a time with the user. Do not silently work around SDK bugs before recording them.
 - Review browser console, relevant network requests, and server logs during each active test session. Background monitoring outside active sessions is not configured.
 - Record only redacted diagnostics: no API keys, JWTs, card numbers, CVCs, passwords, or vault tokens.
@@ -15,7 +15,7 @@
 - Original React UI SDK: `4.7.0`; installed evaluation version: exactly `4.8.0` in both `apps/web` and `packages/ui`.
 - Release: https://github.com/Crossmint/crossmint-sdk/pull/2075
 - Existing integrations: payment method management, CVC recollection, order intent verification.
-- Evaluation environment: production, confirmed by the user for both individual components and full Agent Checkouts.
+- Evaluation environment: Crossmint production for both individual components and full Agent Checkouts; Stytch test for local sign-in.
 - No runtime component results have been collected yet.
 
 ## Evaluation sequence
@@ -61,7 +61,7 @@
 ### Configuration and observability
 
 - Created a private, gitignored `apps/web/.env.local` using the existing production credentials. No credentials are included in this PR.
-- Set Crossmint to `production`, Stytch to `live`, matching browser/server Crossmint client keys, and the local application base URL to `http://localhost:3000`.
+- Initially set Crossmint to `production` and Stytch to `live`. After EVAL-001, switched only Stytch to the root `.env` test credentials at the user's request. Browser/server Crossmint client keys match; the application base URL is `http://localhost:3000`.
 - The root `.env` alone was not sufficient for Next's app-directory environment loading. Its default Stytch variables also pointed to test, so the explicit production values were mapped locally to the names the application reads.
 - No database is configured locally; the existing in-memory store is used. Local request associations will not survive a server restart.
 - Run `pnpm --filter @agent-commerce/web dev --hostname 127.0.0.1` after building workspace packages. Open `http://localhost:3000/app` (use the same origin consistently).
@@ -97,9 +97,9 @@ Existing component integrations are unchanged. Neither `CrossmintAgentCardAuthor
 | Workspace package builds | Passed |
 | `pnpm --filter @agent-commerce/web build` | Passed, including TypeScript and prerendering |
 | Browser `/app` | HTTP 200; login screen renders |
-| `GET /api/agent-commerce/v1/config` | HTTP 200, Crossmint `production`, auth `live`, expected local base URL |
+| `GET /api/agent-commerce/v1/config` | HTTP 200, Crossmint `production`, auth `test`, expected local base URL after the requested auth change |
 | `GET /api/agent-commerce/v1/payment-methods` without a session | HTTP 401 `unauthorized`, as expected |
-| Save/select card, verification, CVC refresh | Blocked by EVAL-001; not yet tested interactively |
+| Save/select card, verification, CVC refresh | Pending joint sign-in; not yet tested interactively |
 
 The first restricted build could not download Google Fonts. A retry initially reused a Turbopack permission error; moving the generated build cache aside and running the web build with the required local/network permissions succeeded. No application workaround was introduced.
 
@@ -107,12 +107,12 @@ Installation reports peer warnings involving Zod 4 versus a transitive Zod 3 exp
 
 ### EVAL-001 — Stytch production rejects the local origin
 
-- **Classification:** environment configuration; blocks authenticated component evaluation.
+- **Classification:** environment configuration; initially blocked authenticated component evaluation with Stytch live.
 - **Reproduction:** start the production-configured local app and open `http://localhost:3000/app`.
 - **Expected:** Stytch initializes for this origin and allows sign-in.
 - **Actual:** the login screen renders, but Stytch reports HTTP 400 `bad_domain_for_stytch_sdk`, followed by an RBAC-policy retrieval error.
 - **Evidence:** matching browser console and Next development log entries; live Stytch request IDs are retained in local logs. Reproduced on subsequent page initialization.
-- **Resolution needed:** authorize `http://localhost:3000` in the production Stytch SDK configuration, or use an already-authorized origin. The user has been asked to choose; no provider permissions were changed.
-- **Retest:** reload, confirm initialization succeeds, then sign in with the user and run the existing card flows while reviewing logs. Crossmint's allowed-origin configuration will also need to be verified when its components mount.
+- **Disposition:** the user requested the existing Stytch test credentials instead. Changed the private local environment only; no Stytch provider permissions were changed. Crossmint remains in production.
+- **Retest:** a fresh browser session renders the login screen with no console warnings/errors, and the public config endpoint confirms `production`/`test`. Sign-in and the card flows are still pending; this does not establish that the resulting JWT is accepted by Crossmint or that its allowed-origin configuration is correct.
 
 A passing automated suite alone does not establish component correctness. The draft PR remains an upgrade and observability checkpoint, with authenticated regression tests explicitly pending.
