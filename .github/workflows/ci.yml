@@ -1,0 +1,35 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm turbo run build --filter='./packages/*'
+      - run: pnpm turbo run typecheck
+      - run: pnpm turbo run test
+      - run: pnpm turbo run build --filter=@agent-commerce/web
+        env:
+          NEXT_PUBLIC_STYTCH_PUBLIC_TOKEN: public-token-test-placeholder
+          NEXT_PUBLIC_CROSSMINT_CLIENT_API_KEY: ck_staging_placeholder
+          STYTCH_PROJECT_ID: project-test-placeholder
+          STYTCH_SECRET: secret-test-placeholder
+          CROSSMINT_CLIENT_API_KEY: ck_staging_placeholder
+          CROSSMINT_ENV: staging
+          AGENT_COMMERCE_WEB_BASE_URL: http://localhost:3000

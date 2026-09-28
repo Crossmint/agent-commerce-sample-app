@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "agent-commerce": {
+      "type": "http",
+      "url": "https://agent-commerce.demos-crossmint.com/api/mcp"
+    }
+  }
+}

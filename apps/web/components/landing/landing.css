@@ -1,0 +1,542 @@
+/*
+ * Landing page motion and the landing phone. Light touches only: rises,
+ * fades, a sheet that slides up, characters that type in. Everything here
+ * turns off or jumps to its final state under prefers-reduced-motion.
+ * Colors come from the theme tokens. The literals are black scrims and the
+ * bubble tails of the messaging mocks, which wear their apps' own colors.
+ */
+
+html {
+  scroll-behavior: smooth;
+  /* No `scroll-padding-top` here: every section sets `scroll-mt-24`, and
+     the two would add up under the sticky nav. */
+}
+
+/*
+ * One phone width for the whole page. Every LandingPhone reads it. On a
+ * phone it takes the width the column can spare, minus the page gutter.
+ */
+.landing {
+  --phone-w: 320px;
+}
+@media (max-width: 639px) {
+  .landing {
+    --phone-w: min(300px, calc(100vw - 48px));
+  }
+}
+
+/* ---------- Entrances ---------- */
+
+@keyframes landing-rise {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes landing-bubble {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes landing-fade {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.landing-rise {
+  animation: landing-rise 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  animation-delay: var(--delay, 0ms);
+}
+.landing-bubble {
+  animation: landing-bubble 0.45s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  animation-delay: var(--delay, 0ms);
+}
+.landing-fade {
+  animation: landing-fade 0.45s ease both;
+  animation-delay: var(--delay, 0ms);
+}
+.landing-reveal[data-reveal="hidden"] {
+  opacity: 0;
+  transform: translateY(22px);
+}
+.landing-reveal[data-reveal="shown"] {
+  opacity: 1;
+  transform: none;
+  transition:
+    opacity 0.7s cubic-bezier(0.2, 0.8, 0.2, 1),
+    transform 0.7s cubic-bezier(0.2, 0.8, 0.2, 1);
+  transition-delay: var(--delay, 0ms);
+}
+
+/*
+ * Screens stacked in one phone crossfade with a small slide toward the side
+ * they sit on.
+ */
+.landing-screen-layer {
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    opacity 0.45s ease,
+    transform 0.55s cubic-bezier(0.2, 0.8, 0.2, 1),
+    visibility 0s linear 0.45s;
+}
+.landing-screen-layer[data-state="before"] {
+  transform: translateX(-16px);
+}
+.landing-screen-layer[data-state="after"] {
+  transform: translateX(16px);
+}
+.landing-screen-layer[data-state="active"] {
+  opacity: 1;
+  visibility: visible;
+  transform: none;
+  transition-delay: 0s;
+}
+
+/* ---------- Timeline pieces ---------- */
+
+/*
+ * A run in progress. Each mark is three stacked layers: a hollow dot that
+ * vanishes at --delay, a spinner that shows for --dur from --delay, and a
+ * check that pops at --delay. Labels brighten when their step lands.
+ */
+@keyframes landing-vanish {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+@keyframes landing-window {
+  0%,
+  100% {
+    opacity: 0;
+  }
+  8%,
+  92% {
+    opacity: 1;
+  }
+}
+@keyframes landing-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.4);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes landing-bright {
+  from {
+    opacity: 0.45;
+  }
+  to {
+    opacity: 1;
+  }
+}
+.landing-vanish {
+  animation: landing-vanish 0.2s ease both;
+  animation-delay: var(--delay, 0ms);
+}
+.landing-window {
+  animation: landing-window var(--dur, 800ms) linear both;
+  animation-delay: var(--delay, 0ms);
+}
+.landing-pop {
+  animation: landing-pop 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  animation-delay: var(--delay, 0ms);
+}
+.landing-bright {
+  animation: landing-bright 0.3s ease both;
+  animation-delay: var(--delay, 0ms);
+}
+
+/*
+ * A row that arrives the way the app's checkout steps do: it opens from
+ * nothing and fades in at --delay, so the card grows as each step lands.
+ * The row's only child clips while it opens.
+ */
+@keyframes landing-grow {
+  from {
+    grid-template-rows: 0fr;
+    opacity: 0;
+  }
+  to {
+    grid-template-rows: 1fr;
+    opacity: 1;
+  }
+}
+.landing-grow {
+  display: grid;
+  animation: landing-grow 0.3s ease both;
+  animation-delay: var(--delay, 0ms);
+}
+.landing-grow > * {
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* The other way: a row that folds away and fades out at --delay. */
+@keyframes landing-shrink {
+  from {
+    grid-template-rows: 1fr;
+    opacity: 1;
+  }
+  to {
+    grid-template-rows: 0fr;
+    opacity: 0;
+  }
+}
+.landing-shrink {
+  display: grid;
+  animation: landing-shrink 0.3s ease both;
+  animation-delay: var(--delay, 0ms);
+}
+.landing-shrink > * {
+  min-height: 0;
+  overflow: hidden;
+}
+
+/*
+ * Typing. Characters fade in one by one (each span gets its own --delay), a
+ * field shows the focus ring for --dur from --delay, a caret blinks while
+ * the field is focused, and a button presses at --delay.
+ *
+ * The character fade is a short real fade, not a 1ms step: Chrome mishandles
+ * dozens of 1ms delayed animations in one subtree and some characters flip
+ * back to the `from` keyframe after they finish.
+ */
+@keyframes landing-type {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes landing-focus {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 transparent;
+    border-color: var(--border);
+  }
+  0.1%,
+  99.9% {
+    box-shadow: 0 0 0 3px color-mix(in oklch, var(--ring) 25%, transparent);
+    border-color: var(--ring);
+  }
+}
+@keyframes landing-caret {
+  0%,
+  100% {
+    opacity: 0;
+  }
+  0.1%,
+  99.9% {
+    opacity: 1;
+  }
+}
+@keyframes landing-press {
+  0%,
+  100% {
+    transform: none;
+    filter: none;
+  }
+  35% {
+    transform: scale(0.965);
+    filter: brightness(0.9);
+  }
+}
+@keyframes landing-ready {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 color-mix(in oklch, var(--primary) 35%, transparent);
+  }
+  50% {
+    box-shadow: 0 0 0 6px color-mix(in oklch, var(--primary) 20%, transparent);
+  }
+}
+@keyframes landing-draw {
+  from {
+    stroke-dashoffset: 30;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+.landing-type {
+  animation: landing-type 0.12s ease both;
+  animation-delay: var(--delay, 0ms);
+}
+.landing-focus {
+  animation: landing-focus var(--dur, 800ms) linear both;
+  animation-delay: var(--delay, 0ms);
+}
+.landing-caret {
+  display: inline-block;
+  width: 1.5px;
+  height: 1em;
+  margin-left: 1px;
+  vertical-align: -0.15em;
+  background: currentColor;
+  animation: landing-caret var(--dur, 800ms) linear both;
+  animation-delay: var(--delay, 0ms);
+}
+.landing-press {
+  animation: landing-press 0.36s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  animation-delay: var(--delay, 0ms);
+}
+.landing-ready {
+  animation: landing-ready 1.4s ease-in-out infinite;
+  animation-delay: var(--delay, 0ms);
+}
+.landing-draw {
+  stroke-dasharray: 30;
+  stroke-dashoffset: 30;
+  animation: landing-draw 0.4s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  animation-delay: var(--delay, 0ms);
+}
+
+/*
+ * A sheet inside the phone. The scrim fades in and the sheet slides up at
+ * --delay; with --leave set, both go away again at that moment.
+ */
+@keyframes landing-scrim-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes landing-sheet-in {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: none;
+  }
+}
+@keyframes landing-scrim-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+@keyframes landing-sheet-out {
+  from {
+    transform: none;
+  }
+  to {
+    transform: translateY(100%);
+  }
+}
+.landing-scrim {
+  animation: landing-scrim-in 0.3s ease both;
+  animation-delay: var(--delay, 0ms);
+}
+.landing-sheet {
+  animation: landing-sheet-in 0.45s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  animation-delay: var(--delay, 0ms);
+}
+.landing-scrim-leave {
+  animation:
+    landing-scrim-in 0.3s ease both,
+    landing-scrim-out 0.3s ease both;
+  animation-delay: var(--delay, 0ms), var(--leave, 4000ms);
+}
+
+/*
+ * A sheet that comes and goes over a screen that stays put, driven by
+ * `data-open` instead of a keyframe timeline. The hero needs this: its
+ * thread is mounted once for the whole story, so the sheet cannot ride on
+ * an animation that restarts the screen under it. Transitions also read the
+ * open state both ways, which two `both`-filled keyframes cannot: the later
+ * one wins its properties from the first frame and the sheet starts up.
+ */
+.landing-sheet-toggle {
+  transform: translateY(100%);
+  transition: transform 0.46s cubic-bezier(0.32, 0.72, 0, 1);
+}
+.landing-sheet-toggle[data-open="true"] {
+  transform: none;
+}
+.landing-scrim-toggle {
+  opacity: 0;
+  transition: opacity 0.36s ease;
+}
+.landing-scrim-toggle[data-open="true"] {
+  opacity: 1;
+}
+.landing-sheet-leave {
+  animation:
+    landing-sheet-in 0.45s cubic-bezier(0.2, 0.8, 0.2, 1) both,
+    landing-sheet-out 0.4s cubic-bezier(0.4, 0, 0.8, 0.4) both;
+  animation-delay: var(--delay, 0ms), var(--leave, 4000ms);
+}
+
+/* ---------- Chat bubbles ---------- */
+
+/*
+ * iMessage bubble tails, in Apple's colors. The last bubble of a group grows
+ * a tail on its outer bottom corner: a colored blob that the white canvas
+ * cuts back into a curve.
+ */
+.landing-im-bubble {
+  position: relative;
+}
+.landing-im-tail-sent::before,
+.landing-im-tail-recv::before,
+.landing-im-tail-sent::after,
+.landing-im-tail-recv::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  height: 20px;
+}
+.landing-im-tail-sent::before {
+  right: -7px;
+  width: 20px;
+  background: #007aff;
+  border-bottom-left-radius: 16px 14px;
+}
+.landing-im-tail-sent::after {
+  right: -11px;
+  width: 11px;
+  background: #ffffff;
+  border-bottom-left-radius: 10px;
+}
+.landing-im-tail-recv::before {
+  left: -7px;
+  width: 20px;
+  background: #e9e9eb;
+  border-bottom-right-radius: 16px 14px;
+}
+.landing-im-tail-recv::after {
+  left: -11px;
+  width: 11px;
+  background: #ffffff;
+  border-bottom-right-radius: 10px;
+}
+.landing-im-bubble > * {
+  position: relative;
+}
+
+/*
+ * WhatsApp bubble tails, in WhatsApp's colors. The first bubble of a group
+ * grows a small triangle off its outer top corner.
+ */
+.landing-wa-tail-recv::before,
+.landing-wa-tail-sent::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  width: 0;
+  height: 0;
+  border-top: 8px solid;
+}
+.landing-wa-tail-recv::before {
+  left: -7px;
+  border-top-color: #ffffff;
+  border-left: 7px solid transparent;
+}
+.landing-wa-tail-sent::before {
+  right: -7px;
+  border-top-color: #d9fdd3;
+  border-right: 7px solid transparent;
+}
+
+/* ---------- Accordion ---------- */
+
+/* Open steps grow from 0fr to 1fr, so the height animates without a fixed value. */
+.landing-fold {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.landing-fold[data-open="true"] {
+  grid-template-rows: 1fr;
+}
+.landing-fold > * {
+  overflow: hidden;
+}
+
+/* ---------- Reduced motion ---------- */
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  .landing-rise,
+  .landing-bubble,
+  .landing-fade,
+  .landing-pop,
+  .landing-bright,
+  .landing-grow,
+  .landing-type,
+  .landing-press,
+  .landing-ready,
+  .landing-draw,
+  .landing-scrim,
+  .landing-sheet {
+    animation: none;
+    opacity: 1;
+  }
+  .landing-draw {
+    stroke-dashoffset: 0;
+  }
+  .landing-focus,
+  .landing-caret {
+    animation: none;
+  }
+  .landing-caret {
+    opacity: 0;
+  }
+  /* The sheet has come and gone: show what it left behind. */
+  .landing-scrim-leave,
+  .landing-sheet-leave {
+    animation: none;
+    opacity: 0;
+    visibility: hidden;
+  }
+  .landing-vanish,
+  .landing-window {
+    animation: none;
+    opacity: 0;
+  }
+  .landing-shrink {
+    animation: none;
+    grid-template-rows: 0fr;
+    opacity: 0;
+  }
+  .landing-reveal[data-reveal="hidden"] {
+    opacity: 1;
+    transform: none;
+  }
+  .landing-reveal[data-reveal="shown"],
+  .landing-screen-layer,
+  .landing-fold,
+  .landing-sheet-toggle,
+  .landing-scrim-toggle {
+    transition: none;
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "name": "agent-commerce",
+  "description": "Pay with the user's own card, with their approval. Request a bounded agent card, get it approved on the wallet, then check out at any store or mint a scoped card number. Powered by Crossmint.",
+  "version": "0.1.0",
+  "author": {
+    "name": "Crossmint",
+    "email": "hello@crossmint.com"
+  },
+  "homepage": "https://github.com/Crossmint/agent-commerce-sample-app",
+  "repository": "https://github.com/Crossmint/agent-commerce-sample-app",
+  "license": "MIT",
+  "keywords": ["payments", "agent cards", "checkout", "crossmint", "wallet", "mcp", "commerce"]
+}

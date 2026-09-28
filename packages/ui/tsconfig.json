@@ -1,0 +1,1 @@
+{ "extends": "@agent-commerce/tsconfig/react-library.json", "include": ["src", "test"] }

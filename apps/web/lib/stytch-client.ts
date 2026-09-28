@@ -1,0 +1,54 @@
+"use client";
+
+import { createStytchUIClient, type StytchClient } from "@stytch/nextjs";
+
+const token = process.env.NEXT_PUBLIC_STYTCH_PUBLIC_TOKEN;
+
+/**
+ * One Stytch browser client for the app. The SDK is safe to create during
+ * server rendering of client components. Null when the token is not set, so
+ * the app can show a setup message instead of crashing.
+ */
+export const stytch: StytchClient | null = token ? createStytchUIClient(token) : null;
+
+/**
+ * Session length to request at login, in minutes. Default 7 days. Must not exceed
+ * the project's maximum in the Stytch dashboard (SDK Configuration → Sessions).
+ * Raise both together for long-lived agent logins.
+ */
+export const SESSION_MINUTES: number = (() => {
+  const raw = Number(process.env.NEXT_PUBLIC_STYTCH_SESSION_MINUTES);
+  return Number.isFinite(raw) && raw > 0 ? raw : 60 * 24 * 7;
+})();
+
+/** Fallback when the project maximum is lower than SESSION_MINUTES. */
+export const FALLBACK_SESSION_MINUTES = 60;
+
+/** Stytch throws its API errors with the readable text on `error_message`. */
+export function stytchMessage(e: unknown, fallback: string): string {
+  if (e && typeof e === "object" && "error_message" in e) {
+    const m = (e as { error_message?: unknown }).error_message;
+    if (typeof m === "string" && m) return m;
+  }
+  return e instanceof Error && e.message ? e.message : fallback;
+}
+
+export function isSessionDurationError(e: unknown): boolean {
+  const msg = e instanceof Error ? e.message : String(e);
+  return /invalid_session_duration/.test(msg);
+}
+
+/**
+ * Run a Stytch authenticate call with SESSION_MINUTES. If the project maximum
+ * is lower than that, retry once with a short session instead of failing the
+ * login. Shared by the OTP form and the OAuth callback, so both behave alike.
+ */
+export async function authenticateWithSessionFallback(authenticate: (minutes: number) => Promise<unknown>): Promise<void> {
+  try {
+    await authenticate(SESSION_MINUTES);
+  } catch (e: unknown) {
+    if (!isSessionDurationError(e)) throw e;
+    console.warn("[agent-commerce] Session duration above the Stytch project maximum. Retrying with", FALLBACK_SESSION_MINUTES, "minutes.");
+    await authenticate(FALLBACK_SESSION_MINUTES);
+  }
+}

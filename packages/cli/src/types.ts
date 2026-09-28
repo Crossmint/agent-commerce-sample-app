@@ -1,0 +1,152 @@
+/**
+ * Shapes the CLI reads from the Agent Commerce HTTP API. They mirror docs/API.md.
+ * Crossmint shapes (AgentCard, PaymentMethod, PendingUserAction) come from @agent-commerce/core.
+ */
+import type {
+  Amount,
+  CheckoutReceipt,
+  CheckoutResult,
+  CheckoutStatus,
+  Merchant,
+  PendingUserAction,
+  RenderedAction,
+} from "@agent-commerce/core";
+
+export interface PublicConfig {
+  name: string;
+  apiBaseUrl: string;
+  webBaseUrl: string;
+  crossmintEnvironment: "staging" | "production";
+  auth: {
+    provider: string;
+    projectId: string;
+    environment: "test" | "live";
+    oauth: {
+      authorizationEndpoint: string;
+      tokenEndpoint: string;
+      cliClientId?: string;
+      mcpClientId?: string;
+      scopes: string[];
+    };
+  };
+}
+
+export interface Me {
+  userId: string;
+  email?: string;
+}
+
+export type AgentCardRequestStatus =
+  "pending" | "approved" | "active" | "denied" | "expired" | "failed";
+
+export interface AgentCardRequest {
+  id: string;
+  userId: string;
+  requester: string;
+  amount: Amount;
+  description: string;
+  merchant?: Merchant;
+  expiresAt: string;
+  requestExpiresAt: string;
+  status: AgentCardRequestStatus;
+  agentCardId?: string;
+  paymentMethodId?: string;
+  failureReason?: string;
+  approvalUrl: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateAgentCardRequestBody {
+  amount: Amount;
+  description: string;
+  merchant?: Merchant;
+  expiresInHours?: number;
+  requester?: string;
+}
+
+export interface MintCredentialBody {
+  amount?: Amount;
+  merchant?: Merchant;
+  format?: "card";
+}
+
+export interface CredentialResponse {
+  agentCardId: string;
+  rail: "agentic-token" | "encrypted-card";
+  provider?: "vic" | "agentpay" | "stripe";
+  enforced: boolean;
+  card?: { number: string; expirationMonth: string; expirationYear: string; cvc: string };
+  token?: string;
+  expiresAt?: string;
+}
+
+export interface CreateCheckoutBody {
+  startUrl: string;
+  task?: string;
+  /** Omit to let the user choose a payment method at the run's payment step. */
+  agentCardId?: string;
+  maxCost: { amount: string; currency: string };
+  /** What the purchase is, in a few words: shown when the user approves the payment. */
+  purpose?: string;
+  buyerProfileId?: string;
+  browserProfileId?: string;
+  freshBrowser?: boolean;
+  merchantGuidance?: string;
+}
+
+/** Body of POST /v1/checkouts/:id/messages. */
+export interface CheckoutMessageBody {
+  requestId?: string;
+  action?: "submit" | "decline" | "alternative";
+  values?: Record<string, unknown>;
+  text?: string;
+}
+
+/**
+ * The run reached its payment step. The user chooses a payment method at
+ * `approvalUrl`, which mints the agent card that pays.
+ */
+export interface CheckoutPaymentRequest {
+  requestId: string;
+  status: string;
+  approvalUrl: string;
+  amount: { value: string; currency: string };
+  description: string;
+  merchant?: { name: string; url?: string; countryCode?: string };
+  agentCardId?: string;
+  failureReason?: string;
+}
+
+/**
+ * The store asks for the password of the user's account there. The user
+ * types it at `url`, the checkout's page, into a secure field; nothing here
+ * ever carries the password.
+ */
+export interface CheckoutPasswordRequest {
+  requestId: string;
+  question: string;
+  merchantDomain?: string;
+  expiresAt?: string;
+  url: string;
+}
+
+export interface CheckoutView {
+  id: string;
+  status: CheckoutStatus;
+  agentCardId?: string;
+  paymentRequest?: CheckoutPaymentRequest;
+  passwordRequest?: CheckoutPasswordRequest;
+  pendingUserAction?: PendingUserAction;
+  rendered?: RenderedAction;
+  embedUrl?: string;
+  result?: CheckoutResult;
+  receipt?: CheckoutReceipt;
+  failure?: { reason: string; message?: string };
+  spentUsd?: string;
+  createdAt?: string;
+}
+
+export interface ApiErrorEnvelope {
+  error: { code: string; message: string; details?: unknown };
+}

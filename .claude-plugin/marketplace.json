@@ -1,0 +1,18 @@
+{
+  "name": "agent-commerce",
+  "owner": {
+    "name": "Crossmint",
+    "email": "hello@crossmint.com"
+  },
+  "metadata": {
+    "description": "Agent Commerce: let your agent pay with the user's own card, with their approval. Agent cards and agent checkouts powered by Crossmint.",
+    "version": "0.1.0"
+  },
+  "plugins": [
+    {
+      "name": "agent-commerce",
+      "source": "./plugins/claude",
+      "description": "Pay with the user's card through Agent Commerce: request a bounded agent card, get it approved, check out anywhere."
+    }
+  ]
+}

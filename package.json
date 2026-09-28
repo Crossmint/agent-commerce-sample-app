@@ -1,0 +1,29 @@
+{
+  "name": "agent-commerce-sample-app",
+  "private": true,
+  "packageManager": "pnpm@10.33.0",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev --parallel",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
+    "clean": "turbo run clean && rm -rf node_modules",
+    "format": "prettier --write \"**/*.{ts,tsx,md,json,css}\"",
+    "plugin:validate": "node scripts/validate-cursor-plugin.mjs && claude plugin validate plugins/claude && claude plugin validate .claude-plugin/marketplace.json",
+    "plugin:sync": "cp skills/agent-commerce/SKILL.md plugins/cursor/skills/agent-commerce/SKILL.md && cp skills/agent-commerce/SKILL.md plugins/claude/skills/agent-commerce/SKILL.md && cp skills/agent-commerce/SKILL.md apps/web/public/skill.md"
+  },
+  "devDependencies": {
+    "prettier": "^3.6.0",
+    "turbo": "^2.10.0",
+    "typescript": "^5.9.0"
+  },
+  "pnpm": {
+    "overrides": {
+      "axios": "^1.20.0"
+    }
+  }
+}

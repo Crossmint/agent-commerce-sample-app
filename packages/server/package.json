@@ -1,0 +1,52 @@
+{
+  "name": "@agent-commerce/server",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Agent Commerce HTTP API as Web-standard request handlers. Mount in Next.js or any runtime with Request/Response.",
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./drizzle": {
+      "types": "./dist/drizzle.d.ts",
+      "import": "./dist/drizzle.js",
+      "default": "./dist/drizzle.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "clean": "rm -rf dist .turbo"
+  },
+  "dependencies": {
+    "@agent-commerce/auth": "workspace:*",
+    "@agent-commerce/core": "workspace:*",
+    "zod": "^4.6.0"
+  },
+  "peerDependencies": {
+    "drizzle-orm": ">=0.40.0"
+  },
+  "peerDependenciesMeta": {
+    "drizzle-orm": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@agent-commerce/tsconfig": "workspace:*",
+    "drizzle-orm": "^0.45.0",
+    "tsup": "^8.5.0",
+    "typescript": "^5.9.0",
+    "vitest": "^5.0.0"
+  }
+}

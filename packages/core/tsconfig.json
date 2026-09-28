@@ -1,0 +1,4 @@
+{
+  "extends": "@agent-commerce/tsconfig/library.json",
+  "include": ["src", "test"]
+}
