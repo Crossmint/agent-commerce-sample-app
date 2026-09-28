@@ -13,13 +13,16 @@ import {
 import {
   AnswerPasswordRequest,
   ApproveAgentCard,
+  SaveCard,
   formatAmount,
   PAYMENT_STEP_ASK,
   type CheckoutStep,
   type ApproveOutcome,
   type PasswordRequestOutcome,
+  type SaveCardResult,
 } from "@agent-commerce/ui";
 import {
+  AGENT_COMPANY,
   AGENT_DOMAIN,
   AGENT_NAME,
   AgentAvatar,
@@ -48,6 +51,7 @@ import { ENTER, ENTER_SENT } from "@/components/chat/text";
 import { pickMessage, ProductDetails, ProductImage } from "@/components/chat/product-cards";
 import { CheckoutWatcher, runTitle, type LiveWatch } from "@/components/chat/checkout-card";
 import { STARTERS } from "@/components/chat/starters";
+import { savedCardOutcome } from "@/components/chat/add-card";
 import { Receipt, type ReceiptData } from "@/components/receipt";
 import { useScrollToBottom } from "@/components/chat/use-scroll-to-bottom";
 import { DeviceFrame } from "@/components/frame/device-frame";
@@ -188,6 +192,7 @@ function toBubbles(
   live: ReadonlyMap<string, LiveWatch>,
   onReview: (a: Approval) => void,
   onEnterPassword: (ask: PasswordAsk) => void,
+  onAddCard: (toolCallId: string) => void,
   onPick: (message: string) => void,
   onOpen: (product: FoundProduct) => void,
 ): Bubble[] {
@@ -245,6 +250,28 @@ function toBubbles(
             ? undefined
             : () =>
                 onReview({ toolCallId: part.toolCallId, requestId: part.input.requestId, paying }),
+        });
+        return;
+      }
+      // Adding a card: a link to the wallet, where Crossmint's card form takes it.
+      if (
+        part.type === "tool-await_saved_card" &&
+        (part.state === "input-available" || part.state === "output-available")
+      ) {
+        const done =
+          part.state === "output-available"
+            ? part.output.status === "saved"
+              ? "Saved"
+              : "Skipped"
+            : undefined;
+        out.push({
+          key,
+          kind: "link",
+          side: "recv",
+          title: "Add a card",
+          path: "/wallet",
+          done,
+          onOpen: done ? undefined : () => onAddCard(part.toolCallId),
         });
         return;
       }
@@ -1173,6 +1200,9 @@ function SignedIn({
   const [approvalOpen, setApprovalOpen] = useState(false);
   const [password, setPassword] = useState<PasswordAsk | null>(null);
   const [passwordOpen, setPasswordOpen] = useState(false);
+  // The add_card call whose form is open in the browser sheet.
+  const [addCard, setAddCard] = useState<string | null>(null);
+  const [addCardOpen, setAddCardOpen] = useState(false);
   // The product whose details are open. It keeps its value through the
   // slide-out, so the page does not go blank while leaving.
   const [product, setProduct] = useState<FoundProduct | null>(null);
@@ -1217,6 +1247,21 @@ function SignedIn({
     setPasswordOpen(false);
     setTimeout(() => setPassword(null), PAGE_SHEET_TRANSITION_MS);
   }, []);
+  const onAddCard = useCallback((toolCallId: string) => {
+    setAddCard(toolCallId);
+    setAddCardOpen(true);
+  }, []);
+  const closeAddCard = useCallback(() => {
+    setAddCardOpen(false);
+    setTimeout(() => setAddCard(null), PAGE_SHEET_TRANSITION_MS);
+  }, []);
+  const onCardSavedHere = useCallback(
+    (result: SaveCardResult) => {
+      if (addCard) chat.onCardSaved(addCard, savedCardOutcome(result));
+      setTimeout(closeAddCard, DONE_LINGER_MS);
+    },
+    [addCard, chat, closeAddCard],
+  );
   const onPasswordDone = useCallback(
     (status: PasswordRequestOutcome) => {
       if (password) chat.onPasswordOutcome(password.toolCallId, { status });
@@ -1243,14 +1288,22 @@ function SignedIn({
             choices: STARTERS.map((s) => ({
               label: s.title,
               message: s.message,
-              description: s.sub,
             })),
             onPick: chat.send,
             used: chat.messages.length > 0,
           },
         ]
       : []),
-    ...toBubbles(chat.messages, watches, live, onReview, onEnterPassword, chat.send, openProduct),
+    ...toBubbles(
+      chat.messages,
+      watches,
+      live,
+      onReview,
+      onEnterPassword,
+      onAddCard,
+      chat.send,
+      openProduct,
+    ),
   ];
   if (thread.loading) bubbles.push({ key: "loading", kind: "status", text: "Loading…" });
   if (chat.error) bubbles.push({ key: "error", kind: "status", text: chat.error });
@@ -1314,9 +1367,20 @@ function SignedIn({
             checkoutId={password.checkoutId}
             requestId={password.requestId}
             merchantDomain={password.domain}
+            platformName={AGENT_COMPANY}
             onDone={onPasswordDone}
           />
         ) : null}
+      </BrowserSheet>
+
+      <BrowserSheet
+        open={addCardOpen}
+        path="/wallet"
+        brand={brand}
+        onDone={closeAddCard}
+        ariaLabel="Add a card"
+      >
+        {addCard ? <SaveCard key={addCard} showResult={false} onSaved={onCardSavedHere} /> : null}
       </BrowserSheet>
 
       {pending.map((w) => (

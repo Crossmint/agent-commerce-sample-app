@@ -5,7 +5,12 @@ import { ArrowDown } from "lucide-react";
 import type { ChatStatus } from "ai";
 import { cn } from "@agent-commerce/ui";
 import { AgentAvatar } from "@/components/brand";
-import type { ApprovalOutcome, CheckoutOutcome, ProtectedInputOutcome } from "@/lib/chat/tools";
+import type {
+  ApprovalOutcome,
+  CheckoutOutcome,
+  ProtectedInputOutcome,
+  SavedCardOutcome,
+} from "@/lib/chat/tools";
 import type { ChatMessage } from "@/lib/chat/types";
 import { Greeting } from "./greeting";
 import { Message, Thinking } from "./message";
@@ -17,6 +22,7 @@ export interface MessagesProps {
   status: ChatStatus;
   onApprovalOutcome: (toolCallId: string, outcome: ApprovalOutcome) => void;
   onPasswordOutcome: (toolCallId: string, outcome: ProtectedInputOutcome) => void;
+  onCardSaved: (toolCallId: string, outcome: SavedCardOutcome) => void;
   onCheckoutOutcome: (toolCallId: string, outcome: CheckoutOutcome) => void;
   onPickStarter: (text: string) => void;
   /** Send a message as the user, for a tap on a product card. */
@@ -29,6 +35,7 @@ export function Messages({
   status,
   onApprovalOutcome,
   onPasswordOutcome,
+  onCardSaved,
   onCheckoutOutcome,
   onPickStarter,
   onSend,
@@ -53,6 +60,7 @@ export function Messages({
                 streaming={status === "streaming" && i === messages.length - 1}
                 onApprovalOutcome={onApprovalOutcome}
                 onPasswordOutcome={onPasswordOutcome}
+                onCardSaved={onCardSaved}
                 onCheckoutOutcome={onCheckoutOutcome}
                 watches={watches}
                 onSend={onSend}

@@ -77,6 +77,13 @@ export const approvalOutcomeSchema = z.object({
 });
 export type ApprovalOutcome = z.infer<typeof approvalOutcomeSchema>;
 
+/** What `await_saved_card` hands back: whether a card was saved, and which, by network and last four digits only. */
+export const savedCardOutcomeSchema = z.object({
+  status: z.enum(["saved", "cancelled"]),
+  card: z.object({ paymentMethodId: z.string(), brand: z.string(), last4: z.string() }).optional(),
+});
+export type SavedCardOutcome = z.infer<typeof savedCardOutcomeSchema>;
+
 /** What `await_protected_input` hands back: whether the user gave the password. Never the password, never its id. */
 export const protectedInputOutcomeSchema = z.object({
   status: z.enum(["submitted", "declined"]),
@@ -362,6 +369,14 @@ export function createChatTools(api: AgentCommerceClient, opts: { userEmail?: st
       outputSchema: approvalOutcomeSchema,
     }),
 
+    // Client-side tool: no `execute`. The chat shows Crossmint's card form;
+    // the model hears only which card was saved, never its number.
+    await_saved_card: tool({
+      description: describeTool("await_saved_card"),
+      inputSchema: z.object({}),
+      outputSchema: savedCardOutcomeSchema,
+    }),
+
     // Client-side tool: no `execute`. The chat shows Crossmint's password
     // field; the app answers the run with what it returns, and the model
     // only hears whether the user did.
@@ -470,9 +485,16 @@ export function createChatTools(api: AgentCommerceClient, opts: { userEmail?: st
         void action; // for the site card only
         // The store's agent asks for an email on most checkouts. Give it the
         // user's up front, so nobody is asked for what the app already knows.
+        // It is a contact address: an account named in the task is the one to
+        // sign in with, and must not be swapped for it.
         const task =
           opts.userEmail && !input.task?.includes(opts.userEmail)
-            ? [input.task, `The buyer's email is ${opts.userEmail}.`].filter(Boolean).join(" ")
+            ? [
+                input.task,
+                `The buyer's contact email is ${opts.userEmail}. It is not a store login: to sign in, use the account the task names, if any.`,
+              ]
+                .filter(Boolean)
+                .join(" ")
             : input.task;
         return guard(() =>
           api.createCheckout({

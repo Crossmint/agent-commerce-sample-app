@@ -4,10 +4,16 @@ import { useState } from "react";
 import { Check, Copy } from "lucide-react";
 import { cn } from "@agent-commerce/ui";
 import { AgentAvatar } from "@/components/brand";
-import type { ApprovalOutcome, CheckoutOutcome, ProtectedInputOutcome } from "@/lib/chat/tools";
+import type {
+  ApprovalOutcome,
+  CheckoutOutcome,
+  ProtectedInputOutcome,
+  SavedCardOutcome,
+} from "@/lib/chat/tools";
 import type { ChatMessage, ChatMessagePart } from "@/lib/chat/types";
 import { AgentCardApproval } from "./agent-card-approval";
 import { PasswordRequest } from "./password-request";
+import { AddCard } from "./add-card";
 import { AttachmentPreview } from "./attachment-preview";
 import { WatchRun } from "./checkout-card";
 import { CheckoutSiteLine } from "./checkout-site";
@@ -41,6 +47,7 @@ export interface MessageProps {
   streaming: boolean;
   onApprovalOutcome: (toolCallId: string, outcome: ApprovalOutcome) => void;
   onPasswordOutcome: (toolCallId: string, outcome: ProtectedInputOutcome) => void;
+  onCardSaved: (toolCallId: string, outcome: SavedCardOutcome) => void;
   onCheckoutOutcome: (toolCallId: string, outcome: CheckoutOutcome) => void;
   /** The thread's watched checkouts, from `watchIndex`. */
   watches: WatchIndex;
@@ -57,6 +64,7 @@ export function Message({
   streaming,
   onApprovalOutcome,
   onPasswordOutcome,
+  onCardSaved,
   onCheckoutOutcome,
   watches,
   onSend,
@@ -82,6 +90,7 @@ export function Message({
               streaming={streaming}
               onApprovalOutcome={onApprovalOutcome}
               onPasswordOutcome={onPasswordOutcome}
+              onCardSaved={onCardSaved}
               onCheckoutOutcome={onCheckoutOutcome}
               watches={watches}
               onSend={onSend}
@@ -169,6 +178,7 @@ function Part({
   streaming,
   onApprovalOutcome,
   onPasswordOutcome,
+  onCardSaved,
   onCheckoutOutcome,
   watches,
   onSend,
@@ -178,6 +188,7 @@ function Part({
   streaming: boolean;
   onApprovalOutcome: MessageProps["onApprovalOutcome"];
   onPasswordOutcome: MessageProps["onPasswordOutcome"];
+  onCardSaved: MessageProps["onCardSaved"];
   onCheckoutOutcome: MessageProps["onCheckoutOutcome"];
   watches: WatchIndex;
   onSend: MessageProps["onSend"];
@@ -216,6 +227,23 @@ function Part({
         </ActivityLine>
       );
     }
+
+    // Adding a card: Crossmint's card form in a dialog.
+    case "tool-await_saved_card":
+      if (part.state === "input-available" || part.state === "output-available") {
+        return (
+          <AddCard
+            toolCallId={part.toolCallId}
+            output={part.state === "output-available" ? part.output : undefined}
+            onOutcome={onCardSaved}
+          />
+        );
+      }
+      return (
+        <ActivityLine busy={toolBusy(part.state)} failed={part.state === "output-error"}>
+          {toolTitle(part.type)}
+        </ActivityLine>
+      );
 
     // The store asks for a password: Crossmint's field in a dialog, never words.
     case "tool-await_protected_input": {

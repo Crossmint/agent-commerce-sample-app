@@ -159,6 +159,14 @@ export const TOOL_DOCS = {
     params: { checkoutId: PARAM_DOCS.checkoutId },
     surfaces: ["chat"],
   },
+  await_saved_card: {
+    title: "Wait for a card",
+    summary:
+      "Show the user a secure form to add a card, and wait until they have. The card is saved with Crossmint: neither you nor the chat sees the number. " +
+      "Call it when the user wants to add a card, or needs one and has none saved, with no text in between; the chat asks the user. It returns saved, with the card's network and last four digits, or cancelled.",
+    params: {},
+    surfaces: ["chat"],
+  },
   await_protected_input: {
     title: "Wait for a password",
     summary:

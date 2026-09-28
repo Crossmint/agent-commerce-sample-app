@@ -11,6 +11,7 @@ import {
   cn,
   type PasswordRequestOutcome,
 } from "@agent-commerce/ui";
+import { AGENT_COMPANY } from "@/components/brand";
 import type { ProtectedInputOutcome } from "@/lib/chat/tools";
 import { APPROVAL_DONE_LINGER_MS } from "./agent-card-approval";
 import { SiteIcon } from "./checkout-site";
@@ -18,7 +19,12 @@ import { AgentBubble } from "./text";
 
 /** What the agent asks when a store wants the password of the user's account there. */
 export function passwordQuestion(domain: string): string {
-  return `${domain} asks you to sign in to continue. Can you enter your password?`;
+  return `Can you sign in to ${siteName(domain)}?`;
+}
+
+/** "www.amazon.com" → "amazon.com", for reading only. */
+function siteName(domain: string): string {
+  return domain.replace(/^www\./, "");
 }
 
 const OUTCOME_LABEL: Record<ProtectedInputOutcome["status"], string> = {
@@ -63,14 +69,14 @@ export function PasswordInThread({
         <div className="flex items-start justify-between gap-3">
           <p className="flex min-w-0 items-center gap-2 text-sm leading-snug font-medium">
             <SiteIcon host={domain} size={16} />
-            <span className="truncate">Sign in to {domain}</span>
+            <span className="truncate">Sign in to {siteName(domain)}</span>
           </p>
           <Badge variant={output?.status === "submitted" ? "success" : "muted"}>
             {output ? OUTCOME_LABEL[output.status] : "Pending"}
           </Badge>
         </div>
         <p className="text-sm text-muted-foreground">
-          Your password goes straight to Crossmint. Neither this app nor the agent sees it.
+          Encrypted and only used on {siteName(domain)}. {AGENT_COMPANY} never sees it.
         </p>
         {output ? null : (
           <Button type="button" size={buttonSize} className="w-full" onClick={onEnter}>
@@ -129,6 +135,7 @@ export function PasswordRequest({
               checkoutId={checkoutId}
               requestId={requestId}
               merchantDomain={domain}
+              platformName={AGENT_COMPANY}
               onDone={handleDone}
             />
           ) : null}

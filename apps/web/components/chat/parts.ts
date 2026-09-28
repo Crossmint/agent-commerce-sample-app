@@ -476,6 +476,7 @@ export function toolTitle(type: string): string {
     "tool-request_agent_card": "Requesting an agent card",
     "tool-await_agent_card_approval": "Waiting for your approval",
     "tool-await_protected_input": "Waiting for your password",
+    "tool-await_saved_card": "Waiting for your card",
     "tool-watch_checkout": "Following the checkout",
     "tool-pay_checkout_with_agent_card": "Paying with your agent card",
     "tool-save_buyer_profile": "Saving your details for next time",

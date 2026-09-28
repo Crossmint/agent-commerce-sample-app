@@ -2,6 +2,7 @@
 
 import {
   useCallback,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -29,8 +30,9 @@ import {
   type AgentCardGroup,
   type ApproveOutcome,
   type PasswordRequestOutcome,
+  type SaveCardResult,
 } from "@agent-commerce/ui";
-import { AGENT_NAME, AgentAvatar, PLATFORM_NAME } from "@/components/brand";
+import { AGENT_COMPANY, AGENT_NAME, AgentAvatar, PLATFORM_NAME } from "@/components/brand";
 import { DeviceFrame } from "@/components/frame/device-frame";
 import { PhoneSheet } from "@/components/frame/phone-sheet";
 import { PhoneStatusBar } from "@/components/frame/phone-status-bar";
@@ -57,6 +59,7 @@ import {
 } from "@/components/chat/parts";
 import { APPROVAL_DONE_LINGER_MS, ApprovalInThread } from "@/components/chat/agent-card-approval";
 import { PasswordInThread } from "@/components/chat/password-request";
+import { AddCardInThread, savedCardOutcome } from "@/components/chat/add-card";
 import { WatchRun } from "@/components/chat/checkout-card";
 import { CheckoutSiteLine } from "@/components/chat/checkout-site";
 import { ProductCards, ProductDetails, pickMessage } from "@/components/chat/product-cards";
@@ -128,6 +131,8 @@ function Home({
   const [accountOpen, setAccountOpen] = useState(false);
   const [approval, setApproval] = useState<Approval | null>(null);
   const [password, setPassword] = useState<PasswordAsk | null>(null);
+  // The add_card call whose form is open in the sheet.
+  const [addCard, setAddCard] = useState<string | null>(null);
   // The product whose details are open, over the chat.
   const [product, setProduct] = useState<FoundProduct | null>(null);
 
@@ -138,6 +143,14 @@ function Home({
       setTimeout(() => setApproval(null), APPROVAL_DONE_LINGER_MS);
     },
     [approval, chat],
+  );
+  const onCardSavedHere = useCallback(
+    (result: SaveCardResult) => {
+      if (!addCard) return;
+      chat.onCardSaved(addCard, savedCardOutcome(result));
+      setTimeout(() => setAddCard(null), APPROVAL_DONE_LINGER_MS);
+    },
+    [addCard, chat],
   );
   const onPasswordDone = useCallback(
     (status: PasswordRequestOutcome) => {
@@ -167,6 +180,7 @@ function Home({
         chatEnabled={chatEnabled}
         onReview={setApproval}
         onEnterPassword={setPassword}
+        onAddCard={setAddCard}
         onOpenProduct={setProduct}
       />
       <Composer chat={chat} disabled={!chatEnabled} />
@@ -234,9 +248,19 @@ function Home({
             checkoutId={password.checkoutId}
             requestId={password.requestId}
             merchantDomain={password.domain}
+            platformName={AGENT_COMPANY}
             onDone={onPasswordDone}
           />
         ) : null}
+      </PhoneSheet>
+
+      <PhoneSheet
+        open={addCard !== null}
+        onOpenChange={(open) => !open && setAddCard(null)}
+        container={screen}
+        title="Add a card"
+      >
+        {addCard ? <SaveCard key={addCard} showResult={false} onSaved={onCardSavedHere} /> : null}
       </PhoneSheet>
     </>
   );
@@ -273,6 +297,7 @@ function Thread({
   chatEnabled,
   onReview,
   onEnterPassword,
+  onAddCard,
   onOpenProduct,
 }: {
   chat: AgentChat;
@@ -280,6 +305,7 @@ function Thread({
   chatEnabled: boolean;
   onReview: (approval: Approval) => void;
   onEnterPassword: (ask: PasswordAsk) => void;
+  onAddCard: (toolCallId: string) => void;
   onOpenProduct: (product: FoundProduct) => void;
 }) {
   const { containerRef } = useScrollToBottom(chat.messages.length);
@@ -332,6 +358,7 @@ function Thread({
               streaming={chat.status === "streaming" && i === chat.messages.length - 1}
               onReview={onReview}
               onEnterPassword={onEnterPassword}
+              onAddCard={onAddCard}
               onCheckoutOutcome={chat.onCheckoutOutcome}
               watches={watches}
               onSend={chat.send}
@@ -355,6 +382,7 @@ function CompactMessage({
   streaming,
   onReview,
   onEnterPassword,
+  onAddCard,
   onCheckoutOutcome,
   watches,
   onSend,
@@ -364,6 +392,7 @@ function CompactMessage({
   streaming: boolean;
   onReview: (a: Approval) => void;
   onEnterPassword: (ask: PasswordAsk) => void;
+  onAddCard: (toolCallId: string) => void;
   onCheckoutOutcome: (toolCallId: string, outcome: CheckoutOutcome) => void;
   watches: WatchIndex;
   onSend: (text: string) => void;
@@ -391,6 +420,7 @@ function CompactMessage({
         message={message}
         onReview={onReview}
         onEnterPassword={onEnterPassword}
+        onAddCard={onAddCard}
         onCheckoutOutcome={onCheckoutOutcome}
         watches={watches}
         onSend={onSend}
@@ -412,6 +442,7 @@ function CompactPart({
   message,
   onReview,
   onEnterPassword,
+  onAddCard,
   onCheckoutOutcome,
   watches,
   onSend,
@@ -421,6 +452,7 @@ function CompactPart({
   message: ChatMessage;
   onReview: (a: Approval) => void;
   onEnterPassword: (ask: PasswordAsk) => void;
+  onAddCard: (toolCallId: string) => void;
   onCheckoutOutcome: (toolCallId: string, outcome: CheckoutOutcome) => void;
   watches: WatchIndex;
   onSend: (text: string) => void;
@@ -461,6 +493,24 @@ function CompactPart({
         </ActivityLine>
       );
     }
+
+    // Adding a card: Crossmint's card form in a sheet.
+    case "tool-await_saved_card":
+      if (part.state === "input-available" || part.state === "output-available") {
+        return (
+          <AddCardInThread
+            output={part.state === "output-available" ? part.output : undefined}
+            onAdd={() => onAddCard(part.toolCallId)}
+            bubbleClassName="max-w-[85%] px-3.5 py-2 text-[15px] leading-snug"
+            className="max-w-none"
+          />
+        );
+      }
+      return (
+        <ActivityLine busy={toolBusy(part.state)} failed={part.state === "output-error"}>
+          {toolTitle(part.type)}
+        </ActivityLine>
+      );
 
     // The store asks for a password: Crossmint's field in a sheet, never words.
     case "tool-await_protected_input": {
@@ -618,10 +668,24 @@ function Notice({
 // The composer
 // ---------------------------------------------------------------------------
 
+/** The most lines the message box grows to before it scrolls. */
+const COMPOSER_MAX_LINES = 3;
+
 function Composer({ chat, disabled }: { chat: AgentChat; disabled: boolean }) {
   const [text, setText] = useState("");
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
   const canSend = !chat.busy && !disabled && text.trim().length > 0;
+
+  // The box grows with its text, a line at a time, up to three lines; past that it scrolls.
+  useLayoutEffect(() => {
+    const box = inputRef.current;
+    if (!box) return;
+    const style = getComputedStyle(box);
+    const line = parseFloat(style.lineHeight) || 24;
+    const padding = parseFloat(style.paddingTop) + parseFloat(style.paddingBottom);
+    box.style.height = "auto";
+    box.style.height = `${Math.min(box.scrollHeight, line * COMPOSER_MAX_LINES + padding)}px`;
+  }, [text]);
 
   function submit() {
     if (!canSend) return;
@@ -630,7 +694,7 @@ function Composer({ chat, disabled }: { chat: AgentChat; disabled: boolean }) {
     inputRef.current?.focus();
   }
 
-  function onKeyDown(e: KeyboardEvent<HTMLInputElement>) {
+  function onKeyDown(e: KeyboardEvent<HTMLTextAreaElement>) {
     if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
       e.preventDefault();
       submit();
@@ -645,16 +709,18 @@ function Composer({ chat, disabled }: { chat: AgentChat; disabled: boolean }) {
         submit();
       }}
     >
-      <div className="flex h-12 items-center gap-2 rounded-full bg-muted pr-1.5 pl-4">
-        <input
+      {/* 24px corners: a pill at one line, a rounded box as it grows. */}
+      <div className="flex min-h-12 items-end gap-2 rounded-3xl bg-muted py-1.5 pr-1.5 pl-4">
+        <textarea
           ref={inputRef}
+          rows={1}
           value={text}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={onKeyDown}
           disabled={disabled}
           placeholder="Ask the agent to buy something"
           aria-label="Message"
-          className="min-w-0 flex-1 bg-transparent text-base text-foreground outline-none placeholder:text-muted-foreground disabled:opacity-50"
+          className="min-w-0 flex-1 resize-none bg-transparent py-1.5 text-base leading-6 text-foreground outline-none scrollbar-none placeholder:text-muted-foreground disabled:opacity-50"
         />
         {chat.busy ? (
           <button

@@ -218,6 +218,7 @@ export function CheckoutView({
             checkoutId={checkoutId}
             requestId={data.pendingUserAction.id}
             merchantDomain={data.pendingUserAction.protected.merchant?.domain ?? "the store"}
+            platformName={platformName}
             onDone={() => {
               void refetch();
               void messages.refetch();

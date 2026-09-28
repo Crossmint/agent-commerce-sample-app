@@ -8,7 +8,12 @@ import {
   lastAssistantMessageIsCompleteWithToolCalls,
   type ChatStatus,
 } from "ai";
-import type { ApprovalOutcome, CheckoutOutcome, ProtectedInputOutcome } from "@/lib/chat/tools";
+import type {
+  ApprovalOutcome,
+  CheckoutOutcome,
+  ProtectedInputOutcome,
+  SavedCardOutcome,
+} from "@/lib/chat/tools";
 import type { Attachment, ChatMessage } from "@/lib/chat/types";
 import { useChatSounds } from "./use-chat-sounds";
 
@@ -28,6 +33,8 @@ export interface AgentChat {
   stop: () => void;
   /** Hand the approval screen's answer back to the `await_agent_card_approval` tool call. */
   onApprovalOutcome: (toolCallId: string, outcome: ApprovalOutcome) => void;
+  /** Hand the card form's result (saved or cancelled) back to the `await_saved_card` tool call. */
+  onCardSaved: (toolCallId: string, outcome: SavedCardOutcome) => void;
   /** Hand the password field's answer (submitted or declined) back to the `await_protected_input` tool call. */
   onPasswordOutcome: (toolCallId: string, outcome: ProtectedInputOutcome) => void;
   /** Hand a watched checkout's question or ending back to the `watch_checkout` tool call. Once per call. */
@@ -108,6 +115,7 @@ export function useAgentChat({ id, initialMessages, persist }: UseAgentChatOptio
   type Output = { chatId: string; toolCallId: string } & (
     | { tool: "await_agent_card_approval"; output: ApprovalOutcome }
     | { tool: "await_protected_input"; output: ProtectedInputOutcome }
+    | { tool: "await_saved_card"; output: SavedCardOutcome }
     | { tool: "watch_checkout"; output: CheckoutOutcome }
   );
   const queue = useRef<Output[]>([]);
@@ -165,6 +173,13 @@ export function useAgentChat({ id, initialMessages, persist }: UseAgentChatOptio
     [hand],
   );
 
+  const onCardSaved = useCallback(
+    (toolCallId: string, output: SavedCardOutcome) => {
+      hand({ tool: "await_saved_card", toolCallId, output });
+    },
+    [hand],
+  );
+
   const onPasswordOutcome = useCallback(
     (toolCallId: string, output: ProtectedInputOutcome) => {
       hand({ tool: "await_protected_input", toolCallId, output });
@@ -192,6 +207,7 @@ export function useAgentChat({ id, initialMessages, persist }: UseAgentChatOptio
     stop: () => void stop(),
     onApprovalOutcome,
     onPasswordOutcome,
+    onCardSaved,
     onCheckoutOutcome,
     error,
     dismissError: () => setError(null),
