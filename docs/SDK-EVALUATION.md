@@ -173,3 +173,11 @@ This internal history includes setup blockers and harness observations to avoid 
 - Browser recovery after the callback stores only the opaque order-intent ID. The SDK retains ownership of in-progress authorization behavior; pre-callback unmount/recovery remains a joint test.
 - App login screen renders in the available automation browser. No authenticated SDK submission or purchase was performed during implementation.
 - Validation: 141 tests passed across core, auth, server, MCP and CLI; workspace typecheck/lint, package builds and the production web build passed. The final server rerun passed all 70 tests. Local `/app` responds HTTP 200; the unauthenticated browser smoke check reported no warnings/errors. These checks validate the integration, not the SDK's authenticated runtime behavior.
+
+## Checkout connection failures reported after integration (2026-09-28)
+
+- Two recent attempts logged `could not resolve a browser profile` followed by `TypeError: fetch failed`, with an `AggregateError` cause code `ETIMEDOUT`. The fatal stack is `CrossmintClient.request` → `createCheckout` → the chat tool. The failure occurs during checkout creation, before a payment-step request or the authorization component.
+- The chat route still returns HTTP 200 because tool failures are handled inside the streamed conversation; that status does not mean checkout succeeded. No `[sdk-evaluation]` authorization callbacks appear in the captured server log.
+- Subsequent read-only, unauthenticated GET probes to the production checkout endpoint returned HTTP 403 in approximately 0.4 seconds using both curl and Node fetch. Connectivity responded at probe time; these probes do not establish authenticated API health or explain the earlier timeouts. No checkout POST was replayed.
+- Other nearby messages: favicon HTTP 400 responses for partial streamed hostnames and an AI SDK `JSON Schema propertyNames` compatibility warning. Neither is evidence of a Crossmint React component defect.
+- Browser-console inspection was unavailable because the connected browser exposed no tabs. This finding is retained as integration/environment context only, outside the component bug report. Exact network cause and authenticated retry outcome remain unverified.
