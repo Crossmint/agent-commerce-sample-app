@@ -1,6 +1,7 @@
 {
   "name": "@agent-commerce/core",
   "version": "0.1.0",
+  "private": true,
   "description": "Typed Crossmint Agents client and domain logic for Agent Commerce: saved cards, agent cards, credentials, checkouts.",
   "license": "MIT",
   "type": "module",
@@ -10,7 +11,7 @@
   "exports": {
     ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" }
   },
-  "files": ["dist", "README.md"],
+  "files": ["dist"],
   "scripts": {
     "build": "tsup",
     "dev": "tsup --watch",

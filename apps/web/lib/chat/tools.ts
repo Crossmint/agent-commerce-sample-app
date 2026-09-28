@@ -2,6 +2,8 @@ import { tool } from "ai";
 import {
   describeTool,
   PARAM_DOCS,
+  buyerProfileProblems,
+  normalizeBuyerProfile,
   paramDoc,
   type BuyerProfile,
   type BuyerProfileInput,
@@ -712,7 +714,15 @@ export function createChatTools(api: AgentCommerceClient, opts: { userEmail?: st
               code: "invalid_request",
             };
           }
-          const created = await api.createBuyerProfile(merged.profile);
+          const profile = normalizeBuyerProfile(merged.profile);
+          const problems = buyerProfileProblems(profile, { requirePhone: true });
+          if (problems.length) {
+            return {
+              error: `Nothing saved: ${problems.map((p) => p.message).join(" ")} Tell the user what to fix, then save again with only what they correct.`,
+              code: "invalid_request",
+            };
+          }
+          const created = await api.createBuyerProfile(profile);
           return {
             buyerProfileId: created.id,
             saved: true,

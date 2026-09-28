@@ -1,6 +1,7 @@
 {
   "name": "@agent-commerce/mcp",
   "version": "0.1.0",
+  "private": true,
   "description": "MCP server exposing the Agent Commerce API as tools, with OAuth 2.1 via Stytch Connected Apps.",
   "license": "MIT",
   "type": "module",
@@ -16,8 +17,7 @@
     }
   },
   "files": [
-    "dist",
-    "README.md"
+    "dist"
   ],
   "scripts": {
     "build": "tsup",

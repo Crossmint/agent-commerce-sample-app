@@ -1,6 +1,7 @@
 {
   "name": "@agent-commerce/ui",
   "version": "0.1.0",
+  "private": true,
   "description": "React components for Agent Commerce: save card, approve agent card, verify, list, checkout. shadcn/ui on Tailwind.",
   "license": "MIT",
   "type": "module",
@@ -15,8 +16,7 @@
   },
   "files": [
     "dist",
-    "src/styles.css",
-    "README.md"
+    "src/styles.css"
   ],
   "scripts": {
     "build": "tsup",

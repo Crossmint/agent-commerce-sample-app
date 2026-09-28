@@ -4,9 +4,13 @@ Teaches a coding agent (Claude Code, Codex, Cursor, and others that read `SKILL.
 
 ## Requirements
 
+The CLI is not on npm. Build it from this repository and put it on your `PATH`:
+
 ```sh
-npm i -g @agent-commerce/cli
-agent-commerce login --api https://wallet.example.com/api/agent-commerce
+pnpm install
+pnpm turbo run build --filter=@agent-commerce/cli...
+alias agent-commerce="node $PWD/packages/cli/dist/bin.js"
+agent-commerce login --api https://your-app.example.com/api/agent-commerce
 ```
 
 ## Install the skill

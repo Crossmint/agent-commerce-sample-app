@@ -16,18 +16,7 @@ What it installs:
 
 ## Point it at your own wallet
 
-Change the URL in `.mcp.json` to your deployment's `/api/mcp`, or run the server over stdio with the CLI login:
-
-```json
-{
-  "mcpServers": {
-    "agent-commerce": {
-      "command": "npx",
-      "args": ["-y", "@agent-commerce/mcp", "--api", "https://your-wallet.example.com/api/agent-commerce"]
-    }
-  }
-}
-```
+Change the URL in `.mcp.json` to your deployment's `/api/mcp`.
 
 ## Keep the skill in sync
 

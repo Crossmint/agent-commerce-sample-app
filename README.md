@@ -1,75 +1,183 @@
+<div align="center">
+
 # Agent Commerce Sample App
 
-An open source sample app for agentic commerce on the Crossmint Agents APIs.
+### Let AI agents buy with your users' own cards.<br>Your users approve every budget.
 
-The Agent Commerce Sample App shows how to add card payments for AI agents to your platform. A user saves a card. An agent asks for a bounded authorization at a specific merchant, an "agent card". The user approves in a browser. The agent then pays with a scoped card number, or lets Crossmint Agent Checkouts buy on its behalf.
+An open source sample app by [Crossmint](https://www.crossmint.com). Try it live, then build the same experience into your own agent app with [one prompt](#build-it-into-your-agent-app).
 
-It is not a crypto wallet. It wraps the Crossmint Agents APIs and adds the parts Crossmint does not ship: the approval screen, the agent tooling, and the glue between them.
+**[Try it live](https://agent-commerce.demos-crossmint.com/)** &nbsp;·&nbsp; [Read the docs](https://docs.crossmint.com/agents/overview) &nbsp;·&nbsp; [Talk to sales](https://www.crossmint.com/contact/sales)
 
-## What do I use?
+<br>
 
-| You have | You want | Install | Copy |
-|---|---|---|---|
-| A web app with users | Users save cards and grant your agent budgets | `@agent-commerce/core` `@agent-commerce/server` `@agent-commerce/ui` | the `/app` screens from `apps/web` |
-| An agent in Claude Code, ChatGPT, or a chat channel | A hosted place where users approve, plus agent tooling | Deploy `apps/web`. Give agents `agent-commerce` or the MCP URL | Nothing. Configure and deploy |
-| Your own auth (Auth0, Clerk, Supabase) | All of the above with your login | Implement `UserAuth` from `@agent-commerce/auth` | `packages/auth/src/stytch.ts` as a template |
-| Your own backend | Only the typed Crossmint client | `@agent-commerce/core` | Nothing |
-| A chat product | Approve cards inline in the conversation | `@agent-commerce/ui` + `@agent-commerce/server` in process | `components/chat` and `api/chat` from `apps/web` |
+<img src=".github/assets/promo.gif" alt="A user saves a card. An agent asks for a $10 budget at Starbucks. The user approves with a passkey, and the agent buys a latte on starbucks.com." width="100%">
 
-## Packages
+</div>
 
-| Package | What it is |
-|---|---|
-| [`@agent-commerce/core`](packages/core) | Typed Crossmint Agents client. Rail selection. Encrypted-card decryption. Checkout action rendering. |
-| [`@agent-commerce/auth`](packages/auth) | One `UserAuth` interface. Stytch adapter. Generic JWKS adapter. OAuth PKCE helpers. |
-| [`@agent-commerce/server`](packages/server) | The HTTP API as Web-standard request handlers. Mounts in one Next.js route file at `/api/agent-commerce`. |
-| [`@agent-commerce/ui`](packages/ui) | React components on shadcn/ui: save card, approve, verify, list, checkout. |
-| [`@agent-commerce/mcp`](packages/mcp) | MCP server exposing the API as tools, with OAuth 2.1. |
-| [`@agent-commerce/cli`](packages/cli) | The CLI, installed as `agent-commerce`. Same surface as MCP, for terminal agents and humans. |
-| [`skills/agent-commerce`](skills/agent-commerce) | A skill that teaches coding agents how to use the CLI. |
-| [`plugins/cursor`](plugins/cursor) | Cursor plugin: the hosted MCP server, the skill, and a payments rule. Also loads in Grok Bot. |
-| [`plugins/claude`](plugins/claude) | Claude Code plugin: the same MCP server and skill. Install with `/plugin marketplace add Crossmint/agent-commerce-sample-app`. |
-| [`apps/web`](apps/web) | The reference website: the landing page, the app, the API, the MCP endpoint. |
+<br>
 
-## How it flows
+## Three APIs. One approval screen that you host.
 
-1. The agent runs `agent-commerce checkout create --url ... --max-cost 50` and Crossmint starts buying the item in a real browser. No card is asked for yet.
-2. Partway through, the run reaches its **payment step** and the agent gets an approval link. The user opens it, logs in, and picks one of their saved payment methods. A passkey prompt appears once per device.
-3. That mints an **agent card** for this purchase alone, capped at the max cost and locked to the store. Crossmint pays the store with it, and the agent polls until the receipt lands.
+<table>
+  <tr>
+    <td width="33%" align="center"><img src=".github/assets/approve-a-budget.gif" alt="The agent asks for a $10 Starbucks budget. The user adds a card and approves it." width="260"></td>
+    <td width="33%" align="center"><img src=".github/assets/buy-anything.gif" alt="The agent orders a latte on starbucks.com, gets the budget approved at the payment step, and shows the receipt." width="260"></td>
+    <td width="33%" align="center"><img src=".github/assets/sign-in-to-stores.gif" alt="Amazon asks the agent to sign in. The user types the password once, and the agent places the order." width="260"></td>
+  </tr>
+  <tr>
+    <td valign="top">
+      <b>Save cards. Approve budgets.</b><br>
+      The card goes straight into Crossmint's PCI vault. It never touches your servers. The agent asks for an amount, a store and an expiry. The user approves once.
+    </td>
+    <td valign="top">
+      <b>Buy on any website.</b><br>
+      One call to Crossmint Agent Checkouts buys a product, books a table or a flight, or gets event tickets. It works with UCP and with any browser checkout.
+    </td>
+    <td valign="top">
+      <b>Sign in to stores.</b><br>
+      When a store asks for a login, the user types it once. It is encrypted, only that store uses it, and the agent never sees it.
+    </td>
+  </tr>
+</table>
 
-An agent can also ask for an agent card up front, with `agent-commerce agent-card request --amount 50 --description "Flight to SF"`, and then spend it with `agent-commerce agent-card reveal <id>` — for paying somewhere a checkout cannot reach.
+Visa Intelligent Commerce and Mastercard Agent Pay enforce each limit on the card network. Your users keep their points and rewards.
 
-Read [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the full design and [docs/API.md](docs/API.md) for the HTTP contract.
+## Works where your agents are
 
-## Design
+The same APIs run every experience:
 
-The site follows the design of the [Crossmint onramp sample app](https://github.com/Crossmint/onramp-sample-app): a white ground with a dot grid, one blue accent, system sans for text and a display face for money figures only. The app is one Next.js page with a device mockup and an experience switcher at `/app`: Mobile, Desktop, iMessage and Agent MCP show the same flow from each side. The CLI and its skill are in `packages/cli` and `skills/agent-commerce/`, to copy and rename. The standalone screens (log in, approve, authorize an agent, the CLI callback) stand on the same phone mockup. Theme tokens live in `packages/ui/src/styles.css`; the frames live in `apps/web/components/frame/`.
+- **Your own app.** Add components to save cards, approve budgets and show receipts in your chat.
+- **Messaging apps.** On iMessage, WhatsApp or Instagram, the agent sends a link. The user approves on a page that you host.
+- **MCP hosts.** Add one URL to Claude, ChatGPT or Cursor. OAuth signs the user in the first time.
+- **Terminal agents.** A CLI and a skill for Claude Code, Codex and other coding agents.
 
-## Run it locally
+**[See every experience live at agent-commerce.demos-crossmint.com](https://agent-commerce.demos-crossmint.com/)**. Purchases in the live app are real.
+
+## Build it into your agent app
+
+Open your own app's repository in Claude Code, Cursor or Codex, and paste this prompt. Your coding agent reads the Crossmint docs and this sample app, then builds the same flows in your stack. The live app has a button that copies it too.
+
+<!-- Keep this prompt the same as BUILD_PROMPT in apps/web/lib/build-prompt.ts. -->
+
+<details>
+<summary><b>Show the prompt</b></summary>
+
+<br>
+
+```text
+Add agentic commerce to my app with the Crossmint Agents APIs. My users save a card
+once. When my agent needs to pay, it asks for a budget, the user approves it inside my
+app, and the agent buys on any website.
+
+Use these sources:
+- Crossmint docs index: https://docs.crossmint.com/llms.txt
+  (or add the docs MCP server: https://docs.crossmint.com/mcp)
+- Agent cards: https://docs.crossmint.com/agents/cards-quickstart
+- Agent Checkouts: https://docs.crossmint.com/agents/agent-checkouts-quickstart
+- A working reference app: https://github.com/Crossmint/agent-commerce-sample-app
+  (its HTTP API contract is in docs/API.md)
+
+First, read my codebase. Tell me my framework, my auth provider, and where my agent
+runs: an in-app chat, a messaging bot, an MCP server or a CLI. Then propose a plan
+and wait for my OK before you write code.
+
+Build these parts:
+1. Save a card with the CrossmintPaymentMethodManagement component from
+   @crossmint/client-sdk-react-ui. The card goes to Crossmint, never to my servers.
+2. Agent cards. When the agent needs money, create an order intent with an amount,
+   a merchant and an expiry. Show an approval screen in my app where the user picks
+   a card and approves. Run OrderIntentVerification when the card rail needs it.
+3. Agent Checkouts. Start a run at a product URL with a max cost and stream its
+   messages. Answer its form requests. Pay its payment step with an agent card for
+   the exact amount. Collect store passwords with CrossmintProtectedInput.
+4. Buyer details. Save the user's name, contact and shipping address as a buyer
+   profile, so checkouts do not stop to ask for them.
+5. Agent tools. Give my agent tools to list saved cards, request an agent card,
+   start a checkout and answer it. Show each approval as a component in my UI, or
+   as a link when the agent has no UI.
+
+Rules:
+- The model never sees a full card number, a CVC or a password.
+- Nothing is paid until the user approves the budget.
+- The Crossmint server key stays on my server. Card and order-intent calls use the
+  client key with the signed-in user's JWT.
+- Agent Checkouts need a production server key with the agent-checkouts scopes,
+  and the x-crossmint-user-id header on every call.
+```
+
+</details>
+
+<details>
+<summary>Run this sample app locally instead</summary>
+
+<br>
+
+You need a [Crossmint](https://www.crossmint.com/console) project (Agent Checkouts need a production server key) and a [Stytch](https://stytch.com) project for user login. A Postgres URL and an Anthropic or OpenAI key are optional.
 
 ```bash
+git clone https://github.com/Crossmint/agent-commerce-sample-app.git
+cd agent-commerce-sample-app
 pnpm install
-cp .env.example .env
+pnpm turbo run build --filter='./packages/*'
+cp .env.example apps/web/.env.local
 pnpm dev
 ```
 
-You need a Crossmint staging project, a Stytch project, and a Postgres URL. See `.env.example`. Agent Checkouts only work with a production Crossmint key.
+Fill in your keys in `apps/web/.env.local`, then open http://localhost:3000. The comments in `.env.example` explain each variable.
 
-Then, in another terminal:
+</details>
 
-```bash
-pnpm --filter @agent-commerce/cli build
-node packages/cli/dist/bin.js login --api http://localhost:3000/api/agent-commerce
-node packages/cli/dist/bin.js agent-card request --amount 5 --description "Test" --wait
-```
+## FAQ
 
-## License
+<details>
+<summary><b>How is this different from Stripe Link?</b></summary>
 
-MIT
+<br>
 
+Link is a platform your users log into. This is a white-label experience embedded in your own app.
+
+- It stays your app: your users, your design, no second login and no hand-off to somebody else's platform.
+- These are agent cards, not the one-time-use cards Link issues. They run on Visa Intelligent Commerce and Mastercard Agent Pay.
+- They are your users' own cards, scoped and enforced at the network level, so your users keep their points and rewards.
+- Bank statements read as the merchant charging them directly, not as a Stripe charge.
+- Refunds and chargebacks go straight to the merchant, with no Stripe in the middle.
+
+</details>
+
+<details>
+<summary><b>Which card networks are supported?</b></summary>
+
+<br>
+
+Visa Intelligent Commerce and Mastercard Agent Pay for enforced limits, plus an encrypted-card fallback where the limit is advisory. Union Pay and AMEX are coming.
+
+</details>
+
+<details>
+<summary><b>Is it production ready?</b></summary>
+
+<br>
+
+It is a sample app. It runs against production Crossmint keys and real cards, and it shows the flows end to end, but review it before shipping it to your users.
+
+</details>
+
+## What is inside
+
+| Path | What it is |
+|---|---|
+| [`apps/web`](apps/web) | The Next.js site: the landing page, the app at `/app`, the HTTP API and the MCP endpoint. |
+| [`packages`](packages) | The code behind the site: the Crossmint client, auth, API handlers, React components, the MCP server and the CLI. They are workspace packages, not published to npm. |
+| [`skills/agent-commerce`](skills/agent-commerce) | A skill that teaches coding agents to use the CLI. |
+| [`plugins`](plugins) | Claude Code and Cursor plugins with the hosted MCP server and the skill. |
+| [`docs/API.md`](docs/API.md) | The HTTP API contract. |
 
 ### SDK authorization evaluation
 
 New approvals use `CrossmintAgentCardAuthorization` through the `AuthorizeAgentCard` wrapper on every approval surface. New requests require a merchant name, URL and country; the SDK handles card selection, registration, order-intent creation, CVC and verification. The server validates and records the returned ID. See [the API contract](docs/API.md) and [the component QA report](docs/SDK-QA-REPORT.md).
 
 For an existing Postgres deployment, apply migration `0005_sdk_authorization_merchant.sql` through the project's migration workflow before using the new checkout flow. No database migration is needed for the in-memory development store.
+
+## License
+
+[MIT](LICENSE)

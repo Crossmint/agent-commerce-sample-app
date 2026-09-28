@@ -18,18 +18,7 @@ https://github.com/Crossmint/agent-commerce-sample-app
 
 ## Point it at your own wallet
 
-If you deploy the Agent Commerce template yourself, change the URL in `mcp.json` to your deployment's `/api/mcp`. Or run the MCP server locally over stdio, logged in with the CLI:
-
-```json
-{
-  "mcpServers": {
-    "agent-commerce": {
-      "command": "npx",
-      "args": ["-y", "@agent-commerce/mcp", "--api", "https://your-wallet.example.com/api/agent-commerce"]
-    }
-  }
-}
-```
+If you deploy the Agent Commerce template yourself, change the URL in `mcp.json` to your deployment's `/api/mcp`.
 
 ## Keep the skill in sync
 

@@ -9,6 +9,7 @@ import type { ConnectedAgentSession } from "@agent-commerce/ui";
 import { AgentsLockup } from "@/components/brand";
 import type { BrandTheme } from "@/components/brand-themes";
 import { useAgentChat } from "@/components/chat/use-agent-chat";
+import { CopyPromptButton } from "@/components/frame/copy-prompt-button";
 import { FrameControls } from "@/components/frame/frame-selects";
 import { SiteHeader } from "@/components/frame/site-header";
 import { type MessagingApp, type View } from "@/components/frame/views";
@@ -266,11 +267,15 @@ export function AppExperience({
 
   return (
     <>
-      {/* Desktop: one header row, the logo card and the controls beside it. */}
+      {/*
+        Desktop: one header row, the logo card, the controls beside it, and
+        the prompt that builds this into your own agent app.
+      */}
       <div className="fixed top-6 left-6 z-20 hidden flex-col items-start gap-2 md:flex">
         <div className="flex items-center gap-2.5">
           <SiteHeader />
           <FrameControls {...controls} animate />
+          <CopyPromptButton animate />
         </div>
         {/* The app runs on production keys, so anything bought here is bought. */}
         <p className="rounded-full border border-border bg-background/80 px-3 py-1 text-[12px] font-medium text-muted-foreground backdrop-blur">

@@ -1,6 +1,7 @@
 {
   "name": "@agent-commerce/cli",
   "version": "2.0.0-alpha.0",
+  "private": true,
   "description": "Agent Commerce CLI: let an agent request a bounded agent card, reveal it, or run a checkout, with the user's approval.",
   "license": "MIT",
   "type": "module",
@@ -10,8 +11,7 @@
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "files": [
-    "dist",
-    "README.md"
+    "dist"
   ],
   "scripts": {
     "build": "tsup",

@@ -12,3 +12,4 @@ coverage
 .vercel
 *.tsbuildinfo
 .DS_Store
+.claude/

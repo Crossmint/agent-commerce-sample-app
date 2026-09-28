@@ -9,7 +9,6 @@
  * - packages/mcp/src/tools.ts and apps/web/lib/chat/tools.ts (the addenda and the zod shapes)
  * - apps/web/lib/chat/prompt.ts (the flow the chat model follows)
  * - packages/cli/src/commands/* help text, and skills/agent-commerce/SKILL.md (then `pnpm plugin:sync`)
- * - docs/ARCHITECTURE.md section 3.5
  */
 
 export type ToolSurface = "mcp" | "chat";

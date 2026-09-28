@@ -2,12 +2,14 @@ import type { AuthenticatedUser } from "@agent-commerce/auth";
 import {
   alternativeResponse,
   asksPasswordInForm,
+  buyerProfileProblems,
   declineResponse,
   expiresInHours,
   isPaymentAction,
   isProtectedAction,
   isTerminalCheckout,
   newMessageId,
+  normalizeBuyerProfile,
   pendingActionOf,
   protectedResponse,
   receiptOf,
@@ -417,11 +419,16 @@ export async function deleteBrowserProfile(req: Request, ctx: Ctx): Promise<Resp
  * POST /v1/buyer-profiles
  *
  * Save the user's name, contact and shipping address. The new profile is the
- * one every later checkout starts with.
+ * one every later checkout starts with. Details a store could not ship to
+ * are refused field by field, before they reach Crossmint.
  */
 export async function createBuyerProfile(req: Request, ctx: Ctx): Promise<Response> {
   const user = await requireUser(req, ctx);
-  const body = await parseBody(req, buyerProfileSchema);
+  const body = normalizeBuyerProfile(await parseBody(req, buyerProfileSchema));
+  const problems = buyerProfileProblems(body);
+  if (problems.length) {
+    throw invalidRequest(problems.map((p) => p.message).join(" "), { problems });
+  }
   const profile = await ctx.crossmint.checkouts.createBuyerProfile(
     checkoutContext(ctx, user),
     body,

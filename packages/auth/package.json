@@ -1,6 +1,7 @@
 {
   "name": "@agent-commerce/auth",
   "version": "0.1.0",
+  "private": true,
   "description": "Bring-your-own-auth for Agent Commerce: one UserAuth interface, Stytch and generic JWKS adapters, OAuth PKCE helpers for agents.",
   "license": "MIT",
   "type": "module",
@@ -13,7 +14,7 @@
     "./jwks": { "types": "./dist/generic-jwks.d.ts", "import": "./dist/generic-jwks.js" },
     "./oauth": { "types": "./dist/oauth.d.ts", "import": "./dist/oauth.js" }
   },
-  "files": ["dist", "README.md"],
+  "files": ["dist"],
   "scripts": {
     "build": "tsup",
     "dev": "tsup --watch",

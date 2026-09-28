@@ -1,6 +1,7 @@
 {
   "name": "@agent-commerce/server",
   "version": "0.1.0",
+  "private": true,
   "description": "Agent Commerce HTTP API as Web-standard request handlers. Mount in Next.js or any runtime with Request/Response.",
   "license": "MIT",
   "type": "module",
@@ -19,8 +20,7 @@
     }
   },
   "files": [
-    "dist",
-    "README.md"
+    "dist"
   ],
   "scripts": {
     "build": "tsup",
