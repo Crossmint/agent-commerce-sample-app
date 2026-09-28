@@ -10,6 +10,8 @@ export type * from "./api/types.js";
 export * from "./hooks/index.js";
 
 // Components
+export { AuthorizeAgentCard } from "./components/authorize-agent-card.js";
+export type { AuthorizeAgentCardProps } from "./components/authorize-agent-card.js";
 export { SaveCard } from "./components/save-card.js";
 export type {
   SaveCardProps,

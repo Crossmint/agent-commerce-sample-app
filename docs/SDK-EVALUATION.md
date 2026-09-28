@@ -154,3 +154,12 @@ This internal history includes setup blockers and harness observations to avoid 
 - **Current test recovery:** close the old approval and create a new request, using the already-registered card. Do not reconstruct authorization from stale browser data. Avoid reloading the environment during the next attempt.
 - **Follow-up fixes:** handle a terminal not-found response by stopping polling and clearing/disabling stale approval actions, with a clear instruction to request a new authorization. Use the existing database-backed store for evaluations that must survive server reloads.
 - **Status:** documented; no persistence or UI workaround has been applied during this evaluation step.
+
+## Authorization wrapper (2026-09-28)
+
+- Added and exported `AuthorizeAgentCard` and `AuthorizeAgentCardProps` from `@agent-commerce/ui`.
+- The wrapper accepts the SDK's props except `jwt`, which comes from `useAgentCommerce`, and mounts the component inside the existing `CrossmintScope`. Missing configuration/session and provider loading/failure have explicit fallback text.
+- Props, SDK defaults, and callback payloads are preserved. The wrapper performs no backend registration, approval, or checkout mutation of its own.
+- Callback diagnostics use `[sdk-evaluation] authorization.completed` with order-intent ID, rail, and provider, and `authorization.failed` with the error code only. Full result/error objects, JWTs, and card details are not logged by the wrapper.
+- Validation: UI package typecheck and build passed, including generated public declarations. These are integration checks, not runtime SDK QA evidence.
+- The wrapper is not mounted in a screen yet. Interactive evaluation and callback verification remain pending; no production authorization was initiated for this change.
