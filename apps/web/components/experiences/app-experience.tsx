@@ -9,6 +9,7 @@ import type { ConnectedAgentSession } from "@agent-commerce/ui";
 import { AgentsLockup } from "@/components/brand";
 import type { BrandTheme } from "@/components/brand-themes";
 import { useAgentChat } from "@/components/chat/use-agent-chat";
+import { CopyPromptButton } from "@/components/frame/copy-prompt-button";
 import { FrameControls } from "@/components/frame/frame-selects";
 import { SiteHeader } from "@/components/frame/site-header";
 import { type MessagingApp, type View } from "@/components/frame/views";
@@ -276,6 +277,11 @@ export function AppExperience({
         <p className="rounded-full border border-border bg-background/80 px-3 py-1 text-[12px] font-medium text-muted-foreground backdrop-blur">
           All purchases are real purchases.
         </p>
+      </div>
+
+      {/* Desktop: the prompt that builds this into your own agent app, opposite the logo card. */}
+      <div className="fixed top-6 right-6 z-20 hidden md:flex">
+        <CopyPromptButton animate />
       </div>
 
       {/*
