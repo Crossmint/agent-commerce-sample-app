@@ -16,7 +16,7 @@
 - Release: https://github.com/Crossmint/crossmint-sdk/pull/2075
 - Existing integrations: payment method management, CVC recollection, order intent verification.
 - Evaluation environment: Crossmint production for both individual components and full Agent Checkouts; Stytch test for local sign-in.
-- No runtime component results have been collected yet.
+- Runtime results are recorded under Joint evaluation findings below; verification and CVC recollection remain pending.
 
 ## Evaluation sequence
 
@@ -128,7 +128,7 @@ A passing automated suite alone does not establish component correctness. The dr
 - **Configuration finding:** the initial setup selected the explicit `*_PRODUCTION_*` Crossmint key pair from the root `.env`. After switching Stytch to test, that pair remained active. The original, unsuffixed Crossmint key pair in `.env` is different and is also production. Selecting a key solely by the environment suffix did not establish that it trusted the selected Stytch project.
 - **Local change:** restored the original `CROSSMINT_SERVER_API_KEY` and `NEXT_PUBLIC_CROSSMINT_CLIENT_API_KEY` from the root `.env`; mirrored the latter into server-side `CROSSMINT_CLIENT_API_KEY`. Stytch remains test and Crossmint remains production. No credentials or provider trust settings were published or changed.
 - **Hypothesis:** the explicit production pair belongs to a configuration that does not trust this Stytch test signing key. Restoring the original pair is a configuration correction to test, not yet a confirmed resolution.
-- **Retest:** requested from the user in the browser where they submitted the form. The observable Codex browser currently shows the login screen, so authenticated success has not been verified there.
+- **Retest:** the user's subsequent submission reached `POST /v1/payment-methods/:id/register` with HTTP 200, and the approval UI displays the saved card selected. This confirms that authenticated registration works with the original Crossmint production pair and Stytch test. The iframe's direct save request was not independently captured. Verification and CVC recollection have not yet been reached.
 - **Evidence handling:** only the error category and redacted key-ID prefix are recorded. The user's screenshot contains payment details and is not copied into the repository or PR.
 
 ### EVAL-003 — Embedded form exposes an actionable-looking but misleading auth error
@@ -138,3 +138,14 @@ A passing automated suite alone does not establish component correctness. The dr
 - **Impact:** the buyer cannot fix provider trust settings, and the server-key wording can mislead an integrator into replacing a browser client key with a secret. The application must continue using a client key plus buyer JWT in the browser.
 - **Proposed behavior:** show a concise authentication failure and a relevant recovery action to the buyer; expose structured, redacted diagnostics to the integrator separately. Do not recommend a server key from the client-side card form.
 - **Status:** recorded from the supplied screenshot; no SDK or hosted-form workaround applied.
+
+### EVAL-004 — Environment reload loses an approval request while the UI still offers Allow
+
+- **Classification:** confirmed sample-app/local persistence and stale-state handling issue, not a Crossmint component failure.
+- **Reproduction:** create an agent-card request and leave its approval UI open; reload the server environment while using the in-memory store, then press Allow.
+- **Evidence:** the same request returned HTTP 200 before the logged `.env.local` reload and HTTP 404 immediately afterward. Subsequent reads continue returning 404, as does `POST /v1/agent-card-requests/:id/approve`. `DATABASE_URL` is absent, and `buildStore()` creates `memoryRequestStore()` with a new `Map`.
+- **Cause:** correcting the key selection reloaded the server module and lost the in-memory request. The previous request data remains in `useResource` after a failed refetch. `useAgentCardRequest` continues polling based on that stale `pending` state; `ApproveAgentCard` still enables Allow when a card is selected.
+- **Impact:** the UI invites repeated approval attempts for a request that no longer exists and polls it repeatedly. This failed approval exits in `loadOwnedRequest`, before registration or order-intent creation in Crossmint.
+- **Current test recovery:** close the old approval and create a new request, using the already-registered card. Do not reconstruct authorization from stale browser data. Avoid reloading the environment during the next attempt.
+- **Follow-up fixes:** handle a terminal not-found response by stopping polling and clearing/disabling stale approval actions, with a clear instruction to request a new authorization. Use the existing database-backed store for evaluations that must survive server reloads.
+- **Status:** documented; no persistence or UI workaround has been applied during this evaluation step.
