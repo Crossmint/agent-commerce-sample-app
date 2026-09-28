@@ -59,6 +59,11 @@ Open your own app's repository in Claude Code, Cursor or Codex, and paste this p
 
 <!-- Keep this prompt the same as BUILD_PROMPT in apps/web/lib/build-prompt.ts. -->
 
+<details>
+<summary><b>Show the prompt</b></summary>
+
+<br>
+
 ```text
 Add agentic commerce to my app with the Crossmint Agents APIs. My users save a card
 once. When my agent needs to pay, it asks for a budget, the user approves it inside my
@@ -99,6 +104,8 @@ Rules:
 - Agent Checkouts need a production server key with the agent-checkouts scopes,
   and the x-crossmint-user-id header on every call.
 ```
+
+</details>
 
 <details>
 <summary>Run this sample app locally instead</summary>
