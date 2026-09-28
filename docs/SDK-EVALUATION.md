@@ -116,3 +116,25 @@ Installation reports peer warnings involving Zod 4 versus a transitive Zod 3 exp
 - **Retest:** a fresh browser session renders the login screen with no console warnings/errors, and the public config endpoint confirms `production`/`test`. Sign-in and the card flows are still pending; this does not establish that the resulting JWT is accepted by Crossmint or that its allowed-origin configuration is correct.
 
 A passing automated suite alone does not establish component correctness. The draft PR remains an upgrade and observability checkpoint, with authenticated regression tests explicitly pending.
+
+## Joint evaluation findings (2026-09-28)
+
+### EVAL-002 — Saving a card fails JWT authentication
+
+- **Classification:** authentication configuration; exact Crossmint trust configuration has not yet been inspected.
+- **Reproduction:** sign in with Stytch test, open Add a card, complete the form, and submit. The user observed this in the existing payment-method-management component on SDK 4.8.0.
+- **Expected:** Crossmint authenticates the buyer's session and saves the payment method.
+- **Actual:** the embedded form reports that a JWT signing key is absent from the JWKS for a `jwk-test-…` key ID. Its combined authentication error also reports that an alternative method requires a server-side API key. The local payment-methods read returned HTTP 401 as well.
+- **Configuration finding:** the initial setup selected the explicit `*_PRODUCTION_*` Crossmint key pair from the root `.env`. After switching Stytch to test, that pair remained active. The original, unsuffixed Crossmint key pair in `.env` is different and is also production. Selecting a key solely by the environment suffix did not establish that it trusted the selected Stytch project.
+- **Local change:** restored the original `CROSSMINT_SERVER_API_KEY` and `NEXT_PUBLIC_CROSSMINT_CLIENT_API_KEY` from the root `.env`; mirrored the latter into server-side `CROSSMINT_CLIENT_API_KEY`. Stytch remains test and Crossmint remains production. No credentials or provider trust settings were published or changed.
+- **Hypothesis:** the explicit production pair belongs to a configuration that does not trust this Stytch test signing key. Restoring the original pair is a configuration correction to test, not yet a confirmed resolution.
+- **Retest:** requested from the user in the browser where they submitted the form. The observable Codex browser currently shows the login screen, so authenticated success has not been verified there.
+- **Evidence handling:** only the error category and redacted key-ID prefix are recorded. The user's screenshot contains payment details and is not copied into the repository or PR.
+
+### EVAL-003 — Embedded form exposes an actionable-looking but misleading auth error
+
+- **Classification:** confirmed user-facing error presentation issue in the hosted form; ownership between the SDK and hosted backend remains to be determined.
+- **Observed:** the form prints a long aggregate authentication error, including duplicate `API Key` method names, a JWKS key identifier, and instructions to use a server-side API key. This is shown beneath Continue to the buyer.
+- **Impact:** the buyer cannot fix provider trust settings, and the server-key wording can mislead an integrator into replacing a browser client key with a secret. The application must continue using a client key plus buyer JWT in the browser.
+- **Proposed behavior:** show a concise authentication failure and a relevant recovery action to the buyer; expose structured, redacted diagnostics to the integrator separately. Do not recommend a server key from the client-side card form.
+- **Status:** recorded from the supplied screenshot; no SDK or hosted-form workaround applied.
