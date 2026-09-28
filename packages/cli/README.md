@@ -35,12 +35,12 @@ Check the session with `agent-commerce whoami`. Remove it with `agent-commerce l
 ## Flow 1: request an agent card
 
 ```sh
-agent-commerce agent-card request --amount 50 --description "Flight to SF" --wait
+agent-commerce agent-card request --amount 50 --description "Flight to SF" --merchant-name United --merchant-url https://united.com --merchant-country US --wait
 ```
 
 The command prints an approval URL. Show it to the user. They pick a saved card and approve. With `--wait` the command blocks until the card is active, denied, or expired.
 
-Lock the card to one merchant with `--merchant-name`, `--merchant-url`, and `--merchant-country`. Set the lifetime with `--expires-in-hours` (default 24).
+Every new authorization requires a merchant. Supply `--merchant-name`, `--merchant-url`, and `--merchant-country`. Set the lifetime with `--expires-in-hours` (default 24).
 
 Then:
 
@@ -56,7 +56,7 @@ agent-commerce agent-card status <requestId> --wait   # resume waiting on a requ
 Crossmint buys the item. It fills in the card itself. The card number never reaches the agent. Start here: no agent card is needed up front.
 
 ```sh
-agent-commerce checkout create --url https://shop.example/p/1 --max-cost 100 --request "medium, black" --wait
+agent-commerce checkout create --url https://shop.example/p/1 --merchant-name Shop --merchant-url https://shop.example --merchant-country US --max-cost 100 --request "medium, black" --wait
 ```
 
 When the run reaches its payment step it exits with code 2 and prints a link. Show it to the user: they pick a saved payment method there, which mints an agent card for this purchase alone. Then keep waiting with `agent-commerce checkout get <checkoutId> --wait`.

@@ -56,7 +56,7 @@ export const TOOL_DOCS = {
       description:
         "What the money is for, in the user's words, e.g. Flight to SF. Shown on the approval screen.",
       merchant:
-        "Lock the card to one merchant, only when the user named a real store (Starbucks, united.com). Leave it out for a general budget such as lunch this week or a trip: the purpose is not a store.",
+        "Required: the real merchant name, website URL and countryCode. Ask for missing details before requesting authorization; general budgets without a merchant are not supported.",
       expiresInHours: "How long the agent card stays valid. Default 24.",
       requester: "Name of the agent shown to the user.",
     },
@@ -122,6 +122,7 @@ export const TOOL_DOCS = {
       "maxCost is a hard cap: the run stops as blocked instead of paying more. Returns the checkoutId. Poll get_checkout every few seconds until it is done or asks a question.",
     params: {
       startUrl: "Product or cart page URL to start from.",
+      merchant: "Merchant name, website URL matching startUrl, and verified two-letter countryCode. Required unless paying with an existing agentCardId. Do not infer the country from the domain or currency; ask if unknown.",
       purpose:
         "What the purchase is, in a few words, as the user would say it: Blue Pikachu erasable pen, Dinner for 2 at Nopa, 2 tickets to Coldplay. The user sees it when they approve the payment. Under 40 characters, no instructions.",
       task: "What to buy and how, e.g. medium, black, cheapest shipping, pay by card. The more you say here, the fewer questions the agent stops to ask.",

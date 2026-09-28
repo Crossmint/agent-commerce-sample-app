@@ -1,0 +1,1 @@
+ALTER TABLE "checkouts" ADD COLUMN "merchant" jsonb;

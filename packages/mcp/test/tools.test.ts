@@ -50,7 +50,7 @@ describe("Agent Commerce tools", () => {
     const { client } = await connect(fetchMock);
     const result = await client.callTool({
       name: "request_agent_card",
-      arguments: { amount: 50, description: "Flight to SF" },
+      arguments: { amount: 50, description: "Flight to SF", merchant: { name: "United", url: "https://united.com", countryCode: "US" } },
     });
 
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];

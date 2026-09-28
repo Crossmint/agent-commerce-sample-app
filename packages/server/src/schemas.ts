@@ -7,8 +7,8 @@ export const amountSchema = z.object({
 
 export const merchantSchema = z.object({
   name: z.string().min(1),
-  url: z.string().min(1),
-  countryCode: z.string().length(2),
+  url: z.string().url().refine((url) => /^https?:\/\//i.test(url), "Use an HTTP(S) merchant URL"),
+  countryCode: z.string().regex(/^[A-Za-z]{2}$/).transform((value) => value.toUpperCase()),
   categoryCode: z.string().optional(),
   acquirerBin: z.string().optional(),
 });
@@ -22,7 +22,7 @@ export const registerCardSchema = z.object({
 export const createRequestSchema = z.object({
   amount: amountSchema,
   description: z.string().min(1).max(500),
-  merchant: merchantSchema.optional(),
+  merchant: merchantSchema,
   expiresInHours: z
     .number()
     .positive()
@@ -31,10 +31,8 @@ export const createRequestSchema = z.object({
   requester: z.string().min(1).max(100).optional(),
 });
 
-export const approveSchema = z.object({
-  paymentMethodId: z.string().min(1),
-  email: z.string().email().optional(),
-  countryCode: z.string().length(2).optional(),
+export const authorizedSchema = z.object({
+  orderIntentId: z.string().min(1),
 });
 
 export const credentialsSchema = z.object({
@@ -60,6 +58,7 @@ export const createCheckoutSchema = z
     agentCardId: z.string().min(1).optional(),
     // What the purchase is, in a few words: shown when the user approves the payment.
     purpose: z.string().trim().min(1).max(80).optional(),
+    merchant: merchantSchema.optional(),
     maxCost: z.object({
       amount: decimalAmount,
       currency: z.string().length(3),

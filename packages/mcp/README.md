@@ -11,7 +11,7 @@ Auth is OAuth 2.1. Stytch Connected Apps is the authorization server. This packa
 | Tool | What it does |
 |---|---|
 | `list_payment_methods` | Saved cards, masked. |
-| `request_agent_card` | Ask the user for a spending limit. Returns `requestId` and `approvalUrl`. |
+| `request_agent_card` | Ask the user for a spending limit at a specified merchant (name, URL and country required). Returns `requestId` and `approvalUrl`. |
 | `get_agent_card_request` | Poll a request until `active`, `denied`, `expired` or `failed`. |
 | `list_agent_cards` | Agent cards with balance and expiry. |
 | `get_agent_card` | One agent card. |

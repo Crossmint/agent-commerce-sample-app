@@ -9,7 +9,7 @@ import {
 import pc from "picocolors";
 import type { AgentCommerceApi } from "../api.js";
 import type { CliContext } from "../context.js";
-import { CliExit, EXIT, formatDate, kv, statusColor, table, toJson } from "../output.js";
+import { CliExit, EXIT, fail, formatDate, kv, statusColor, table, toJson } from "../output.js";
 import { detectRequester } from "../requester.js";
 import type {
   AgentCardRequest,
@@ -50,14 +50,15 @@ export function buildRequestBody(
   opts: RequestOptions,
   ctx: Pick<CliContext, "env" | "hostname">,
 ): CreateAgentCardRequestBody {
+  const merchant = merchantFromOptions(opts);
+  if (!merchant) throw fail("Provide --merchant-name, --merchant-url and --merchant-country for authorization.");
   const body: CreateAgentCardRequestBody = {
     amount: { value: toDecimalString(opts.amount), currency: opts.currency.toUpperCase() },
     description: opts.description,
+    merchant,
     expiresInHours: opts.expiresInHours,
     requester: opts.requester ?? detectRequester(ctx.env, ctx.hostname()),
   };
-  const merchant = merchantFromOptions(opts);
-  if (merchant) body.merchant = merchant;
   return body;
 }
 
@@ -74,9 +75,9 @@ export function registerAgentCardCommands(program: Command, ctx: CliContext): vo
       .requiredOption("--amount <n>", "budget, e.g. 50 or 49.99", parseAmount("--amount"))
       .option("--currency <code>", "ISO currency", "USD")
       .requiredOption("--description <text>", "what the card is for; the user sees this")
-      .option("--merchant-name <name>", "lock to one merchant: name")
-      .option("--merchant-url <url>", "lock to one merchant: URL")
-      .option("--merchant-country <cc>", "lock to one merchant: ISO country code")
+      .requiredOption("--merchant-name <name>", "lock to one merchant: name")
+      .requiredOption("--merchant-url <url>", "lock to one merchant: URL")
+      .requiredOption("--merchant-country <cc>", "lock to one merchant: ISO country code")
       .option(
         "--expires-in-hours <h>",
         "agent card lifetime",
@@ -201,7 +202,8 @@ export function registerAgentCardCommands(program: Command, ctx: CliContext): vo
           currency: opts.currency.toUpperCase(),
         };
       const merchant = merchantFromOptions(opts);
-      if (merchant) body.merchant = merchant;
+      if (!merchant) throw fail("Provide --merchant-name, --merchant-url and --merchant-country for authorization.");
+  body.merchant = merchant;
       const cred = await api.mintCredential(id, body);
       if (opts.json) {
         ctx.out(toJson(cred));

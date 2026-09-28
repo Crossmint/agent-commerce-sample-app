@@ -105,28 +105,13 @@ export interface AgentCardRequest {
 export interface CreateAgentCardRequestInput {
   amount: Amount;
   description: string;
-  merchant?: Merchant;
+  merchant: Merchant;
   expiresInHours?: number;
   requester?: string;
 }
 
-export interface ApproveAgentCardRequestInput {
-  paymentMethodId: string;
-  email?: string;
-  countryCode?: string;
-}
-
-export interface ApproveAgentCardRequestResult {
+export interface AuthorizedAgentCardRequestResult {
   request: AgentCardRequest;
-  agentCard: AgentCard;
-  needsVerification: boolean;
-  /** The vault's copy of the card's security code lapsed. The user types it again. */
-  needsCvcRecollection?: boolean;
-}
-
-export interface VerifiedAgentCardRequestResult {
-  request: AgentCardRequest;
-  agentCard: AgentCard;
 }
 
 export interface MintCredentialsInput {
@@ -146,9 +131,11 @@ export interface MintCredentialsResult {
 }
 
 export interface CreateCheckoutInput {
+  /** Required for a new SDK authorization; optional when using an existing agent card. */
+  merchant?: { name: string; url: string; countryCode: string };
   startUrl: string;
   task?: string;
-  agentCardId: string;
+  agentCardId?: string;
   maxCost: { amount: string; currency: string };
   /** What the purchase is, in a few words: shown when the user approves the payment. */
   purpose?: string;

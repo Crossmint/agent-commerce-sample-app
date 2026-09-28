@@ -3,7 +3,7 @@
  * Import from "@agent-commerce/server/drizzle". Needs `drizzle-orm` installed.
  */
 import type { Amount, Merchant } from "@agent-commerce/core";
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, inArray } from "drizzle-orm";
 import {
   boolean,
   index,
@@ -62,6 +62,7 @@ export const checkouts = pgTable("checkouts", {
   agentCardRequestId: text("agent_card_request_id"),
   // What the purchase is, in the agent's few words: the agent card's purpose.
   purpose: text("purpose"),
+  merchant: jsonb("merchant").$type<Merchant>(),
   createdAt: timestamp("created_at", tz).notNull().defaultNow(),
 });
 
@@ -208,6 +209,14 @@ export function drizzleRequestStore(
       return toRequest(row);
     },
 
+    async transition(id, from, patch) {
+      const [row] = await db.update(agentCardRequests)
+        .set({ ...patch, updatedAt: new Date() })
+        .where(and(eq(agentCardRequests.id, id), inArray(agentCardRequests.status, from)))
+        .returning();
+      return row ? toRequest(row) : null;
+    },
+
     async listByUser(userId: string): Promise<AgentCardRequest[]> {
       const rows = await db
         .select()
@@ -229,6 +238,7 @@ export function drizzleRequestStore(
         ...(patch?.agentCardId ? { agentCardId: patch.agentCardId } : {}),
         ...(patch?.agentCardRequestId ? { agentCardRequestId: patch.agentCardRequestId } : {}),
         ...(patch?.purpose ? { purpose: patch.purpose } : {}),
+        ...(patch?.merchant ? { merchant: patch.merchant } : {}),
       };
       await db
         .insert(checkouts)
@@ -284,6 +294,7 @@ export function drizzleRequestStore(
         ...(row.agentCardId ? { agentCardId: row.agentCardId } : {}),
         ...(row.agentCardRequestId ? { agentCardRequestId: row.agentCardRequestId } : {}),
         ...(row.purpose ? { purpose: row.purpose } : {}),
+        ...(row.merchant ? { merchant: row.merchant } : {}),
         createdAt: row.createdAt.toISOString(),
       };
     },

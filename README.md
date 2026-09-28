@@ -2,7 +2,7 @@
 
 An open source sample app for agentic commerce on the Crossmint Agents APIs.
 
-The Agent Commerce Sample App shows how to add card payments for AI agents to your platform. A user saves a card. An agent asks for a bounded budget on it, an "agent card". The user approves in a browser. The agent then pays with a scoped card number, or lets Crossmint Agent Checkouts buy on its behalf.
+The Agent Commerce Sample App shows how to add card payments for AI agents to your platform. A user saves a card. An agent asks for a bounded authorization at a specific merchant, an "agent card". The user approves in a browser. The agent then pays with a scoped card number, or lets Crossmint Agent Checkouts buy on its behalf.
 
 It is not a crypto wallet. It wraps the Crossmint Agents APIs and adds the parts Crossmint does not ship: the approval screen, the agent tooling, and the glue between them.
 
@@ -66,3 +66,10 @@ node packages/cli/dist/bin.js agent-card request --amount 5 --description "Test"
 ## License
 
 MIT
+
+
+### SDK authorization evaluation
+
+New approvals use `CrossmintAgentCardAuthorization` through the `AuthorizeAgentCard` wrapper on every approval surface. New requests require a merchant name, URL and country; the SDK handles card selection, registration, order-intent creation, CVC and verification. The server validates and records the returned ID. See [the API contract](docs/API.md) and [the component QA report](docs/SDK-QA-REPORT.md).
+
+For an existing Postgres deployment, apply migration `0005_sdk_authorization_merchant.sql` through the project's migration workflow before using the new checkout flow. No database migration is needed for the in-memory development store.

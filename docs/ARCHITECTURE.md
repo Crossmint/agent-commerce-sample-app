@@ -547,3 +547,12 @@ Verification, when a rail needs it, replaces the button area in place. Success r
 7. Checkouts, on a production Crossmint key.
 8. The chat experience: the AI SDK chat with Stytch as the login and the agent card tools.
 9. Changesets, publish.
+
+
+## SDK authorization integration (2026-09-28)
+
+The approval implementation now uses `AuthorizeAgentCard` / `CrossmintAgentCardAuthorization` on all chat frames, the standalone approval page, and checkout views. Earlier descriptions of the custom picker, Allow button, server-side creation and manual verification above are historical. The SDK owns that sequence; the app displays the request context and persists the returned order-intent ID through `/authorized`. See `docs/API.md` for the current contract.
+
+New authorizations require a merchant. Checkout links persist explicitly supplied merchant metadata; migration `0005_sdk_authorization_merchant.sql` adds that nullable JSON column. Old checkouts without this metadata must be restarted. Memory-only development still loses requests and checkout links on a server restart.
+
+Request stores implement atomic `transition` for authorization, denial and expiration races. Browser recovery retains only the returned order-intent ID in sessionStorage and retries association. Recovery before the SDK emits `onAuthorized` remains an SDK lifecycle test, not an implemented app workaround. Checkout settlement is serialized per run within a server context; this is not a distributed exactly-once guarantee.

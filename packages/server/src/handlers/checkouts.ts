@@ -32,7 +32,7 @@ import {
   stickyBrowserProfileId,
 } from "../browser-profile.js";
 import { currentBuyerProfile, rememberBuyerProfile } from "../buyer-profile.js";
-import { forbidden, HttpError, json, noContent } from "../errors.js";
+import { forbidden, HttpError, invalidRequest, json, noContent } from "../errors.js";
 import { agentCardRequestId } from "../ids.js";
 import type { Params } from "../router.js";
 import {
@@ -134,6 +134,12 @@ export async function createCheckout(req: Request, ctx: Ctx): Promise<Response> 
   const body = await parseBody(req, createCheckoutSchema);
   const cctx = checkoutContext(ctx, user);
   const task = body.task ?? body.request;
+  if (!body.agentCardId && !body.merchant) {
+    throw new HttpError(400, "merchant_required", "Provide the merchant name, URL and countryCode for card authorization");
+  }
+  if (body.merchant && hostOf(body.merchant.url) !== hostOf((body.startUrl ?? body.url)!)) {
+    throw invalidRequest("The merchant must match the checkout start URL");
+  }
   /*
    * Sessions are sticky by default: without a profile every run starts in a
    * fresh browser and the store asks the user to log in again. A caller that
@@ -159,6 +165,7 @@ export async function createCheckout(req: Request, ctx: Ctx): Promise<Response> 
   await ctx.checkouts.linkCheckout(checkout.runId, user.userId, {
     ...(body.agentCardId ? { agentCardId: body.agentCardId } : {}),
     ...(body.purpose ? { purpose: body.purpose } : {}),
+    ...(body.merchant ? { merchant: body.merchant } : {}),
   });
   const link = (await ctx.checkouts.getCheckout(checkout.runId)) ?? undefined;
   const view = await settlePayment(ctx, user, cctx, checkout, link);
@@ -561,7 +568,28 @@ function paymentAmount(action: PendingUserAction, checkout: Checkout): Amount {
  * picks a payment method there, that creates the order intent, and the next
  * read answers the run with it.
  */
-async function settlePayment(
+const paymentSettlements = new WeakMap<Ctx, Map<string, Promise<CheckoutView>>>();
+function settlePayment(
+  ctx: Ctx,
+  user: AuthenticatedUser,
+  cctx: CheckoutContext,
+  checkout: Checkout,
+  link: CheckoutLink | undefined,
+): Promise<CheckoutView> {
+  let pending = paymentSettlements.get(ctx);
+  if (!pending) {
+    pending = new Map();
+    paymentSettlements.set(ctx, pending);
+  }
+  const key = `${user.userId}:${checkout.runId}`;
+  const existing = pending.get(key);
+  if (existing) return existing;
+  const work = settlePaymentOnce(ctx, user, cctx, checkout, link).finally(() => pending.delete(key));
+  pending.set(key, work);
+  return work;
+}
+
+async function settlePaymentOnce(
   ctx: Ctx,
   user: AuthenticatedUser,
   cctx: CheckoutContext,
@@ -620,6 +648,14 @@ async function paymentStepRequest(
   spent: string | undefined,
 ): Promise<AgentCardRequest> {
   const amount = paymentAmount(action, checkout);
+  const merchant = link?.merchant;
+  if (!merchant) {
+    throw new HttpError(409, "merchant_required", "Start a new checkout with explicit merchant details");
+  }
+  const paymentHost = action.payment?.merchant?.domain ?? merchantFromCheckout(checkout)?.url;
+  if (paymentHost && hostOf(merchant.url) !== hostOf(paymentHost)) {
+    throw new HttpError(409, "agent_card_wrong_merchant", "The payment merchant changed; start a new checkout for that merchant");
+  }
   if (link?.agentCardRequestId) {
     const existing = await ctx.store.get(link.agentCardRequestId);
     // Approved but not yet active: the card exists and verification may have
@@ -630,6 +666,8 @@ async function paymentStepRequest(
       existing &&
       existing.amount.value === amount.value &&
       existing.amount.currency.toUpperCase() === amount.currency &&
+      existing.merchant?.url === merchant.url &&
+      existing.merchant?.countryCode === merchant.countryCode &&
       (!spent || existing.agentCardId !== spent);
     if (existing && fits) return reconcileRequest(ctx, user, existing);
   }
@@ -637,14 +675,13 @@ async function paymentStepRequest(
   const now = ctx.now();
   const id = agentCardRequestId();
   const domain = action.payment?.merchant?.domain ?? merchantFromCheckout(checkout)?.name;
-  // As Agent Checkouts wants it: the exact amount the run asks for, for the
-  // rest of the checkout only, and no merchant, because the checkout binds
-  // the credential to the store itself when it mints it.
+  // The SDK authorizes the requested amount for this merchant and checkout window.
   const row: NewAgentCardRequest = {
     id,
     userId: user.userId,
     requester: ctx.defaultRequester,
     amount,
+    merchant,
     // Short, for the approval screen and the card list: the purpose the
     // caller gave the checkout, else the store. Never the run's task, which
     // is written for the store's agent and runs to paragraphs.

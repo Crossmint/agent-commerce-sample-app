@@ -85,19 +85,18 @@ interface AgentCardRequest {
 `POST /v1/agent-card-requests` (agent) body:
 
 ```json
-{ "amount": { "value": "50.00", "currency": "USD" }, "description": "Flight to SF", "merchant"?: {...}, "expiresInHours"?: 24, "requester"?: "Claude Code" }
+{ "amount": { "value": "50.00", "currency": "USD" }, "description": "Flight to SF", "merchant": { "name": "United", "url": "https://united.com", "countryCode": "US" }, "expiresInHours"?: 24, "requester"?: "Claude Code" }
 ```
 
 → `201 AgentCardRequest` with `status: "pending"`.
 
 `GET /v1/agent-card-requests/:id` → `AgentCardRequest`. Only the owning user. A `pending` request past `requestExpiresAt` is returned as `expired`.
 
-`POST /v1/agent-card-requests/:id/approve` (browser) body `{ "paymentMethodId": string, "email"?: string, "countryCode"?: string }`.
-Server: registers the card for order intents (idempotent), creates the order intent with the user JWT, stores `agentCardId`, sets `status: "approved"`, or `"active"` right away if a rail is already active.
-→ `{ "request": AgentCardRequest, "agentCard": AgentCard, "needsVerification": boolean, "needsCvcRecollection": boolean }`. `AgentCard` is the Crossmint `OrderIntent` shape. `needsCvcRecollection` says the card cannot pay until the user types the security code again, so the approval screen asks for the digits. It is false when a live rail still pays and only the unused fallback is stale.
-Answers a `pending` request, and a second time while it is `approved`: the card exists but no agent can spend from it until verification lands, so the user may still swap cards or retry. The earlier order intent is revoked first, best effort. Once the request is `active`, `denied`, `expired` or `failed`, approve returns `409`.
+`POST /v1/agent-card-requests/:id/authorized` (browser) body `{ "orderIntentId": string }` → `{ "request": AgentCardRequest }`.
 
-`POST /v1/agent-card-requests/:id/verified` (browser) → re-reads the order intent. If a rail is active, `status: "active"`. → `{ "request": AgentCardRequest, "agentCard": AgentCard }`.
+`CrossmintAgentCardAuthorization` owns card selection, registration, creation, CVC and verification. The browser passes the ID from `onAuthorized`; the server reads it with the buyer JWT, checks active status and a usable card rail, exact amount/currency, merchant origin/country, description and expiration, then atomically marks the pending request active. Repeated submission of the same ID is idempotent; a different ID, a denied/expired request or mismatched authorization returns 409. It does not create a second order intent.
+
+The old `/approve` and `/verified` endpoints have been removed. New requests must include a concrete merchant; legacy records without one must be replaced. Existing standalone CVC and verification components remain available for managing saved cards.
 
 `POST /v1/agent-card-requests/:id/deny` → `AgentCardRequest` with `status: "denied"`. Allowed while `pending` or `approved`; an order intent made on the way is revoked with it.
 
@@ -138,8 +137,10 @@ Wraps [Crossmint Agent Checkouts](https://docs.crossmint.com/api-reference/agent
 `POST /v1/checkouts` (agent) body:
 
 ```json
-{ "startUrl": "https://shop.example/p/1", "task"?: "medium, black", "purpose"?: "Black tee, medium", "agentCardId"?: "…", "maxCost": { "amount": "100.00", "currency": "USD" }, "buyerProfileId"?: "…", "browserProfileId"?: "…", "freshBrowser"?: false, "merchantGuidance"?: "…" }
+{ "startUrl": "https://shop.example/p/1", "merchant": { "name": "Shop", "url": "https://shop.example", "countryCode": "US" }, "task"?: "medium, black", "purpose"?: "Black tee, medium", "agentCardId"?: "…", "maxCost": { "amount": "100.00", "currency": "USD" }, "buyerProfileId"?: "…", "browserProfileId"?: "…", "freshBrowser"?: false, "merchantGuidance"?: "…" }
 ```
+
+`merchant` is required unless an existing `agentCardId` is provided. Its URL must match the start URL; the country must be supplied explicitly. A changed payment merchant requires a new checkout and authorization.
 
 `url` and `request` are accepted as older names for `startUrl` and `task`. `purpose` (up to 80 characters) is what the purchase is, in a few words: the agent card raised at the payment step carries it, so the user sees it when they approve. Without one it reads "Purchase at" and the store. → `201 CheckoutView`.
 
@@ -183,7 +184,7 @@ interface CheckoutView {
 While polling, when the run reaches its **payment step** (a payment input request, `interaction.kind: "payment"`, stating the amount and the merchant's domain) the server never passes it on. It answers it with the id of an order intent (an agent card), as Agent Checkouts requires: `input_response` with `response: { kind: "payment", orderIntentId }`. No card number is ever sent; the checkout mints the credential itself. Which order intent depends on the checkout:
 
 - **With an `agentCardId`** (passed to `POST /v1/checkouts`, set with `POST /v1/checkouts/:id/agent-card`, or made earlier in this run): the server answers with it before returning. The view reports `running` while that is in flight.
-- **Without one**: the server creates an agent card request for the run as Agent Checkouts wants the order intent: the **exact amount** the payment request states, **no merchant** (the checkout binds the credential to the store itself), and an expiry of **two hours**. It returns it as `paymentRequest`, and the status stays `awaiting_input`. The user answers it through the ordinary `POST /v1/agent-card-requests/:id/approve`, or at `approvalUrl`; once the card is active, the next read answers the run with it. The request is reused on every read while it fits; when the run asks again after an answer (the card expired, was too small, or was cancelled), the server raises a fresh one and does not offer the card that failed.
+- **Without one**: the server creates an agent card request for the run as Agent Checkouts wants the order intent: the **exact amount** the payment request states, **the explicitly supplied merchant**, and an expiry of **two hours**. It returns it as `paymentRequest`, and the status stays `awaiting_input`. The user answers it at `approvalUrl` through the SDK, whose result is associated via `POST /v1/agent-card-requests/:id/authorized`; once the card is active, the next read answers the run with it. The request is reused on every read while it fits; when the run asks again after an answer (the card expired, was too small, or was cancelled), the server raises a fresh one and does not offer the card that failed.
 
 `POST /v1/checkouts/:id/messages` body, one of:
 

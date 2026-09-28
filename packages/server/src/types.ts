@@ -56,6 +56,8 @@ export interface RequestStore {
   get(id: string): Promise<AgentCardRequest | null>;
   /** Apply the patch and set `updatedAt`. Throws when the id is unknown. */
   update(id: string, patch: AgentCardRequestPatch): Promise<AgentCardRequest>;
+  /** Atomically change an answerable request; null if another answer won. */
+  transition(id: string, from: AgentCardRequestStatus[], patch: AgentCardRequestPatch): Promise<AgentCardRequest | null>;
   /** Optional. Newest first. */
   listByUser?(userId: string): Promise<AgentCardRequest[]>;
 }
@@ -76,6 +78,8 @@ export interface CheckoutLink {
   agentCardRequestId?: string;
   /** What the purchase is, in the agent's few words: the agent card's purpose at the payment step. */
   purpose?: string;
+  /** Explicit merchant metadata supplied when starting the checkout. */
+  merchant?: Merchant;
   createdAt: string;
 }
 
@@ -84,6 +88,8 @@ export interface CheckoutLinkPatch {
   agentCardId?: string;
   agentCardRequestId?: string;
   purpose?: string;
+  /** Explicit merchant metadata supplied when starting the checkout. */
+  merchant?: Merchant;
 }
 
 /**

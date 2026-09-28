@@ -335,7 +335,7 @@ export function createChatTools(api: AgentCommerceClient, opts: { userEmail?: st
           .min(1)
           .max(200)
           .describe(paramDoc("request_agent_card", "description")),
-        merchant: merchantSchema.optional().describe(paramDoc("request_agent_card", "merchant")),
+        merchant: merchantSchema.describe(paramDoc("request_agent_card", "merchant")),
         expiresInHours: z
           .number()
           .positive()
@@ -480,6 +480,7 @@ export function createChatTools(api: AgentCommerceClient, opts: { userEmail?: st
           .optional()
           .describe(paramDoc("create_checkout", "buyerProfileId")),
         purpose: z.string().min(1).max(80).describe(paramDoc("create_checkout", "purpose")),
+        merchant: merchantSchema.describe(paramDoc("create_checkout", "merchant")),
       }),
       execute: ({ action, currency, maxCost, ...input }) => {
         void action; // for the site card only

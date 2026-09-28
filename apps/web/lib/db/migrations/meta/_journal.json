@@ -36,6 +36,13 @@
       "when": 1790270500153,
       "tag": "0004_flimsy_nightcrawler",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1790608543215,
+      "tag": "0005_sdk_authorization_merchant",
+      "breakpoints": true
     }
   ]
 }

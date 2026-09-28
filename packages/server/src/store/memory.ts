@@ -37,6 +37,13 @@ export function memoryRequestStore(): RequestStore & CheckoutStore & SessionStor
       requests.set(id, next);
       return { ...next };
     },
+    async transition(id, from, patch) {
+      const row = requests.get(id);
+      if (!row || !from.includes(row.status)) return null;
+      const next = { ...row, ...patch, updatedAt: new Date().toISOString() };
+      requests.set(id, next);
+      return { ...next };
+    },
     async listByUser(userId: string) {
       return [...requests.values()]
         .filter((r) => r.userId === userId)
@@ -104,6 +111,7 @@ export function memoryCheckoutStore(): CheckoutStore {
         ...(patch?.agentCardId ? { agentCardId: patch.agentCardId } : {}),
         ...(patch?.agentCardRequestId ? { agentCardRequestId: patch.agentCardRequestId } : {}),
         ...(patch?.purpose ? { purpose: patch.purpose } : {}),
+        ...(patch?.merchant ? { merchant: patch.merchant } : {}),
       });
     },
     async getCheckout(checkoutId) {

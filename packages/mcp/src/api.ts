@@ -78,7 +78,7 @@ export interface AgentCardRequest {
 export interface CreateAgentCardRequestInput {
   amount: Amount;
   description: string;
-  merchant?: { name: string; url: string; countryCode: string };
+  merchant: { name: string; url: string; countryCode: string };
   expiresInHours?: number;
   requester?: string;
 }
@@ -101,6 +101,8 @@ export interface CredentialResult {
 }
 
 export interface CreateCheckoutInput {
+  /** Required for a new SDK authorization; optional when using an existing agent card. */
+  merchant?: { name: string; url: string; countryCode: string };
   startUrl: string;
   task?: string;
   /** Omit to let the user choose a payment method at the run's payment step. */

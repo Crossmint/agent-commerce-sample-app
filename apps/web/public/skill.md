@@ -10,7 +10,7 @@ Agent Commerce wraps the Crossmint Agents APIs. You never see a Crossmint key. T
 Four objects:
 
 - **Payment method**: a card the user saved in the wallet website. Agent cards are minted from these.
-- **Agent card**: scoped, user-approved spending on one payment method. Has an amount, a description, an expiry, and an optional merchant lock.
+- **Agent card**: scoped, user-approved spending on one payment method. Has an amount, a description, an expiry, and a required merchant lock for new authorizations.
 - **Checkout**: Crossmint buys at a URL. Start here. It reaches a **payment step** of its own, where the user chooses a payment method and an agent card is minted for that purchase.
 - **Credential**: a scoped card number minted from an agent card, for paying somewhere a checkout cannot reach. Last resort.
 
@@ -31,10 +31,10 @@ If `AGENT_COMMERCE_API_URL` and `AGENT_COMMERCE_TOKEN` are set, no login is need
 ## Step 1: start a checkout
 
 ```sh
-agent-commerce checkout create --url <product url> --max-cost 60 --task "size 10, blue, cheapest shipping" --wait
+agent-commerce checkout create --url <product url> --merchant-name <store> --merchant-url <https://store> --merchant-country <CC> --max-cost 60 --task "size 10, blue, cheapest shipping" --wait
 ```
 
-No `--agent-card`. The run gets its card at the payment step, in step 2.
+No `--agent-card`. The run gets its card at the payment step, in step 2. Supply the merchant name, website and verified country; if a detail is unknown, ask the user before starting.
 
 Crossmint drives the shop's checkout in a real browser. It fills in the card itself. You never see the number. `--max-cost` is a hard cap: the run stops as `blocked` instead of paying more. Put everything you know in `--task` (size, color, shipping choice, "pay by card"): the more you say, the fewer questions the agent stops to ask.
 
@@ -88,7 +88,7 @@ If the user declines, the run stays stuck. Tell them, and cancel it if they are 
 Ask for one only when the user wants a card for something a checkout cannot reach — a phone order, a form you drive yourself — or when they ask for one outright.
 
 ```sh
-agent-commerce agent-card request --amount 60 --description "Blue running shoes, size 10" --wait --timeout 600
+agent-commerce agent-card request --amount 60 --description "Blue running shoes, size 10" --merchant-name "Nike" --merchant-url https://nike.com --merchant-country US --wait --timeout 600
 ```
 
 The command prints an approval URL. **Show that URL to the user verbatim.** They open it, pick a payment method, and approve. `--wait` blocks until the request is active, denied, or expired.
@@ -97,7 +97,7 @@ The command prints an approval URL. **Show that URL to the user verbatim.** They
 - Exit 1: denied or expired. Tell the user. Do not retry without asking.
 - Exit 2: still pending when the timeout hit. Show the URL again and resume with `agent-commerce agent-card status <requestId> --wait`.
 
-Lock the card to one shop when you know it: `--merchant-name "Nike" --merchant-url https://nike.com --merchant-country US`. If you leave the card open, you must name the merchant later at `reveal` time. Card networks issue a number per merchant.
+Every new authorization requires a real merchant name, URL and country. Verify these details or ask the user; never infer the country from a domain or currency. General budgets without a merchant are not supported. The browser uses CrossmintAgentCardAuthorization for selection, registration, CVC and verification.
 
 To spend an existing card on a checkout instead of choosing at the payment step, pass `--agent-card <id>` to `checkout create`. Only do that when the user asks to pay with that card.
 

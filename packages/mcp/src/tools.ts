@@ -99,7 +99,7 @@ export function registerAgentCommerceTools(
         amount: amountSchema.describe(paramDoc("request_agent_card", "amount")),
         currency: currencySchema.optional(),
         description: z.string().min(1).describe(paramDoc("request_agent_card", "description")),
-        merchant: merchantSchema.optional().describe(paramDoc("request_agent_card", "merchant")),
+        merchant: merchantSchema.describe(paramDoc("request_agent_card", "merchant")),
         expiresInHours: z
           .number()
           .positive()
@@ -250,6 +250,7 @@ export function registerAgentCommerceTools(
       ),
       inputSchema: {
         startUrl: z.string().url().describe(paramDoc("create_checkout", "startUrl")),
+        merchant: merchantSchema.optional().describe(paramDoc("create_checkout", "merchant")),
         task: z.string().max(20000).optional().describe(paramDoc("create_checkout", "task")),
         purpose: z.string().max(80).optional().describe(paramDoc("create_checkout", "purpose")),
         agentCardId: z.string().optional().describe(paramDoc("create_checkout", "agentCardId")),
@@ -275,6 +276,7 @@ export function registerAgentCommerceTools(
     guard(async (args) => {
       const checkout = await api.createCheckout({
         startUrl: args.startUrl,
+        merchant: args.merchant,
         task: args.task,
         purpose: args.purpose,
         agentCardId: args.agentCardId,

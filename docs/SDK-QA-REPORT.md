@@ -65,7 +65,15 @@ Finding IDs retain their notebook identifiers; gaps do not indicate missing SDK 
 | `CrossmintPaymentMethodManagement` | New-card form displayed; auth error presentation confirmed. User subsequently advanced to a saved card and downstream registration returned 200. Direct iframe save response and callback contract were not independently captured. | Verify save callbacks, SDK existing-card selection, cancel/reopen, retries, validation, and appearance. The app's custom card picker does not count as SDK selection coverage. |
 | `OrderIntentVerification` | Integrated, not yet verified end to end. | Success/failure, cancellation, expiry, retry, and callback behavior. |
 | `CrossmintCvcRecollection` | Integrated, not yet verified. | Validation, submission, callback contract, retry, cancellation, and sensitive-data handling. |
-| `CrossmintAgentCardAuthorization` | `AuthorizeAgentCard` wrapper added and exported; not yet mounted in a test flow or evaluated interactively. | New/existing card, exact amount/currency/merchant, rails, verification, expiry, and callback cardinality. |
+| `CrossmintAgentCardAuthorization` | `AuthorizeAgentCard` now replaces the custom authorization sequence in every approval surface. Authenticated interactive evaluation remains pending; the available automation browser currently shows login. | New/existing card, exact amount/currency/merchant, rails, verification, expiry, and callback cardinality. |
 | `CrossmintProtectedInput` | Integration imported from `main` (`b901be1`); not yet evaluated in this QA session. | Load, validation, submit, retry, cancel/reopen, identifier handoff, and sensitive-data handling. |
 
 For each component, also exercise keyboard/focus behavior, narrow viewports, loading and error states, JWT expiry/refresh, slow or failed requests, repeated clicks, and unmount/remount. Harness build and unit-test results are retained in the internal notebook; they are not SDK component QA passes.
+
+## Authorization integration checkpoint (2026-09-28)
+
+All approval surfaces route through the SDK. The harness no longer calls a server endpoint to register/create/verify a new authorization. It validates the SDK result through a JWT-scoped order-intent read before continuing checkout. Harness tests are not counted as SDK passes.
+
+Next joint test: request a merchant-specific authorization, open Review, inspect the SDK new/existing-card UI, then authorize with the user. Correlate `authorization.completed` / `authorization.failed` with `authorization.attached` and the checkout payment response. Full callback objects and payment details are not logged by the wrapper.
+
+Lifecycle coverage remains open: close/reopen before success, pending verification, denial while work is in flight, and JWT expiry. The published SDK keeps its in-progress order-intent cache in component memory and exposes neither an existing-order-intent input nor a cancel callback. No claim of safe pre-callback recovery is made. After a successful callback, the harness retains the opaque ID in sessionStorage for retrying association without creating another intent. This limitation is a test target, not a confirmed runtime defect.

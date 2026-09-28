@@ -17,6 +17,8 @@ import {
   checkoutSummary,
   describeAction,
   getApi,
+  merchantFromOptions,
+  type MerchantOptions,
   type JsonOption,
   parseAmount,
   parseJsonValues,
@@ -27,7 +29,7 @@ import {
 
 const CHECKOUT_POLL_MS = 1500;
 
-interface CreateOptions extends JsonOption {
+interface CreateOptions extends JsonOption, MerchantOptions {
   url: string;
   /** Optional: without one, the run's payment step asks the user to choose a payment method. */
   agentCard?: string;
@@ -62,6 +64,9 @@ export function buildCheckoutBody(opts: CreateOptions): CreateCheckoutBody {
     maxCost: { amount: toDecimalString(opts.maxCost), currency: opts.currency.toUpperCase() },
   };
   if (opts.agentCard) body.agentCardId = opts.agentCard;
+  const merchant = merchantFromOptions(opts);
+  if (merchant) body.merchant = merchant;
+  else if (!opts.agentCard) throw fail("Provide --merchant-name, --merchant-url and --merchant-country for authorization.");
   const task = opts.task ?? opts.request;
   if (task) body.task = task;
   if (opts.purpose) body.purpose = opts.purpose;
@@ -111,6 +116,9 @@ export function registerCheckoutCommands(program: Command, ctx: CliContext): voi
         .command("create")
         .description("start a checkout")
         .requiredOption("--url <url>", "product or cart URL to start from")
+        .option("--merchant-name <name>", "merchant name for authorization")
+        .option("--merchant-url <url>", "merchant website matching the checkout URL")
+        .option("--merchant-country <cc>", "verified merchant country code")
         .option(
           "--agent-card <id>",
           "pay from an agent card the user already approved; omit to let them choose a payment method at the payment step",

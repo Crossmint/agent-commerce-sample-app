@@ -1,16 +1,10 @@
 import type { AuthenticatedUser } from "@agent-commerce/auth";
-import {
-  expiresInHours,
-  isReadyForAgent,
-  needsCvcRecollection,
-  pendingVerificationRails,
-  withAgentRails,
-} from "@agent-commerce/core";
-import { parseBody, requireUser, type Ctx, resolveEmail } from "../context.js";
-import { forbidden, HttpError, invalidRequest, json, notFound } from "../errors.js";
+import { expiresInHours, isReadyForAgent } from "@agent-commerce/core";
+import { parseBody, requireUser, type Ctx } from "../context.js";
+import { forbidden, HttpError, json, notFound } from "../errors.js";
 import { agentCardRequestId } from "../ids.js";
 import type { Params } from "../router.js";
-import { approveSchema, createRequestSchema } from "../schemas.js";
+import { authorizedSchema, createRequestSchema } from "../schemas.js";
 import type { AgentCardRequest, NewAgentCardRequest } from "../types.js";
 
 /** POST /v1/agent-card-requests */
@@ -75,78 +69,78 @@ export async function reconcileRequest(
   return request;
 }
 
-/**
- * POST /v1/agent-card-requests/:id/approve
- *
- * Also answers a second time while the request is `approved`: the card is
- * made but not usable yet, so verification may have failed and the user may
- * be trying another card. The card from the first answer is revoked, because
- * nothing may be left behind that an agent could still spend from.
- */
-export async function approveRequest(req: Request, ctx: Ctx, params: Params): Promise<Response> {
+/** POST /v1/agent-card-requests/:id/authorized. The SDK already created and verified it. */
+export async function authorizedRequest(req: Request, ctx: Ctx, params: Params): Promise<Response> {
   const user = await requireUser(req, ctx);
-  const body = await parseBody(req, approveSchema);
+  const { orderIntentId } = await parseBody(req, authorizedSchema);
   const request = await loadOwnedRequest(ctx, user, params.id!);
-  assertAnswerable(request);
+  // A retry after a lost response must not recreate or revalidate a now-spent authorization.
+  if (request.status === "active" && request.agentCardId === orderIntentId)
+    return json({ request });
+  if (request.status !== "pending")
+    throw new HttpError(409, "invalid_request", `This request is already ${request.status}`);
+  if (!request.merchant)
+    throw new HttpError(
+      409,
+      "merchant_required",
+      "Request a new authorization for a specific merchant",
+    );
 
-  const email = await resolveEmail(user, ctx, body.email);
-  const jwt = { jwt: user.jwt };
-
-  await revokePreviousCard(ctx, jwt, request);
-
-  // Idempotent. Turns on the network rails the card supports.
-  await ctx.crossmint.paymentMethods.registerForOrderIntents(jwt, body.paymentMethodId, {
-    email,
-    countryCode: body.countryCode ?? "US",
+  // Ownership is established by this JWT-scoped read, never by the browser callback.
+  const card = await ctx.crossmint.orderIntents.get({ jwt: user.jwt }, orderIntentId);
+  const expires = Date.parse(card.expiresAt);
+  const sameAmount = decimalEqual(card.amount.total, request.amount.value);
+  const sameMerchant =
+    card.merchant &&
+    new URL(card.merchant.url).origin === new URL(request.merchant.url).origin &&
+    card.merchant.countryCode.toUpperCase() === request.merchant.countryCode.toUpperCase();
+  if (
+    card.status !== "active" ||
+    !isReadyForAgent(card) ||
+    !Number.isFinite(expires) ||
+    expires <= ctx.now().getTime() ||
+    expires !== Date.parse(request.expiresAt) ||
+    !sameAmount ||
+    !decimalEqual(card.amount.available, request.amount.value) ||
+    card.amount.currency.toUpperCase() !== request.amount.currency.toUpperCase() ||
+    !sameMerchant ||
+    card.description !== request.description
+  ) {
+    throw new HttpError(
+      409,
+      "agent_card_unusable",
+      "The authorization does not match this request or is not ready",
+    );
+  }
+  // Crossmint reads can take time. Recheck expiry, then atomically win against denial/other callbacks.
+  if (Date.parse(request.requestExpiresAt) <= ctx.now().getTime()) {
+    await ctx.store.transition(request.id, ["pending"], { status: "expired" });
+    throw new HttpError(409, "expired", "This request expired before authorization completed");
+  }
+  const updated = await ctx.store.transition(request.id, ["pending"], {
+    status: "active",
+    agentCardId: orderIntentId,
+    paymentMethodId: card.paymentMethodId,
   });
-
-  const agentCard = await ctx.crossmint.orderIntents.create(jwt, {
-    paymentMethodId: body.paymentMethodId,
-    amount: request.amount,
-    description: request.description,
-    expiresAt: request.expiresAt,
-    ...(request.merchant ? { merchant: request.merchant } : {}),
-  });
-
-  // Active means an agent can pay with it: a card rail is live, or nothing is left to verify.
-  const active = isReadyForAgent(agentCard);
-  const updated = await ctx.store.update(request.id, {
-    status: active ? "active" : "approved",
-    agentCardId: agentCard.orderIntentId,
-    paymentMethodId: body.paymentMethodId,
-  });
-  const needsVerification = pendingVerificationRails(agentCard).length > 0;
-  // A card that cannot pay until the user types the security code again: the
-  // approval screen asks for the digits rather than leaving the request
-  // sitting at `approved`. A lapsed code behind a live rail is not this.
-  const needsCvc = needsCvcRecollection(agentCard);
-  return json({
-    request: updated,
-    agentCard: withAgentRails(agentCard),
-    needsVerification,
-    needsCvcRecollection: needsCvc,
-  });
+  if (!updated) {
+    const latest = await ctx.store.get(request.id);
+    if (latest?.status === "active" && latest.agentCardId === orderIntentId)
+      return json({ request: latest });
+    throw new HttpError(409, "invalid_request", "This request has already been answered");
+  }
+  console.info("[sdk-evaluation] authorization.attached", { requestId: request.id, orderIntentId });
+  return json({ request: updated });
 }
 
-/** POST /v1/agent-card-requests/:id/verified */
-export async function verifiedRequest(req: Request, ctx: Ctx, params: Params): Promise<Response> {
-  const user = await requireUser(req, ctx);
-  const request = await loadOwnedRequest(ctx, user, params.id!);
-  if (!request.agentCardId) {
-    throw new HttpError(409, "invalid_request", "This request has no agent card yet");
-  }
-  const agentCard = await ctx.crossmint.orderIntents.get({ jwt: user.jwt }, request.agentCardId);
-
-  let updated: AgentCardRequest = request;
-  if (agentCard.status !== "active") {
-    updated = await ctx.store.update(request.id, {
-      status: "failed",
-      failureReason: `Agent card is ${agentCard.status}`,
-    });
-  } else if (isReadyForAgent(agentCard) && request.status !== "active") {
-    updated = await ctx.store.update(request.id, { status: "active" });
-  }
-  return json({ request: updated, agentCard: withAgentRails(agentCard) });
+/** Decimal comparison without floating-point rounding or accepting malformed values. */
+function decimalEqual(a: string, b: string): boolean {
+  const normalize = (value: string) => {
+    if (!/^\d+(\.\d+)?$/.test(value)) return undefined;
+    const [whole, fraction = ""] = value.split(".");
+    return `${BigInt(whole!)}.${fraction.replace(/0+$/, "")}`;
+  };
+  const left = normalize(a);
+  return left !== undefined && left === normalize(b);
 }
 
 /**
@@ -159,9 +153,12 @@ export async function denyRequest(req: Request, ctx: Ctx, params: Params): Promi
   const user = await requireUser(req, ctx);
   const request = await loadOwnedRequest(ctx, user, params.id!);
   assertAnswerable(request);
+  const updated = await ctx.store.transition(request.id, ["pending", "approved"], {
+    status: "denied",
+  });
+  if (!updated)
+    throw new HttpError(409, "invalid_request", "This request has already been answered");
   await revokePreviousCard(ctx, { jwt: user.jwt }, request);
-  // The revoked card id stays on the record: it says what was undone.
-  const updated = await ctx.store.update(request.id, { status: "denied" });
   return json(updated);
 }
 
@@ -177,7 +174,10 @@ async function loadOwnedRequest(
   if (!request) throw notFound(`Agent card request ${id} not found`);
   if (request.userId !== user.userId) throw forbidden();
   if (request.status === "pending" && Date.parse(request.requestExpiresAt) <= ctx.now().getTime()) {
-    return ctx.store.update(id, { status: "expired" });
+    return (
+      (await ctx.store.transition(id, ["pending"], { status: "expired" })) ??
+      (await ctx.store.get(id))!
+    );
   }
   return request;
 }

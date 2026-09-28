@@ -22,6 +22,8 @@ function request(overrides: Partial<AgentCardRequest> = {}): AgentCardRequest {
   };
 }
 
+const merchantArgs = ["--merchant-name", "United", "--merchant-url", "https://united.com", "--merchant-country", "US"];
+
 describe("agent-commerce agent-card request", () => {
   it("parses options into the POST body and prints the approval URL", async () => {
     const { fetch, calls } = fakeFetch({
@@ -32,6 +34,7 @@ describe("agent-commerce agent-card request", () => {
       [
         "agent-card",
         "request",
+        ...merchantArgs,
         "--amount",
         "$49.9",
         "--description",
@@ -74,6 +77,7 @@ describe("agent-commerce agent-card request", () => {
       [
         "agent-card",
         "request",
+        ...merchantArgs,
         "--amount",
         "50",
         "--description",
@@ -88,6 +92,7 @@ describe("agent-commerce agent-card request", () => {
     expect(calls[0]?.body).toEqual({
       amount: { value: "50.00", currency: "USD" },
       description: "Books",
+      merchant: { name: "United", url: "https://united.com", countryCode: "US" },
       expiresInHours: 24,
       requester: "My Bot",
     });
@@ -101,7 +106,7 @@ describe("agent-commerce agent-card request", () => {
       "POST /v1/agent-card-requests": (call) => json(request({ ...(call.body as object) }), 201),
     });
     const t = testContext({ fetch });
-    await runCli(["agent-card", "request", "--amount", "5", "--description", "x"], t.overrides);
+    await runCli(["agent-card", "request", ...merchantArgs, "--amount", "5", "--description", "x"], t.overrides);
     expect((calls[0]?.body as { requester: string }).requester).toBe("agent-commerce CLI on testbox");
   });
 
@@ -113,7 +118,7 @@ describe("agent-commerce agent-card request", () => {
       t.overrides,
     );
     expect(partial).toBe(EXIT.ERROR);
-    expect(t.stderr.join("\n")).toContain("--merchant-country");
+    expect(t.stderr.join("\n")).toContain("--merchant-url");
     const bad = await runCli(
       ["agent-card", "request", "--amount", "-1", "--description", "x"],
       t.overrides,
@@ -156,6 +161,7 @@ describe("agent-commerce agent-card request", () => {
       [
         "agent-card",
         "request",
+        ...merchantArgs,
         "--amount",
         "50",
         "--description",
@@ -183,7 +189,7 @@ describe("agent-commerce agent-card request", () => {
     });
     const t = testContext({ fetch });
     const code = await runCli(
-      ["agent-card", "request", "--amount", "50", "--description", "x", "--wait"],
+      ["agent-card", "request", ...merchantArgs, "--amount", "50", "--description", "x", "--wait"],
       t.overrides,
     );
     expect(code).toBe(EXIT.ERROR);
@@ -194,7 +200,7 @@ describe("agent-commerce agent-card request", () => {
     const { fetch, calls } = fakeFetch({});
     const t = testContext({ fetch, config: null });
     const code = await runCli(
-      ["agent-card", "request", "--amount", "50", "--description", "x"],
+      ["agent-card", "request", ...merchantArgs, "--amount", "50", "--description", "x"],
       t.overrides,
     );
     expect(code).toBe(EXIT.NOT_LOGGED_IN);

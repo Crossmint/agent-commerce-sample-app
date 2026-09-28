@@ -1,8 +1,7 @@
 import type { AgentCard, BuyerProfile, BuyerProfileInput, PaymentMethod, RegisterCardInput, RegisterCardResult } from "@agent-commerce/core";
 import type {
   AgentCardRequest,
-  ApproveAgentCardRequestInput,
-  ApproveAgentCardRequestResult,
+  AuthorizedAgentCardRequestResult,
   CheckoutMessageInput,
   CheckoutMessageList,
   CheckoutView,
@@ -15,7 +14,6 @@ import type {
   MintCredentialsInput,
   MintCredentialsResult,
   Reveal,
-  VerifiedAgentCardRequestResult,
 } from "./types.js";
 
 export class AgentCommerceApiError extends Error {
@@ -115,10 +113,8 @@ export function createAgentCommerceApi(opts: AgentCommerceApiOptions) {
     createAgentCardRequest: (input: CreateAgentCardRequestInput) =>
       request<AgentCardRequest>("POST", "/agent-card-requests", input),
     getAgentCardRequest: (id: string) => request<AgentCardRequest>("GET", `/agent-card-requests/${enc(id)}`),
-    approveAgentCardRequest: (id: string, input: ApproveAgentCardRequestInput) =>
-      request<ApproveAgentCardRequestResult>("POST", `/agent-card-requests/${enc(id)}/approve`, input),
-    verifiedAgentCardRequest: (id: string) =>
-      request<VerifiedAgentCardRequestResult>("POST", `/agent-card-requests/${enc(id)}/verified`),
+    authorizeAgentCardRequest: (id: string, orderIntentId: string) =>
+      request<AuthorizedAgentCardRequestResult>("POST", `/agent-card-requests/${enc(id)}/authorized`, { orderIntentId }),
     denyAgentCardRequest: (id: string) => request<AgentCardRequest>("POST", `/agent-card-requests/${enc(id)}/deny`),
 
     // Agent cards (order intents)

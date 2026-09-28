@@ -163,3 +163,13 @@ This internal history includes setup blockers and harness observations to avoid 
 - Callback diagnostics use `[sdk-evaluation] authorization.completed` with order-intent ID, rail, and provider, and `authorization.failed` with the error code only. Full result/error objects, JWTs, and card details are not logged by the wrapper.
 - Validation: UI package typecheck and build passed, including generated public declarations. These are integration checks, not runtime SDK QA evidence.
 - The wrapper is not mounted in a screen yet. Interactive evaluation and callback verification remain pending; no production authorization was initiated for this change.
+
+
+## Replace the existing authorization flow (2026-09-28)
+
+- User approved adapting the product to the SDK, including requiring a specific merchant. `ApproveAgentCard` is now the shared host for `AuthorizeAgentCard` in desktop/mobile/messaging, the approval URL, and checkout views. The custom picker, Allow action and manual registration/creation/verification/CVC sequence were removed from new approvals.
+- `/authorized` accepts only `orderIntentId`, reads it under the buyer JWT and validates active status, a card rail, amount/currency, merchant, description and expiry. Atomic store transitions protect against duplicate callbacks and concurrent denial. Old `/approve` and `/verified` routes are removed.
+- Chat/MCP tools and CLI inputs now carry explicit merchant metadata. Checkouts store it for the later payment step. The SQL migration is generated, not applied to an external database; local evaluation uses memory storage.
+- Browser recovery after the callback stores only the opaque order-intent ID. The SDK retains ownership of in-progress authorization behavior; pre-callback unmount/recovery remains a joint test.
+- App login screen renders in the available automation browser. No authenticated SDK submission or purchase was performed during implementation.
+- Validation: 141 tests passed across core, auth, server, MCP and CLI; workspace typecheck/lint, package builds and the production web build passed. The final server rerun passed all 70 tests. Local `/app` responds HTTP 200; the unauthenticated browser smoke check reported no warnings/errors. These checks validate the integration, not the SDK's authenticated runtime behavior.

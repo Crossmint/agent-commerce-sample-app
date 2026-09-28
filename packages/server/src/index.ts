@@ -1,11 +1,10 @@
 import { createContext, type Ctx } from "./context.js";
 import { toErrorResponse } from "./errors.js";
 import {
-  approveRequest,
+  authorizedRequest,
   createRequest,
   denyRequest,
   getRequest,
-  verifiedRequest,
 } from "./handlers/agent-card-requests.js";
 import {
   getAgentCard,
@@ -66,8 +65,7 @@ export function buildRouter(): Router<Ctx> {
     .delete("/v1/payment-methods/:id", deletePaymentMethod)
     .post("/v1/agent-card-requests", createRequest)
     .get("/v1/agent-card-requests/:id", getRequest)
-    .post("/v1/agent-card-requests/:id/approve", approveRequest)
-    .post("/v1/agent-card-requests/:id/verified", verifiedRequest)
+    .post("/v1/agent-card-requests/:id/authorized", authorizedRequest)
     .post("/v1/agent-card-requests/:id/deny", denyRequest)
     .get("/v1/agent-cards", listAgentCards)
     .get("/v1/agent-cards/:id", getAgentCard)
