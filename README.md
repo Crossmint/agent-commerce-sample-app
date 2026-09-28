@@ -4,9 +4,9 @@
 
 ### Let AI agents buy with your users' own cards.<br>Your users approve every budget.
 
-An open source sample app by [Crossmint](https://www.crossmint.com). Fork it, add your brand, and ship agentic commerce in your own product.
+An open source sample app by [Crossmint](https://www.crossmint.com). Try it live, then build the same experience into your own agent app with [one prompt](#build-it-into-your-agent-app).
 
-**[Try it live](https://agent-commerce.demos-crossmint.com)** &nbsp;·&nbsp; [Read the docs](https://docs.crossmint.com/agents/overview) &nbsp;·&nbsp; [Talk to sales](https://www.crossmint.com/contact/sales)
+**[Try it live](https://agent-commerce.demos-crossmint.com/)** &nbsp;·&nbsp; [Read the docs](https://docs.crossmint.com/agents/overview) &nbsp;·&nbsp; [Talk to sales](https://www.crossmint.com/contact/sales)
 
 <br>
 
@@ -51,27 +51,61 @@ The same APIs run every experience:
 - **MCP hosts.** Add one URL to Claude, ChatGPT or Cursor. OAuth signs the user in the first time.
 - **Terminal agents.** A CLI and a skill for Claude Code, Codex and other coding agents.
 
-Try it in Claude Code:
+**[See every experience live at agent-commerce.demos-crossmint.com](https://agent-commerce.demos-crossmint.com/)**. Purchases in the live app are real.
 
+## Build it into your agent app
+
+Open your own app's repository in Claude Code, Cursor or Codex, and paste this prompt. Your coding agent reads the Crossmint docs and this sample app, then builds the same flows in your stack. The live app has a button that copies it too.
+
+<!-- Keep this prompt the same as BUILD_PROMPT in apps/web/lib/build-prompt.ts. -->
+
+```text
+Add agentic commerce to my app with the Crossmint Agents APIs. My users save a card
+once. When my agent needs to pay, it asks for a budget, the user approves it inside my
+app, and the agent buys on any website.
+
+Use these sources:
+- Crossmint docs index: https://docs.crossmint.com/llms.txt
+  (or add the docs MCP server: https://docs.crossmint.com/mcp)
+- Agent cards: https://docs.crossmint.com/agents/cards-quickstart
+- Agent Checkouts: https://docs.crossmint.com/agents/agent-checkouts-quickstart
+- A working reference app: https://github.com/Crossmint/agent-commerce-sample-app
+  (its HTTP API contract is in docs/API.md)
+
+First, read my codebase. Tell me my framework, my auth provider, and where my agent
+runs: an in-app chat, a messaging bot, an MCP server or a CLI. Then propose a plan
+and wait for my OK before you write code.
+
+Build these parts:
+1. Save a card with the CrossmintPaymentMethodManagement component from
+   @crossmint/client-sdk-react-ui. The card goes to Crossmint, never to my servers.
+2. Agent cards. When the agent needs money, create an order intent with an amount,
+   a merchant and an expiry. Show an approval screen in my app where the user picks
+   a card and approves. Run OrderIntentVerification when the card rail needs it.
+3. Agent Checkouts. Start a run at a product URL with a max cost and stream its
+   messages. Answer its form requests. Pay its payment step with an agent card for
+   the exact amount. Collect store passwords with CrossmintProtectedInput.
+4. Buyer details. Save the user's name, contact and shipping address as a buyer
+   profile, so checkouts do not stop to ask for them.
+5. Agent tools. Give my agent tools to list saved cards, request an agent card,
+   start a checkout and answer it. Show each approval as a component in my UI, or
+   as a link when the agent has no UI.
+
+Rules:
+- The model never sees a full card number, a CVC or a password.
+- Nothing is paid until the user approves the budget.
+- The Crossmint server key stays on my server. Card and order-intent calls use the
+  client key with the signed-in user's JWT.
+- Agent Checkouts need a production server key with the agent-checkouts scopes,
+  and the x-crossmint-user-id header on every call.
 ```
-/plugin marketplace add Crossmint/agent-commerce-sample-app
-/plugin install agent-commerce@agent-commerce
-```
 
-## Why not Stripe Link?
+<details>
+<summary>Run this sample app locally instead</summary>
 
-- **It stays your product.** Your users, your brand, and no second login on a different platform.
-- **Your users' own cards.** Agent cards come from the cards your users already have, so they keep their rewards.
-- **No middleman.** Bank statements show the merchant. Refunds and chargebacks go straight to the merchant.
+<br>
 
-## Run it yourself
-
-You need:
-
-- A [Crossmint](https://www.crossmint.com/console) project. Agent Checkouts need a production server key.
-- A [Stytch](https://stytch.com) project for user login.
-- Optional: a Postgres URL. Without one, the app keeps its data in memory.
-- Optional: an Anthropic or OpenAI API key for the agent chat.
+You need a [Crossmint](https://www.crossmint.com/console) project (Agent Checkouts need a production server key) and a [Stytch](https://stytch.com) project for user login. A Postgres URL and an Anthropic or OpenAI key are optional.
 
 ```bash
 git clone https://github.com/Crossmint/agent-commerce-sample-app.git
@@ -82,7 +116,44 @@ cp .env.example apps/web/.env.local
 pnpm dev
 ```
 
-Fill in your keys in `apps/web/.env.local`, then open http://localhost:3000. The comments in `.env.example` explain each variable. To deploy, import the repository in Vercel and set the root directory to `apps/web`.
+Fill in your keys in `apps/web/.env.local`, then open http://localhost:3000. The comments in `.env.example` explain each variable.
+
+</details>
+
+## FAQ
+
+<details>
+<summary><b>How is this different from Stripe Link?</b></summary>
+
+<br>
+
+Link is a platform your users log into. This is a white-label experience embedded in your own app.
+
+- It stays your app: your users, your design, no second login and no hand-off to somebody else's platform.
+- These are agent cards, not the one-time-use cards Link issues. They run on Visa Intelligent Commerce and Mastercard Agent Pay.
+- They are your users' own cards, scoped and enforced at the network level, so your users keep their points and rewards.
+- Bank statements read as the merchant charging them directly, not as a Stripe charge.
+- Refunds and chargebacks go straight to the merchant, with no Stripe in the middle.
+
+</details>
+
+<details>
+<summary><b>Which card networks are supported?</b></summary>
+
+<br>
+
+Visa Intelligent Commerce and Mastercard Agent Pay for enforced limits, plus an encrypted-card fallback where the limit is advisory. Union Pay and AMEX are coming.
+
+</details>
+
+<details>
+<summary><b>Is it production ready?</b></summary>
+
+<br>
+
+It is a sample app. It runs against production Crossmint keys and real cards, and it shows the flows end to end, but review it before shipping it to your users.
+
+</details>
 
 ## What is inside
 
