@@ -5,10 +5,11 @@
 - Work from the latest `origin/main` on `codex/evaluate-agent-commerce-sdk`.
 - Never push to `main`. Deliver through a pull request; the user performs the merge.
 - Use Crossmint production exclusively for component and checkout evaluations. Use the existing Stytch test credentials for local authentication, as subsequently requested by the user. Crossmint staging is outside this evaluation's scope.
+- QA and the developer-facing report cover Crossmint SDK components and their hosted UI exclusively. The sample app is a test harness, not a QA target. Keep app/auth-provider/AI SDK observations out of the report except for necessary reproduction context or coverage blockers; never count custom app flows as SDK component coverage.
 - Integrate and evaluate one component at a time with the user. Do not silently work around SDK bugs before recording them.
 - Review browser console, relevant network requests, and server logs during each active test session. Background monitoring outside active sessions is not configured.
 - Record only redacted diagnostics: no API keys, JWTs, card numbers, CVCs, passwords, or vault tokens.
-- Treat each joint test as QA evidence for `docs/SDK-QA-REPORT.md`. Read browser and server diagnostics after each action; record successes, failures, warnings, and unobserved behavior separately. Snapshot available logs before intentional restarts and attach reviewed excerpts to findings. Never count browser messages forwarded to the server as separate incidents.
+- Treat each joint component test as QA evidence for `docs/SDK-QA-REPORT.md`. Triage all available logs, but report only component-relevant evidence. Read browser and server diagnostics after each action; record successes, failures, warnings, and unobserved behavior separately. Snapshot available logs before intentional restarts and attach reviewed excerpts to findings. Never count browser messages forwarded to the server as separate incidents.
 - Capture continues while the development server runs; analysis happens during active Codex sessions. No background analysis automation is configured. Missing iframe/network visibility must remain explicit in the report.
 
 ## Baseline
@@ -42,7 +43,7 @@
 
 ## Evidence required for each finding
 
-- ID and classification: SDK, application integration, backend/environment, or undetermined.
+- ID and classification in this internal notebook: SDK, application integration, backend/environment, or undetermined. Only component findings belong in the developer-facing report; undetermined ownership must be explicit.
 - SDK version, environment, browser, timestamp, and sanitized correlation IDs when available.
 - Preconditions and exact reproduction steps.
 - Expected and actual behavior; frequency and user impact.
@@ -120,6 +121,8 @@ Installation reports peer warnings involving Zod 4 versus a transitive Zod 3 exp
 A passing automated suite alone does not establish component correctness. The draft PR remains an upgrade and observability checkpoint, with authenticated regression tests explicitly pending.
 
 ## Joint evaluation findings (2026-09-28)
+
+This internal history includes setup blockers and harness observations to avoid misattributing them to Crossmint. EVAL-001, EVAL-002, and EVAL-004 are outside the component report; only necessary reproduction context is carried over. App follow-up suggestions below are historical notes, not planned QA work or SDK defects.
 
 ### EVAL-002 — Saving a card fails JWT authentication
 
