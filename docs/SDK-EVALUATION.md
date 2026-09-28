@@ -8,6 +8,8 @@
 - Integrate and evaluate one component at a time with the user. Do not silently work around SDK bugs before recording them.
 - Review browser console, relevant network requests, and server logs during each active test session. Background monitoring outside active sessions is not configured.
 - Record only redacted diagnostics: no API keys, JWTs, card numbers, CVCs, passwords, or vault tokens.
+- Treat each joint test as QA evidence for `docs/SDK-QA-REPORT.md`. Read browser and server diagnostics after each action; record successes, failures, warnings, and unobserved behavior separately. Snapshot available logs before intentional restarts and attach reviewed excerpts to findings. Never count browser messages forwarded to the server as separate incidents.
+- Capture continues while the development server runs; analysis happens during active Codex sessions. No background analysis automation is configured. Missing iframe/network visibility must remain explicit in the report.
 
 ## Baseline
 
