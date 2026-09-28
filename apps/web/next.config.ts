@@ -13,8 +13,6 @@ const nextConfig: NextConfig = {
     fetches: { fullUrl: false },
     serverFunctions: false,
   },
-  // /install reads the skill file at request time.
-  outputFileTracingIncludes: { "/install": ["./public/skill.md"] },
 };
 
 export default nextConfig;

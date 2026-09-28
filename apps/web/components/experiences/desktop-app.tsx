@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { ChevronsUpDown, CreditCard, LogOut, MapPin, Plus, Trash2, TriangleAlert, X } from "lucide-react";
+import { useEffect, useState } from "react";
+import { ChevronsUpDown, CreditCard, LogOut, Plus, Trash2, TriangleAlert, UserRound, X } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle, Button, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger, Spinner } from "@agent-commerce/ui";
 import { AGENT_DOMAIN, AGENT_NAME, AgentMark } from "@/components/brand";
 import { BuyerDetails } from "@/components/buyer-details";
@@ -65,7 +65,7 @@ function Workspace({ email, chat, thread, chats, chatEnabled, attachmentsEnabled
             <CreditCard className="size-4" /> Saved cards
           </NavItem>
           <NavItem active={section === "details"} onClick={() => setSection("details")}>
-            <MapPin className="size-4" /> Buyer details
+            <UserRound className="size-4" /> Buyer details
           </NavItem>
         </div>
 
@@ -112,7 +112,7 @@ function Workspace({ email, chat, thread, chats, chatEnabled, attachmentsEnabled
           </div>
         ) : thread.loading ? (
           <div className="flex flex-1 items-center justify-center text-muted-foreground">
-            <Spinner />
+            <LateSpinner />
           </div>
         ) : !chatEnabled ? (
           <div className="flex flex-1 items-center justify-center p-8">
@@ -124,7 +124,7 @@ function Workspace({ email, chat, thread, chats, chatEnabled, attachmentsEnabled
           </div>
         ) : (
           <div key={thread.id} className="flex min-h-0 flex-1 flex-col animate-in fade-in duration-200">
-            <Messages messages={chat.messages} status={chat.status} onApprovalOutcome={chat.onApprovalOutcome} onCheckoutOutcome={chat.onCheckoutOutcome} onPickStarter={(text) => chat.send(text)} onSend={(text) => chat.send(text)} />
+            <Messages messages={chat.messages} status={chat.status} onApprovalOutcome={chat.onApprovalOutcome} onPasswordOutcome={chat.onPasswordOutcome} onCardSaved={chat.onCardSaved} onCheckoutOutcome={chat.onCheckoutOutcome} onPickStarter={(text) => chat.send(text)} onSend={(text) => chat.send(text)} />
             <div className="mx-auto w-full max-w-3xl px-4 pt-2 pb-4 sm:px-6">
               {chat.error ? (
                 <Alert variant="destructive" className="mb-3">
@@ -148,6 +148,23 @@ function Workspace({ email, chat, thread, chats, chatEnabled, attachmentsEnabled
       </main>
     </div>
   );
+}
+
+/** How long a chat's history may take before a spinner says it is on its way. */
+const SPINNER_DELAY_MS = 400;
+
+/**
+ * A spinner that shows only once the wait is long enough to notice. A saved
+ * chat usually loads at once, and a spinner that flashes just before the
+ * thread fades in makes one change look like two.
+ */
+function LateSpinner() {
+  const [shown, setShown] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => setShown(true), SPINNER_DELAY_MS);
+    return () => clearTimeout(t);
+  }, []);
+  return shown ? <Spinner className="animate-in fade-in duration-200" /> : null;
 }
 
 function NavItem({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {

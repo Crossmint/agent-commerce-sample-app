@@ -28,30 +28,33 @@ import { useStepLoop } from "./use-step-loop";
  * the script.
  */
 
-/** When each entry lands, ms from the start of a run. */
+/** How long the sheet holds on "Approved." before it goes down, ms. */
+const HOLD_APPROVED = 2800;
+
+/** The sheet, on the run clock. */
+const SHEET = {
+  up: 3400,
+  ready: 3900,
+  press: 4700,
+  approved: 5250,
+  down: 5250 + HOLD_APPROVED,
+} as const;
+
+/** When each entry lands, ms from the start of a run. Everything after the approval follows the sheet down. */
 const AT = {
   ask: 300,
   lookedAtCards: 1100,
   reply: 1700,
   request: 2300,
-  granted: 6950,
-  ordering: 7500,
-  progress: 8050,
-  done: 11600,
-  receipt: 12150,
-} as const;
-
-/** The sheet, on the run clock. */
-const SHEET = {
-  up: 3400,
-  down: 6600,
-  ready: 3900,
-  press: 4700,
-  approved: 5250,
+  granted: SHEET.down + 350,
+  ordering: SHEET.down + 900,
+  progress: SHEET.down + 1450,
+  done: SHEET.down + 5000,
+  receipt: SHEET.down + 5550,
 } as const;
 
 /** The run restarts here, a beat after the receipt has settled. */
-const LOOP = 15400;
+const LOOP = SHEET.down + 8800;
 
 const SCRIPT: AppRunScript = {
   thread: [

@@ -66,6 +66,6 @@ Finding IDs retain their notebook identifiers; gaps do not indicate missing SDK 
 | `OrderIntentVerification` | Integrated, not yet verified end to end. | Success/failure, cancellation, expiry, retry, and callback behavior. |
 | `CrossmintCvcRecollection` | Integrated, not yet verified. | Validation, submission, callback contract, retry, cancellation, and sensitive-data handling. |
 | `CrossmintAgentCardAuthorization` | `AuthorizeAgentCard` wrapper added and exported; not yet mounted in a test flow or evaluated interactively. | New/existing card, exact amount/currency/merchant, rails, verification, expiry, and callback cardinality. |
-| `CrossmintProtectedInput` | Not yet integrated or evaluated. | Load, validation, submit, retry, cancel/reopen, identifier handoff, and sensitive-data handling. |
+| `CrossmintProtectedInput` | Integration imported from `main` (`b901be1`); not yet evaluated in this QA session. | Load, validation, submit, retry, cancel/reopen, identifier handoff, and sensitive-data handling. |
 
 For each component, also exercise keyboard/focus behavior, narrow viewports, loading and error states, JWT expiry/refresh, slow or failed requests, repeated clicks, and unmount/remount. Harness build and unit-test results are retained in the internal notebook; they are not SDK component QA passes.

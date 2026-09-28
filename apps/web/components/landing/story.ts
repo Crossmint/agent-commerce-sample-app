@@ -22,6 +22,8 @@ export const STORY = {
   cli: AGENT_COMPANY.toLowerCase(),
 
   ask: "Order my usual coffee from Starbucks",
+  /** What the agent is doing at the store, as the checkout card's title says it. */
+  action: "Ordering a Caffè Latte",
   purpose: "Coffee",
   amount: "$10.00",
   amountBare: "10",

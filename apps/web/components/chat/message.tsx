@@ -2,40 +2,52 @@
 
 import { useState } from "react";
 import { Check, Copy } from "lucide-react";
-import type { CheckoutView } from "@agent-commerce/server";
-import { PAYMENT_STEP_ASK, cn } from "@agent-commerce/ui";
+import { cn } from "@agent-commerce/ui";
 import { AgentAvatar } from "@/components/brand";
-import type { ApprovalOutcome, CheckoutOutcome } from "@/lib/chat/tools";
+import type {
+  ApprovalOutcome,
+  CheckoutOutcome,
+  ProtectedInputOutcome,
+  SavedCardOutcome,
+} from "@/lib/chat/tools";
 import type { ChatMessage, ChatMessagePart } from "@/lib/chat/types";
-import { AgentCardApproval, AgentCardRequestCard } from "./agent-card-approval";
+import { AgentCardApproval } from "./agent-card-approval";
+import { PasswordRequest } from "./password-request";
+import { AddCard } from "./add-card";
 import { AttachmentPreview } from "./attachment-preview";
-import { CheckoutCard, WatchRun } from "./checkout-card";
+import { WatchRun } from "./checkout-card";
 import { CheckoutSiteLine } from "./checkout-site";
 import { ProductCards } from "./product-cards";
+import { Receipt } from "@/components/receipt";
+import { ActivityLine } from "./activity-line";
 import {
-  CHECKOUT_TITLES,
+  checkoutOf,
   checkoutSiteOf,
+  checkoutStatusLine,
   findPaymentStep,
   productsMessageOf,
   productsOf,
+  receiptMessageOf,
+  receiptOf,
   isToolError,
   isCheckoutPart,
   messageText,
-  toolSummary,
+  passwordRequestOf,
+  toolBusy,
   toolTitle,
   watchedHere,
-  type RequestSummary,
+  type ToolState,
   type WatchIndex,
-  type ToolError,
 } from "./parts";
 import { AgentBubble, ENTER, ENTER_SENT } from "./text";
-import { ToolCard, type ToolState } from "./tool-card";
 
 export interface MessageProps {
   message: ChatMessage;
   /** True while this message is still streaming in. */
   streaming: boolean;
   onApprovalOutcome: (toolCallId: string, outcome: ApprovalOutcome) => void;
+  onPasswordOutcome: (toolCallId: string, outcome: ProtectedInputOutcome) => void;
+  onCardSaved: (toolCallId: string, outcome: SavedCardOutcome) => void;
   onCheckoutOutcome: (toolCallId: string, outcome: CheckoutOutcome) => void;
   /** The thread's watched checkouts, from `watchIndex`. */
   watches: WatchIndex;
@@ -51,6 +63,8 @@ export function Message({
   message,
   streaming,
   onApprovalOutcome,
+  onPasswordOutcome,
+  onCardSaved,
   onCheckoutOutcome,
   watches,
   onSend,
@@ -75,6 +89,8 @@ export function Message({
               part={part}
               streaming={streaming}
               onApprovalOutcome={onApprovalOutcome}
+              onPasswordOutcome={onPasswordOutcome}
+              onCardSaved={onCardSaved}
               onCheckoutOutcome={onCheckoutOutcome}
               watches={watches}
               onSend={onSend}
@@ -161,6 +177,8 @@ function Part({
   part,
   streaming,
   onApprovalOutcome,
+  onPasswordOutcome,
+  onCardSaved,
   onCheckoutOutcome,
   watches,
   onSend,
@@ -169,6 +187,8 @@ function Part({
   part: ChatMessagePart;
   streaming: boolean;
   onApprovalOutcome: MessageProps["onApprovalOutcome"];
+  onPasswordOutcome: MessageProps["onPasswordOutcome"];
+  onCardSaved: MessageProps["onCardSaved"];
   onCheckoutOutcome: MessageProps["onCheckoutOutcome"];
   watches: WatchIndex;
   onSend: MessageProps["onSend"];
@@ -184,55 +204,66 @@ function Part({
         />
       );
 
-    case "tool-request_agent_card":
-      return (
-        <AgentCardRequestCard
-          state={part.state}
-          input={part.input}
-          output={
-            part.state === "output-available"
-              ? (part.output as RequestSummary | ToolError)
-              : undefined
-          }
-          errorText={part.state === "output-error" ? part.errorText : undefined}
-        />
-      );
-
     case "tool-await_agent_card_approval": {
       // A checkout waiting on this is the user choosing how to pay, not an
-      // agent asking for a budget, so the screen says so.
+      // agent asking for a budget, so the agent asks that.
       const requestId = part.input?.requestId ?? "";
-      const ask =
-        watches.paymentRequests.has(requestId) || findPaymentStep(message, requestId)
-          ? PAYMENT_STEP_ASK
-          : undefined;
-      if (part.state === "input-available") {
+      const paying =
+        watches.paymentRequests.has(requestId) || Boolean(findPaymentStep(message, requestId));
+      if (part.state === "input-available" || part.state === "output-available") {
         return (
           <AgentCardApproval
             toolCallId={part.toolCallId}
             requestId={part.input.requestId}
-            ask={ask}
-            onOutcome={onApprovalOutcome}
-          />
-        );
-      }
-      if (part.state === "output-available") {
-        return (
-          <AgentCardApproval
-            toolCallId={part.toolCallId}
-            requestId={part.input.requestId}
-            output={part.output}
-            ask={ask}
+            output={part.state === "output-available" ? part.output : undefined}
+            paying={paying}
             onOutcome={onApprovalOutcome}
           />
         );
       }
       return (
-        <ToolCard
-          title="Waiting for your approval"
-          state={part.state}
-          errorText={part.state === "output-error" ? part.errorText : undefined}
-        />
+        <ActivityLine busy={toolBusy(part.state)} failed={part.state === "output-error"}>
+          {toolTitle(part.type)}
+        </ActivityLine>
+      );
+    }
+
+    // Adding a card: Crossmint's card form in a dialog.
+    case "tool-await_saved_card":
+      if (part.state === "input-available" || part.state === "output-available") {
+        return (
+          <AddCard
+            toolCallId={part.toolCallId}
+            output={part.state === "output-available" ? part.output : undefined}
+            onOutcome={onCardSaved}
+          />
+        );
+      }
+      return (
+        <ActivityLine busy={toolBusy(part.state)} failed={part.state === "output-error"}>
+          {toolTitle(part.type)}
+        </ActivityLine>
+      );
+
+    // The store asks for a password: Crossmint's field in a dialog, never words.
+    case "tool-await_protected_input": {
+      const request = passwordRequestOf(part, watches);
+      if (request && (part.state === "input-available" || part.state === "output-available")) {
+        return (
+          <PasswordRequest
+            toolCallId={part.toolCallId}
+            checkoutId={request.checkoutId}
+            requestId={request.requestId}
+            domain={request.domain}
+            output={part.state === "output-available" ? part.output : undefined}
+            onOutcome={onPasswordOutcome}
+          />
+        );
+      }
+      return (
+        <ActivityLine busy={toolBusy(part.state)} failed={part.state === "output-error"}>
+          {toolTitle(part.type)}
+        </ActivityLine>
       );
     }
 
@@ -252,7 +283,7 @@ function Part({
         );
       }
       return part.state === "output-error" ? (
-        <ToolCard title={toolTitle(part.type)} state={part.state} errorText={part.errorText} />
+        <ActivityLine failed>{toolTitle(part.type)}</ActivityLine>
       ) : null;
 
     default:
@@ -268,18 +299,15 @@ function Part({
           return <CheckoutSiteLine site={site} className="-mb-1.5 pl-1" />;
         }
         if (watchedHere(message, part)) return null;
+        // Anything else a checkout call did: one line, as the phone draws it.
+        const view = checkoutOf(part);
         return (
-          <CheckoutCard
-            title={CHECKOUT_TITLES[part.type]}
-            state={part.state}
-            input={part.input}
-            checkout={
-              part.state === "output-available"
-                ? (part.output as CheckoutView | ToolError)
-                : undefined
-            }
-            errorText={part.state === "output-error" ? part.errorText : undefined}
-          />
+          <ActivityLine
+            busy={toolBusy(part.state)}
+            failed={part.state === "output-error" || Boolean(view?.failure)}
+          >
+            {view ? checkoutStatusLine(view) : toolTitle(part.type)}
+          </ActivityLine>
         );
       }
       {
@@ -296,19 +324,30 @@ function Part({
           );
         }
       }
+      {
+        // A checkout that went through: the receipt, under the agent's line on it.
+        const message = receiptMessageOf(part);
+        const receipt = receiptOf(part);
+        if (message || receipt) {
+          return (
+            <>
+              {message ? <AgentBubble text={message} /> : null}
+              {receipt ? <Receipt receipt={receipt} className="max-w-[300px]" /> : null}
+            </>
+          );
+        }
+      }
+      // Any other tool call: one line, as the phone draws it.
       if (part.type.startsWith("tool-")) {
         const tool = part as Extract<ChatMessagePart, { type: `tool-${string}`; state: ToolState }>;
+        const failed =
+          tool.state === "output-error" ||
+          (tool.state === "output-available" &&
+            Boolean((tool.output as { error?: unknown } | undefined)?.error));
         return (
-          <ToolCard
-            title={toolTitle(tool.type)}
-            state={tool.state}
-            input={tool.input}
-            output={tool.state === "output-available" ? tool.output : undefined}
-            errorText={tool.state === "output-error" ? tool.errorText : undefined}
-            summary={
-              tool.state === "output-available" ? toolSummary(tool.type, tool.output) : undefined
-            }
-          />
+          <ActivityLine busy={toolBusy(tool.state)} failed={failed}>
+            {toolTitle(tool.type)}
+          </ActivityLine>
         );
       }
       // reasoning, step-start, sources, data parts: nothing to draw.

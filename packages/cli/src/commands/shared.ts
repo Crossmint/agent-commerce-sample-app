@@ -1,6 +1,6 @@
 import type { Command } from "commander";
 import type { Merchant, PendingUserAction, RenderedAction, RenderedField } from "@agent-commerce/core";
-import { renderPendingAction } from "@agent-commerce/core";
+import { asksPasswordInForm, renderPendingAction } from "@agent-commerce/core";
 import pc from "picocolors";
 import { AgentCommerceApi } from "../api.js";
 import { resolveConfig } from "../config.js";
@@ -79,6 +79,11 @@ export function parseJsonValues(raw: string): Record<string, unknown> {
 /** The action a checkout is waiting on, rendered. Prefers the server's `rendered`. */
 export function pendingAction(view: CheckoutView): RenderedAction | undefined {
   if (view.rendered) return view.rendered;
+  // A password has no form: the user types it on the page passwordRequest links to.
+  const pending = view.pendingUserAction as PendingUserAction | undefined;
+  if (view.passwordRequest || pending?.protected) return undefined;
+  // Nor does a password asked for in a plain form: it is declined, never filled in.
+  if (pending && asksPasswordInForm(pending)) return undefined;
   if (view.pendingUserAction)
     return renderPendingAction(view.pendingUserAction as PendingUserAction);
   return undefined;

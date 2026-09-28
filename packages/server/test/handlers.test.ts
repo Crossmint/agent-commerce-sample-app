@@ -631,6 +631,7 @@ describe("checkouts", () => {
     expect(await res.json()).toEqual({
       id: "run_1",
       status: "running",
+      startUrl: "https://www.shop.example/products/tee",
       agentCardId: "oi_1",
       embedUrl: "https://www.crossmint.com/embed/run_1",
       createdAt: "2026-09-17T00:00:00.000Z",
@@ -903,6 +904,7 @@ describe("checkouts", () => {
     expect(JSON.parse(text)).toEqual({
       id: "run_1",
       status: "succeeded",
+      startUrl: "https://www.shop.example/products/tee",
       agentCardId: "oi_1",
       result: {
         outcome: "succeeded",
@@ -1221,6 +1223,140 @@ describe("checkouts", () => {
         },
       ],
     });
+  });
+
+  it("answers a password request with the protected input id, and never with values", async () => {
+    let answered = false;
+    const passwordRequest = {
+      type: "input_response",
+      requestId: "req_pw",
+      messageId: "msg_pw",
+      request: {
+        question: "Enter your password for shop.example to sign in.",
+        expiresAt: "2026-09-18T00:00:00.000Z",
+        interaction: { kind: "protected", purpose: "password", merchant: { domain: "shop.example" } },
+      },
+    };
+    const { handlers, calls } = makeServer([
+      {
+        method: "GET",
+        path: "/unstable/agent-checkouts/run_pw",
+        reply: () => ({
+          body: run({
+            runId: "run_pw",
+            status: answered ? "running" : "awaiting_input",
+            requiredAction: answered ? null : passwordRequest,
+          }),
+        }),
+      },
+      {
+        method: "POST",
+        path: "/unstable/agent-checkouts/run_pw/messages",
+        reply: () => {
+          answered = true;
+          return { status: 202, body: { messageId: "m_pw", status: "accepted" } };
+        },
+      },
+    ]);
+    // The view names the secret and where it is for, and offers no form for it.
+    const view = await (await call(handlers, "GET", "/v1/checkouts/run_pw")).json();
+    expect(view.pendingUserAction).toMatchObject({
+      id: "req_pw",
+      protected: { purpose: "password", merchant: { domain: "shop.example" } },
+    });
+    expect(view.rendered).toBeUndefined();
+    // Where the user types it, for a caller that cannot show the field itself.
+    expect(view.passwordRequest).toEqual({
+      requestId: "req_pw",
+      question: "Enter your password for shop.example to sign in.",
+      merchantDomain: "shop.example",
+      expiresAt: "2026-09-18T00:00:00.000Z",
+      url: "https://wallet.test/checkouts/run_pw",
+    });
+
+    // A password typed as a value is refused, and nothing reaches Crossmint.
+    const typed = await call(handlers, "POST", "/v1/checkouts/run_pw/messages", {
+      body: { requestId: "req_pw", values: { password: "hunter2" } },
+    });
+    expect(typed.status).toBe(409);
+    expect((await typed.json()).error.code).toBe("protected_input_required");
+    expect(calls.some((c) => c.method === "POST" && c.path.endsWith("/run_pw/messages"))).toBe(false);
+
+    const reply = await call(handlers, "POST", "/v1/checkouts/run_pw/messages", {
+      body: { requestId: "req_pw", protectedInputId: "pi_1", messageId: "client-pw" },
+    });
+    expect((await reply.json()).status).toBe("running");
+    const sent = calls.find((c) => c.method === "POST" && c.path.endsWith("/run_pw/messages"))!;
+    expect(sent.body).toEqual({
+      id: "client-pw",
+      parts: [
+        {
+          type: "input_response",
+          requestId: "req_pw",
+          action: "submit",
+          response: { kind: "protected", protectedInputId: "pi_1" },
+        },
+      ],
+    });
+  });
+
+  it("refuses a password asked for in a plain form, and renders no form for it", async () => {
+    const passwordForm = {
+      type: "input_response",
+      requestId: "req_pwf",
+      request: {
+        question: "Please enter the password for the selected Amazon account.",
+        expiresAt: "2026-09-18T00:00:00.000Z",
+        interaction: {
+          kind: "form",
+          responseSchema: {
+            type: "object",
+            properties: { amazon_password: { type: "string", title: "Amazon account password" } },
+            required: ["amazon_password"],
+          },
+        },
+      },
+    };
+    const { handlers, calls } = makeServer([
+      {
+        method: "GET",
+        path: "/unstable/agent-checkouts/run_pwf",
+        reply: { body: run({ runId: "run_pwf", status: "awaiting_input", requiredAction: passwordForm }) },
+      },
+    ]);
+    const view = await (await call(handlers, "GET", "/v1/checkouts/run_pwf")).json();
+    expect(view.pendingUserAction).toMatchObject({ id: "req_pwf" });
+    expect(view.rendered).toBeUndefined();
+    const res = await call(handlers, "POST", "/v1/checkouts/run_pwf/messages", {
+      body: { requestId: "req_pwf", values: { amazon_password: "hunter2" } },
+    });
+    expect(res.status).toBe(409);
+    expect((await res.json()).error.code).toBe("password_in_form");
+    expect(calls.some((c) => c.method === "POST" && c.path.endsWith("/run_pwf/messages"))).toBe(false);
+  });
+
+  it("refuses a protected input id for a request that asks for no secret", async () => {
+    const sizeRequest = {
+      type: "input_response",
+      requestId: "req_size2",
+      request: {
+        question: "Which size?",
+        expiresAt: "2026-09-18T00:00:00.000Z",
+        interaction: { kind: "form", responseSchema: { type: "object", properties: { size: { type: "string" } } } },
+      },
+    };
+    const { handlers } = makeServer([
+      {
+        method: "GET",
+        path: "/unstable/agent-checkouts/run_sz",
+        reply: { body: run({ runId: "run_sz", status: "awaiting_input", requiredAction: sizeRequest }) },
+      },
+    ]);
+    const res = await call(handlers, "POST", "/v1/checkouts/run_sz/messages", {
+      body: { requestId: "req_size2", protectedInputId: "pi_2" },
+    });
+    expect(res.status).toBe(409);
+    expect((await res.json()).error.code).toBe("not_a_protected_request");
   });
 
   it("refuses card fields from callers and maps blocked runs to a failure", async () => {

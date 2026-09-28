@@ -322,7 +322,7 @@ Next.js App Router. The reference deployment and the "copy me" target. It is one
 apps/web/app/
 ├── page.tsx                     the landing page
 ├── app/                         the app: one page, a device mockup, and an experience switcher
-│                                (Mobile, Desktop, iMessage, Agent MCP, CLI skill). Saved cards,
+│                                (Mobile, Desktop, iMessage, Agent MCP). Saved cards,
 │                                agent cards, connected agents and the agent chat live inside it
 ├── login/, authenticate/        Stytch login and redirect callback, on the phone screen
 ├── (approve)/approve/[requestId]/  approve an agent card request (the link agents send). Its own
@@ -331,7 +331,6 @@ apps/web/app/
 ├── oauth/authorize/             the Connected Apps Authorization URL: the sample app's own consent screen on
 │                                Stytch's headless `idp` calls
 ├── cli-callback/                shows the OAuth code for `agent-commerce login --code`
-├── install/route.ts             markdown for agents: "Set up https://<host>/install" installs the CLI and the skill
 ├── not-found.tsx                any URL that is not there
 ├── .well-known/oauth-protected-resource/  RFC 9728 metadata so MCP hosts find Stytch
 ├── api/agent-commerce/[...path]/route.ts  the HTTP API from @agent-commerce/server
@@ -496,7 +495,7 @@ For the platform, the CLI is `npm i -g @agent-commerce/cli`. The MCP URL is `htt
 
 ## 7. Design
 
-**Look.** The site follows the design of the Crossmint onramp sample app (`github.com/Crossmint/onramp-sample-app`). It is not a brand of its own: the Crossmint logotype is the only mark. The ground is white with a dot grid, text is neutral grey, `#4564FF` is the one accent, corners step from 10px up to full pills, and money figures are the only thing set in the display face (Mona Sans). The tokens live in `packages/ui/src/styles.css` so an adopter rethemes in one file. The device mockups live in `apps/web/components/frame/`: `DeviceFrame` (a phone), `DesktopFrame` (a window with an address pill), `FramePage` (the dot grid canvas with the logo card top left and the Crossmint footer). `/app` is one page with an experience switcher across the top: Mobile, Desktop, iMessage, Agent MCP and CLI skill show the same flow from each side. The standalone screens (log in, authenticate, approve, authorize an agent, the CLI callback, not found) stand on `components/focus-screen.tsx`: a phone on the canvas, the step's name in 28px, one line under it, tall calls to action. The CLI's own browser callback page repeats the look inline, with no assets to serve.
+**Look.** The site follows the design of the Crossmint onramp sample app (`github.com/Crossmint/onramp-sample-app`). It is not a brand of its own: the Crossmint logotype is the only mark. The ground is white with a dot grid, text is neutral grey, `#4564FF` is the one accent, corners step from 10px up to full pills, and money figures are the only thing set in the display face (Mona Sans). The tokens live in `packages/ui/src/styles.css` so an adopter rethemes in one file. The device mockups live in `apps/web/components/frame/`: `DeviceFrame` (a phone), `DesktopFrame` (a window with an address pill), `FramePage` (the dot grid canvas with the logo card top left and the Crossmint footer). `/app` is one page with an experience switcher across the top: Mobile, Desktop, iMessage and Agent MCP show the same flow from each side. The standalone screens (log in, authenticate, approve, authorize an agent, the CLI callback, not found) stand on `components/focus-screen.tsx`: a phone on the canvas, the step's name in 28px, one line under it, tall calls to action. The CLI's own browser callback page repeats the look inline, with no assets to serve.
 
 **Components.** shadcn/ui on Tailwind, installed into `@agent-commerce/ui` so the web app and any adopter get the same primitives. AI Elements for chat, which is shadcn-based too. Theme tokens live in one CSS file in `@agent-commerce/ui` so a platform can retheme without forking.
 

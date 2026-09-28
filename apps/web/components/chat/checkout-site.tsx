@@ -57,9 +57,12 @@ export function CheckoutRunCard({
   // Something to open: more steps than the folded card shows.
   const many = steps.length > foldedCount;
   const shown = open ? steps : steps.slice(steps.length - foldedCount);
+  // The icon, the clock and the arrow sit on the title's line, not between the two lines.
   const header = (
     <>
-      <SiteIcon host={site.host} size={16} />
+      <span className="mt-0.5 shrink-0">
+        <SiteIcon host={site.host} size={16} />
+      </span>
       <span className="flex min-w-0 flex-1 flex-col">
         <span className="truncate text-sm font-medium">{title}</span>
         <span className="truncate text-[11px] text-muted-foreground">{site.host}</span>
@@ -68,14 +71,14 @@ export function CheckoutRunCard({
         <Elapsed
           startedAt={startedAt}
           endedAt={endedAt}
-          className="shrink-0 text-[11px] text-muted-foreground"
+          className="mt-0.5 shrink-0 text-[11px] leading-4 text-muted-foreground"
         />
       ) : null}
       {many ? (
         <ChevronDown
           aria-hidden
           className={cn(
-            "size-4 shrink-0 text-muted-foreground transition-transform",
+            "mt-0.5 size-4 shrink-0 text-muted-foreground transition-transform",
             open && "rotate-180",
           )}
         />
@@ -102,12 +105,12 @@ export function CheckoutRunCard({
                 : `Show all ${steps.length} steps`
           }
           onClick={() => setOpen((o) => !o)}
-          className="-m-1 flex items-center gap-2 rounded-xl p-1 text-left transition-colors hover:bg-muted/60"
+          className="-m-1 flex items-start gap-2 rounded-xl p-1 text-left transition-colors hover:bg-muted/60"
         >
           {header}
         </button>
       ) : (
-        <div className="flex items-center gap-2">{header}</div>
+        <div className="flex items-start gap-2">{header}</div>
       )}
       {shown.length ? <CheckoutSteps steps={shown} /> : null}
     </div>

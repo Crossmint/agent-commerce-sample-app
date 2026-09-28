@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { AlertCircle } from "lucide-react";
+import { asksPasswordInForm } from "@agent-commerce/core";
 import { errorMessage } from "../api/client.js";
 import type { CheckoutView as CheckoutViewData } from "../api/types.js";
 import { isTerminalCheckoutView, useCheckout } from "../hooks/use-checkout.js";
@@ -18,6 +19,7 @@ import { Skeleton } from "./primitives/skeleton.js";
 import { Spinner } from "./primitives/spinner.js";
 import { ApproveAgentCard, PAYMENT_STEP_ASK } from "./approve-agent-card.js";
 import { CheckoutSteps, checkoutSteps } from "./checkout-steps.js";
+import { AnswerPasswordRequest } from "./protected-input.js";
 import { PendingActionForm } from "./pending-action-form.js";
 
 export interface CheckoutViewProps {
@@ -205,6 +207,51 @@ export function CheckoutView({
               void messages.refetch();
             }}
           />
+        </div>
+      ) : null}
+
+      {/* A password request: Crossmint's protected field, never a form. */}
+      {!terminal && data.pendingUserAction?.protected ? (
+        <div className={PANEL}>
+          <AnswerPasswordRequest
+            key={data.pendingUserAction.id}
+            checkoutId={checkoutId}
+            requestId={data.pendingUserAction.id}
+            merchantDomain={data.pendingUserAction.protected.merchant?.domain ?? "the store"}
+            platformName={platformName}
+            onDone={() => {
+              void refetch();
+              void messages.refetch();
+            }}
+          />
+        </div>
+      ) : null}
+
+      {/* A password in a plain form: never filled in here, only skipped. */}
+      {!terminal && data.pendingUserAction && asksPasswordInForm(data.pendingUserAction) ? (
+        <div className={PANEL}>
+          <Problem
+            title="The store asks for your password"
+            message="It asks in a way this app does not accept: a password is only ever typed into a secure field. Skip it, and the agent carries on without signing in, or tries a guest checkout."
+          />
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            disabled={submitting}
+            className="mt-4"
+            onClick={async () => {
+              setActionError(undefined);
+              try {
+                await decline(data.pendingUserAction!.id);
+                void messages.refetch();
+              } catch (e) {
+                setActionError(e);
+              }
+            }}
+          >
+            Skip this question
+          </Button>
         </div>
       ) : null}
 

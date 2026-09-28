@@ -55,7 +55,8 @@ export const TOOL_DOCS = {
       currency: PARAM_DOCS.currency,
       description:
         "What the money is for, in the user's words, e.g. Flight to SF. Shown on the approval screen.",
-      merchant: "Lock the card to one merchant when the store is known.",
+      merchant:
+        "Lock the card to one merchant, only when the user named a real store (Starbucks, united.com). Leave it out for a general budget such as lunch this week or a trip: the purpose is not a store.",
       expiresInHours: "How long the agent card stays valid. Default 24.",
       requester: "Name of the agent shown to the user.",
     },
@@ -151,10 +152,30 @@ export const TOOL_DOCS = {
     title: "Watch a checkout",
     summary:
       "Follow a running checkout for the user. While it runs, the chat shows the user each update the store's agent writes, as its own message; you do not repeat them. " +
-      "Call it straight after create_checkout, and again after each answer you send; never poll get_checkout meanwhile. It returns with the updates it showed and one of three reasons. " +
+      "Call it straight after create_checkout, and again after each answer you send; never poll get_checkout meanwhile. It returns with the updates it showed and one of four reasons. " +
       "awaiting_input with a question: the store asks something, and you put it to the user. awaiting_payment with a payment: the run reached its payment step, and the user chooses how to pay. " +
+      "awaiting_password with a password: the store asks for the password of the user's account there; call await_protected_input, and never ask for the password in words. " +
       "A final status (succeeded, blocked, failed, cancelled): the run ended, with the total and the order number, or why it stopped.",
     params: { checkoutId: PARAM_DOCS.checkoutId },
+    surfaces: ["chat"],
+  },
+  await_saved_card: {
+    title: "Wait for a card",
+    summary:
+      "Show the user a secure form to add a card, and wait until they have. The card is saved with Crossmint: neither you nor the chat sees the number. " +
+      "Call it when the user wants to add a card, or needs one and has none saved, with no text in between; the chat asks the user. It returns saved, with the card's network and last four digits, or cancelled.",
+    params: {},
+    surfaces: ["chat"],
+  },
+  await_protected_input: {
+    title: "Wait for a password",
+    summary:
+      "When a checkout asks for the password of the user's account at the store, show the user a secure field for it and wait. The password goes straight to Crossmint's vault: neither you nor the chat ever sees it, and the app answers the checkout itself. " +
+      "Call it straight after watch_checkout returns awaiting_password, with no text in between; the chat asks the user. It returns submitted, then call watch_checkout again, or declined, when the user would rather not sign in: ask whether to check out as a guest (answer_checkout with action alternative) or stop.",
+    params: {
+      checkoutId: PARAM_DOCS.checkoutId,
+      requestId: "The password request's requestId, from watch_checkout's password.",
+    },
     surfaces: ["chat"],
   },
   search_products: {
@@ -177,11 +198,33 @@ export const TOOL_DOCS = {
     },
     surfaces: ["chat"],
   },
+  show_receipt: {
+    title: "Send the receipt",
+    summary:
+      "Send the user the receipt for a checkout that succeeded. Call it once, right after the checkout ends as succeeded. " +
+      "The total, the order number and the card that paid are filled in from the checkout; you say what it was, from what the store reported.",
+    params: {
+      checkoutId: "The checkout that succeeded.",
+      kind: "purchase for things shipped, food for a meal or a coffee to pick up or have delivered, reservation for a table or a stay, tickets for events and experiences, travel for flights and trains, other for anything else.",
+      merchant: "Who it is from, as the user knows them: IQBAR, Nopa, Sala Apolo, Iberia.",
+      title:
+        "What it is, in a few words, when the items do not say it: Dinner for 2, 2 tickets to Coldplay. Leave it out for a purchase whose items say it.",
+      details:
+        "The facts the user needs, short, in order: Date, Time, Party, Seats, Venue, Route, Delivery, Pickup. Only what the store confirmed.",
+      items:
+        "What was bought, with quantities in the label (2 × Caffè Latte), then shipping and tax, when the store showed them. Leave it out when it would only repeat the title.",
+      itemAmount: 'Decimal string, e.g. "12.99". Only when the store showed it.',
+      currency: "The currency of the item amounts, when the checkout states no total.",
+      reference: "The order or confirmation number the store gave, when the checkout reports none.",
+    },
+    surfaces: ["chat"],
+  },
   save_buyer_profile: {
     title: "Save the buyer's details",
     summary:
       "Save the user's name, email, phone number and shipping address as their buyer profile. Every later checkout starts with it, so the store fills those fields itself instead of asking. " +
-      "Call it once the user has given you their full name and a full address, typically while answering a store's question for them. Saving again replaces what later checkouts use.",
+      "Pass only what the user gave you or changed: it is added to what is saved, and every field you leave out is kept. When nothing is saved yet, the first save needs the full name, a phone number and the full address; it says what is still missing. " +
+      "When the address changes, pass every part of the new one.",
     params: {
       firstName: "First name.",
       lastName: "Last name.",
@@ -211,7 +254,8 @@ export const TOOL_DOCS = {
     title: "Answer a checkout question",
     summary:
       "Answer the open question on a checkout. Pass requestId with values keyed by field name (as listed by get_checkout) to submit, action decline to refuse it, or action alternative with text to suggest another way (e.g. use the cheapest shipping). " +
-      "Without requestId, text is a note to the agent mid-run. Never send card fields: the payment step is answered from the agent card the user picks.",
+      "Without requestId, text is a note to the agent mid-run. Never send card fields: the payment step is answered from the agent card the user picks. " +
+      "Never send a password, and never ask the user for one: a request for the password of their account at the store (pendingUserAction.protected) is answered by the user in a secure field, on the checkout's page in the app. You may decline it, or send an alternative such as checking out as a guest.",
     params: {
       checkoutId: PARAM_DOCS.checkoutId,
       requestId: "The pending request id from get_checkout.",

@@ -1,4 +1,4 @@
-import { newMessageId, paymentResponse, submitResponse } from "./checkout-messages.js";
+import { newMessageId, paymentResponse, protectedResponse, submitResponse } from "./checkout-messages.js";
 import { CrossmintApiError } from "./errors.js";
 import type {
   BrowserProfile,
@@ -299,6 +299,19 @@ export class CrossmintClient {
       this.checkouts.sendMessage(ctx, runId, {
         id: messageId ?? newMessageId(),
         parts: [paymentResponse(requestId, orderIntentId)],
+      }),
+
+    /** Answer a protected input request (a password) with the id Crossmint's field returned. */
+    answerProtected: (
+      ctx: CheckoutContext,
+      runId: string,
+      requestId: string,
+      protectedInputId: string,
+      messageId?: string,
+    ): Promise<SendCheckoutMessageResult> =>
+      this.checkouts.sendMessage(ctx, runId, {
+        id: messageId ?? newMessageId(),
+        parts: [protectedResponse(requestId, protectedInputId)],
       }),
 
     cancel: (ctx: CheckoutContext, runId: string): Promise<CancelCheckoutResult> =>

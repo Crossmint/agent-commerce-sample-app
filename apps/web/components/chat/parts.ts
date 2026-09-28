@@ -1,11 +1,18 @@
+import { asksPasswordInForm } from "@agent-commerce/core";
 import type { CheckoutView } from "@agent-commerce/server";
 import type { ApproveOutcome } from "@agent-commerce/ui";
 import type { CheckoutMessage } from "@agent-commerce/core";
 import type { CheckoutStep } from "@agent-commerce/ui";
 import type { FoundProduct } from "@/lib/chat/shopify-catalog";
-import type { ApprovalOutcome, CheckoutOutcome, CheckoutUpdate } from "@/lib/chat/tools";
+import { formatAmount, paymentMethodLabel } from "@agent-commerce/ui";
+import type { ReceiptData } from "@/components/receipt";
+import type {
+  ApprovalOutcome,
+  CheckoutOutcome,
+  CheckoutUpdate,
+  ShownReceipt,
+} from "@/lib/chat/tools";
 import type { ChatMessage, ChatMessagePart } from "@/lib/chat/types";
-import { humanizeToolName } from "./tool-card";
 
 /*
  * What the three chat renderers share about a message's parts: how to name a
@@ -26,6 +33,22 @@ export interface RequestSummary {
 }
 
 export type ToolError = { error: string; code: string };
+
+/** Where a tool call stands, as the AI SDK names it. */
+export type ToolState =
+  | "input-streaming"
+  | "input-available"
+  | "approval-requested"
+  | "approval-responded"
+  | "output-available"
+  | "output-error"
+  | "output-denied";
+
+/** "list_agent_cards" → "List agent cards". */
+function humanizeToolName(name: string): string {
+  const s = name.replace(/_/g, " ");
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
 
 export function isToolError(value: unknown): value is ToolError {
   return Boolean(value) && typeof value === "object" && typeof (value as ToolError).error === "string";
@@ -103,6 +126,18 @@ export function stopReason(
     };
   }
   const action = view.pendingUserAction;
+  // A password: the chat shows Crossmint's protected field, never a question in words.
+  if (view.status === "awaiting_input" && action?.protected && !asked.has(action.id)) {
+    return {
+      checkoutId: view.id,
+      status: "awaiting_password",
+      password: {
+        requestId: action.id,
+        question: action.question || "The store asks for your password.",
+        ...(action.protected.merchant ? { domain: action.protected.merchant.domain } : {}),
+      },
+    };
+  }
   // Watching again right after an answer can still see that question for a
   // moment, until the store takes it. It was asked; wait for what comes next.
   if (view.status === "awaiting_input" && action && !pay && !asked.has(action.id)) {
@@ -114,6 +149,7 @@ export function stopReason(
         question: action.question || view.rendered?.title || "The store needs an answer.",
         ...(action.expiresAt ? { expiresAt: action.expiresAt } : {}),
         responseSchema: action.responseSchema as Record<string, unknown>,
+        ...(asksPasswordInForm(action) ? { note: PASSWORD_IN_FORM_NOTE } : {}),
       },
     };
   }
@@ -130,6 +166,10 @@ export function watchedHere(message: ChatMessage, part: ChatMessagePart): boolea
   return message.parts.some((p) => p.type === "tool-watch_checkout" && p.input?.checkoutId === id);
 }
 
+/** What the agent is told when a store asks for a password in a plain form. */
+const PASSWORD_IN_FORM_NOTE =
+  "This asks for the user's password in a plain form. Never ask the user for it and never send it: it would pass through the chat, and the store's agent does not use a password sent that way. Tell the user in one line that this store wants them to sign in, which cannot be done safely here, and ask whether to check out as a guest instead (answer_checkout with action alternative) or stop (action decline).";
+
 /** What the thread's finished watches already did, so the next one does not do it twice. */
 export interface WatchIndex {
   /** Updates already posted, by checkout. A new watch posts only what came after. */
@@ -142,7 +182,25 @@ export interface WatchIndex {
   sites: Map<string, CheckoutSite>;
   /** Each checkout's first `watch_checkout`, by tool call id. */
   firstWatch: Map<string, string>;
+  /** Password requests a watch handed back, by requestId: the store the password is for, from the checkout itself. */
+  passwords: Map<string, { checkoutId: string; domain?: string }>;
+  /**
+   * Watches whose card the next watch takes over: the stretch stopped on a
+   * question the agent answered itself, with nothing shown in between, so the
+   * two read as one card.
+   */
+  absorbed: Set<string>;
+  /** What such a watch takes over, by its tool call id: the earlier steps, when the card began, and the watch that began it. */
+  carried: Map<string, { updates: CheckoutUpdate[]; startedAt?: string; chainStart: string }>;
 }
+
+/** Parts that show the user nothing between two stretches of a checkout. */
+const UNSEEN_BETWEEN_WATCHES = new Set([
+  "step-start",
+  "reasoning",
+  "tool-answer_checkout",
+  "tool-get_checkout",
+]);
 
 export function watchIndex(messages: ChatMessage[]): WatchIndex {
   const index: WatchIndex = {
@@ -151,8 +209,35 @@ export function watchIndex(messages: ChatMessage[]): WatchIndex {
     paymentRequests: new Set(),
     sites: new Map(),
     firstWatch: new Map(),
+    passwords: new Map(),
+    absorbed: new Set(),
+    carried: new Map(),
   };
   for (const m of messages) {
+    // The last watch of each checkout in this message, while nothing visible has come after it.
+    const lastWatch = new Map<string, Extract<ChatMessagePart, { type: "tool-watch_checkout" }>>();
+    for (const part of m.parts) {
+      if (part.type === "tool-watch_checkout" && part.input?.checkoutId) {
+        const prev = lastWatch.get(part.input.checkoutId);
+        if (prev?.state === "output-available" && prev.output.status === "awaiting_input") {
+          const before = index.carried.get(prev.toolCallId);
+          index.absorbed.add(prev.toolCallId);
+          index.carried.set(part.toolCallId, {
+            updates: [...(before?.updates ?? []), ...(prev.output.updates ?? [])],
+            ...((before?.startedAt ?? prev.output.startedAt)
+              ? { startedAt: before?.startedAt ?? prev.output.startedAt }
+              : {}),
+            chainStart: before?.chainStart ?? prev.toolCallId,
+          });
+        }
+        lastWatch.set(part.input.checkoutId, part);
+      } else if (
+        !UNSEEN_BETWEEN_WATCHES.has(part.type) &&
+        !(part.type === "text" && !part.text.trim())
+      ) {
+        lastWatch.clear();
+      }
+    }
     for (const part of m.parts) {
       const site = checkoutSiteOf(part);
       if (site?.checkoutId) index.sites.set(site.checkoutId, site);
@@ -167,10 +252,36 @@ export function watchIndex(messages: ChatMessage[]): WatchIndex {
       if (!shown) index.shown.set(out.checkoutId, (shown = new Set()));
       for (const u of out.updates ?? []) shown.add(u.id);
       if (out.question) index.asked.add(out.question.requestId);
+      if (out.password) {
+        index.asked.add(out.password.requestId);
+        index.passwords.set(out.password.requestId, {
+          checkoutId: out.checkoutId,
+          ...(out.password.domain ? { domain: out.password.domain } : {}),
+        });
+      }
       if (out.payment) index.paymentRequests.add(out.payment.requestId);
     }
   }
   return index;
+}
+
+/**
+ * An `await_protected_input` call, with what its card needs: the checkout,
+ * the request, and the store the password is for. The store comes from the
+ * watch that handed the request back, else the checkout's own site, never
+ * from the model's arguments: the password is bound to it.
+ */
+export function passwordRequestOf(
+  part: ChatMessagePart,
+  watches: WatchIndex,
+): { checkoutId: string; requestId: string; domain: string } | undefined {
+  if (part.type !== "tool-await_protected_input" || part.state === "input-streaming")
+    return undefined;
+  const requestId = part.input?.requestId;
+  const known = requestId ? watches.passwords.get(requestId) : undefined;
+  if (!requestId || !known) return undefined;
+  const domain = known.domain ?? watches.sites.get(known.checkoutId)?.host;
+  return domain ? { checkoutId: known.checkoutId, requestId, domain } : undefined;
 }
 
 /**
@@ -181,7 +292,11 @@ export function watchIndex(messages: ChatMessage[]): WatchIndex {
  */
 /** True when a stretch stopped for the user: its card folds to the title, and the agent asks below. */
 export function stoppedForUser(outcome: CheckoutOutcome | undefined): boolean {
-  return outcome?.status === "awaiting_input" || outcome?.status === "awaiting_payment";
+  return (
+    outcome?.status === "awaiting_input" ||
+    outcome?.status === "awaiting_payment" ||
+    outcome?.status === "awaiting_password"
+  );
 }
 
 export function runSteps(opts: {
@@ -241,6 +356,46 @@ export function productsOf(part: ChatMessagePart): FoundProduct[] | undefined {
   if (part.state !== "output-available") return undefined;
   const out = part.output as { products?: FoundProduct[] } | ToolError;
   return isToolError(out) ? undefined : out.products;
+}
+
+/** The line the agent puts above a receipt, once the call is streamed in. */
+export function receiptMessageOf(part: ChatMessagePart): string | undefined {
+  if (part.type !== "tool-show_receipt" || part.state === "input-streaming") return undefined;
+  const message = (part.input as { message?: string } | undefined)?.message?.trim();
+  return message || undefined;
+}
+
+/** The receipt a `show_receipt` call sends, once the checkout has vouched for it. */
+export function receiptOf(part: ChatMessagePart): ReceiptData | undefined {
+  if (part.type !== "tool-show_receipt" || part.state !== "output-available") return undefined;
+  const out = part.output as ShownReceipt | ToolError;
+  if (isToolError(out)) return undefined;
+  const money = (value: string) => formatAmount(value, out.currency);
+  return {
+    kind: out.kind,
+    merchant: out.merchant,
+    ...(out.host ? { host: out.host } : {}),
+    ...(out.reference ? { reference: out.reference } : {}),
+    ...(out.title ? { title: out.title } : {}),
+    ...(out.details?.length ? { details: out.details } : {}),
+    ...(out.items?.length
+      ? {
+          items: out.items.map((i) => ({
+            label: i.label,
+            ...(i.amount ? { amount: money(i.amount) } : {}),
+          })),
+        }
+      : {}),
+    ...(out.total ? { total: formatAmount(out.total.amount, out.total.currency) } : {}),
+    ...(out.paymentMethod
+      ? {
+          card: {
+            label: paymentMethodLabel(out.paymentMethod),
+            paymentMethod: out.paymentMethod,
+          },
+        }
+      : {}),
+  };
 }
 
 /** The site a `create_checkout` call visits, and what the agent does there, for its card. */
@@ -320,39 +475,19 @@ export function toolTitle(type: string): string {
     "tool-get_agent_card": "Checking an agent card",
     "tool-request_agent_card": "Requesting an agent card",
     "tool-await_agent_card_approval": "Waiting for your approval",
+    "tool-await_protected_input": "Waiting for your password",
+    "tool-await_saved_card": "Waiting for your card",
     "tool-watch_checkout": "Following the checkout",
     "tool-pay_checkout_with_agent_card": "Paying with your agent card",
     "tool-save_buyer_profile": "Saving your details for next time",
     "tool-search_products": "Looking through online stores",
     "tool-look_up_products": "Looking the product up",
+    "tool-show_receipt": "Writing up the receipt",
     "tool-reveal_agent_card": "Minting a card credential",
     "tool-revoke_agent_card": "Revoking an agent card",
     ...CHECKOUT_TITLES,
   };
   return titles[type] ?? humanizeToolName(type.replace(/^tool-/, ""));
-}
-
-/** One line under a finished tool call. */
-export function toolSummary(type: string, output: unknown): string | undefined {
-  if (!output || typeof output !== "object") return undefined;
-  const o = output as Record<string, unknown>;
-  if (typeof o.error === "string") return o.error;
-  switch (type) {
-    case "tool-list_payment_methods": {
-      const n = Array.isArray(o.paymentMethods) ? o.paymentMethods.length : 0;
-      return n === 1 ? "1 saved card" : `${n} saved cards`;
-    }
-    case "tool-list_agent_cards": {
-      const n = Array.isArray(o.agentCards) ? o.agentCards.length : 0;
-      return n === 1 ? "1 agent card" : `${n} agent cards`;
-    }
-    case "tool-get_agent_card":
-      return typeof o.available === "string" && typeof o.currency === "string" ? `${o.available} ${o.currency} available` : undefined;
-    case "tool-reveal_agent_card":
-      return o.enforced === false ? "Limit not enforced on this rail" : `Minted on ${String(o.rail ?? "a rail")}. Number not shown here.`;
-    default:
-      return undefined;
-  }
 }
 
 /** The checkout's state in a few words. */

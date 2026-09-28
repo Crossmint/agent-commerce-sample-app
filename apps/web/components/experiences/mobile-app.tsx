@@ -2,6 +2,7 @@
 
 import {
   useCallback,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -9,37 +10,29 @@ import {
   type KeyboardEvent,
   type ReactNode,
 } from "react";
-import {
-  ArrowLeft,
-  ArrowUp,
-  ChevronRight,
-  CircleAlert,
-  CircleCheck,
-  CreditCard,
-  LogOut,
-  Plus,
-  Square,
-} from "lucide-react";
+import { ArrowLeft, ArrowUp, ChevronRight, CreditCard, LogOut, Plus, Square } from "lucide-react";
 import {
   AgentCardDetailBody,
   AgentCardTable,
+  AnswerPasswordRequest,
   ApproveAgentCard,
-  PAYMENT_STEP_ASK,
   Button,
   CardMark,
+  PAYMENT_STEP_ASK,
   SaveCard,
   Skeleton,
   Spinner,
   errorMessage,
-  formatAmount,
   paymentMethodLabel,
   agentCardGroup,
   useAgentCards,
   usePaymentMethods,
   type AgentCardGroup,
   type ApproveOutcome,
+  type PasswordRequestOutcome,
+  type SaveCardResult,
 } from "@agent-commerce/ui";
-import { AGENT_NAME, AgentAvatar, PLATFORM_NAME } from "@/components/brand";
+import { AGENT_COMPANY, AGENT_NAME, AgentAvatar, PLATFORM_NAME } from "@/components/brand";
 import { DeviceFrame } from "@/components/frame/device-frame";
 import { PhoneSheet } from "@/components/frame/phone-sheet";
 import { PhoneStatusBar } from "@/components/frame/phone-status-bar";
@@ -51,22 +44,28 @@ import {
   checkoutStatusLine,
   productsMessageOf,
   productsOf,
+  receiptMessageOf,
+  receiptOf,
   findPaymentStep,
-  findRequest,
   isCheckoutPart,
   messageText,
-  toApprovalOutcome,
   toolBusy,
   toolTitle,
+  passwordRequestOf,
+  toApprovalOutcome,
   watchIndex,
   watchedHere,
   type WatchIndex,
 } from "@/components/chat/parts";
-import { AgentCardSummary } from "@/components/chat/agent-card-approval";
+import { APPROVAL_DONE_LINGER_MS, ApprovalInThread } from "@/components/chat/agent-card-approval";
+import { PasswordInThread } from "@/components/chat/password-request";
+import { AddCardInThread, savedCardOutcome } from "@/components/chat/add-card";
 import { WatchRun } from "@/components/chat/checkout-card";
 import { CheckoutSiteLine } from "@/components/chat/checkout-site";
 import { ProductCards, ProductDetails, pickMessage } from "@/components/chat/product-cards";
+import { Receipt } from "@/components/receipt";
 import { AgentBubble, ENTER, ENTER_SENT } from "@/components/chat/text";
+import { ActivityLine } from "@/components/chat/activity-line";
 import { StarterCards } from "@/components/chat/starters";
 import { type AgentChat } from "@/components/chat/use-agent-chat";
 import { useScrollToBottom } from "@/components/chat/use-scroll-to-bottom";
@@ -76,14 +75,11 @@ import type { ChatMessage, ChatMessagePart } from "@/lib/chat/types";
 import { cn } from "@/lib/cn";
 import { brandAttr, initialOf, loginNext, type ExperienceProps } from "./types";
 
-/** How long an ending stays on screen before its sheet slides away. */
-const DONE_LINGER_MS = 800;
-
 /**
  * The app as a phone: one chat screen with two round buttons, Cards and
- * Account, that open bottom sheets. An approval opens as a sheet over the
- * chat; a checkout runs in the thread itself, its steps and its questions
- * inline. Everything stays inside the phone.
+ * Account, that open bottom sheets. An approval waits in the thread as a
+ * small card whose Review opens the approval as a sheet over the chat; a
+ * checkout runs in the thread itself, its steps and its questions inline. Everything stays inside the phone.
  */
 export function MobileApp(props: ExperienceProps) {
   // The sheets portal into the screen so they stay inside the frame.
@@ -113,6 +109,9 @@ export function MobileApp(props: ExperienceProps) {
 // Signed in
 // ---------------------------------------------------------------------------
 
+/** A store's password request, open in the sheet. */
+type PasswordAsk = { toolCallId: string; checkoutId: string; requestId: string; domain: string };
+
 type Approval = {
   toolCallId: string;
   requestId: string;
@@ -131,6 +130,9 @@ function Home({
   const [cardsOpen, setCardsOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
   const [approval, setApproval] = useState<Approval | null>(null);
+  const [password, setPassword] = useState<PasswordAsk | null>(null);
+  // The add_card call whose form is open in the sheet.
+  const [addCard, setAddCard] = useState<string | null>(null);
   // The product whose details are open, over the chat.
   const [product, setProduct] = useState<FoundProduct | null>(null);
 
@@ -138,9 +140,25 @@ function Home({
     (o: ApproveOutcome) => {
       if (!approval) return;
       chat.onApprovalOutcome(approval.toolCallId, toApprovalOutcome(o));
-      setTimeout(() => setApproval(null), DONE_LINGER_MS);
+      setTimeout(() => setApproval(null), APPROVAL_DONE_LINGER_MS);
     },
     [approval, chat],
+  );
+  const onCardSavedHere = useCallback(
+    (result: SaveCardResult) => {
+      if (!addCard) return;
+      chat.onCardSaved(addCard, savedCardOutcome(result));
+      setTimeout(() => setAddCard(null), APPROVAL_DONE_LINGER_MS);
+    },
+    [addCard, chat],
+  );
+  const onPasswordDone = useCallback(
+    (status: PasswordRequestOutcome) => {
+      if (!password) return;
+      chat.onPasswordOutcome(password.toolCallId, { status });
+      setTimeout(() => setPassword(null), APPROVAL_DONE_LINGER_MS);
+    },
+    [password, chat],
   );
 
   return (
@@ -161,6 +179,8 @@ function Home({
         loading={thread.loading}
         chatEnabled={chatEnabled}
         onReview={setApproval}
+        onEnterPassword={setPassword}
+        onAddCard={setAddCard}
         onOpenProduct={setProduct}
       />
       <Composer chat={chat} disabled={!chatEnabled} />
@@ -214,6 +234,34 @@ function Home({
           />
         ) : null}
       </PhoneSheet>
+
+      <PhoneSheet
+        open={password !== null}
+        onOpenChange={(open) => !open && setPassword(null)}
+        container={screen}
+        title={password ? `Sign in to ${password.domain}` : "Sign in"}
+        hideTitle
+      >
+        {password ? (
+          <AnswerPasswordRequest
+            key={password.requestId}
+            checkoutId={password.checkoutId}
+            requestId={password.requestId}
+            merchantDomain={password.domain}
+            platformName={AGENT_COMPANY}
+            onDone={onPasswordDone}
+          />
+        ) : null}
+      </PhoneSheet>
+
+      <PhoneSheet
+        open={addCard !== null}
+        onOpenChange={(open) => !open && setAddCard(null)}
+        container={screen}
+        title="Add a card"
+      >
+        {addCard ? <SaveCard key={addCard} showResult={false} onSaved={onCardSavedHere} /> : null}
+      </PhoneSheet>
     </>
   );
 }
@@ -248,12 +296,16 @@ function Thread({
   loading,
   chatEnabled,
   onReview,
+  onEnterPassword,
+  onAddCard,
   onOpenProduct,
 }: {
   chat: AgentChat;
   loading: boolean;
   chatEnabled: boolean;
   onReview: (approval: Approval) => void;
+  onEnterPassword: (ask: PasswordAsk) => void;
+  onAddCard: (toolCallId: string) => void;
   onOpenProduct: (product: FoundProduct) => void;
 }) {
   const { containerRef } = useScrollToBottom(chat.messages.length);
@@ -305,6 +357,8 @@ function Thread({
               message={m}
               streaming={chat.status === "streaming" && i === chat.messages.length - 1}
               onReview={onReview}
+              onEnterPassword={onEnterPassword}
+              onAddCard={onAddCard}
               onCheckoutOutcome={chat.onCheckoutOutcome}
               watches={watches}
               onSend={chat.send}
@@ -327,6 +381,8 @@ function CompactMessage({
   message,
   streaming,
   onReview,
+  onEnterPassword,
+  onAddCard,
   onCheckoutOutcome,
   watches,
   onSend,
@@ -335,6 +391,8 @@ function CompactMessage({
   message: ChatMessage;
   streaming: boolean;
   onReview: (a: Approval) => void;
+  onEnterPassword: (ask: PasswordAsk) => void;
+  onAddCard: (toolCallId: string) => void;
   onCheckoutOutcome: (toolCallId: string, outcome: CheckoutOutcome) => void;
   watches: WatchIndex;
   onSend: (text: string) => void;
@@ -361,6 +419,8 @@ function CompactMessage({
         part={part}
         message={message}
         onReview={onReview}
+        onEnterPassword={onEnterPassword}
+        onAddCard={onAddCard}
         onCheckoutOutcome={onCheckoutOutcome}
         watches={watches}
         onSend={onSend}
@@ -381,6 +441,8 @@ function CompactPart({
   part,
   message,
   onReview,
+  onEnterPassword,
+  onAddCard,
   onCheckoutOutcome,
   watches,
   onSend,
@@ -389,6 +451,8 @@ function CompactPart({
   part: ChatMessagePart;
   message: ChatMessage;
   onReview: (a: Approval) => void;
+  onEnterPassword: (ask: PasswordAsk) => void;
+  onAddCard: (toolCallId: string) => void;
   onCheckoutOutcome: (toolCallId: string, outcome: CheckoutOutcome) => void;
   watches: WatchIndex;
   onSend: (text: string) => void;
@@ -405,38 +469,62 @@ function CompactPart({
 
     case "tool-await_agent_card_approval": {
       const requestId = part.input?.requestId ?? "";
-      const request = findRequest(message, requestId);
       // A checkout waiting on this is the user choosing how to pay for
       // something already underway, not an agent asking for a budget.
       const paying =
         watches.paymentRequests.has(requestId) || Boolean(findPaymentStep(message, requestId));
-      if (part.state === "input-available") {
+      if (part.state === "input-available" || part.state === "output-available") {
         return (
-          <ApprovalCard
-            title={
-              paying
-                ? "Choose how to pay for this"
-                : request
-                  ? `Your agent wants to spend up to ${formatAmount(request.amount.value, request.amount.currency)} for ${request.description}`
-                  : "Your agent is asking for a budget"
+          <ApprovalInThread
+            requestId={part.input.requestId}
+            output={part.state === "output-available" ? part.output : undefined}
+            paying={paying}
+            onReview={() =>
+              onReview({ toolCallId: part.toolCallId, requestId: part.input.requestId, paying })
             }
-            action={
-              <Button
-                type="button"
-                size="xl"
-                className="w-full"
-                onClick={() =>
-                  onReview({ toolCallId: part.toolCallId, requestId: part.input.requestId, paying })
-                }
-              >
-                Review
-              </Button>
-            }
+            bubbleClassName="max-w-[85%] px-3.5 py-2 text-[15px] leading-snug"
+            className="max-w-none"
           />
         );
       }
-      if (part.state === "output-available") {
-        return <AgentCardSummary requestId={part.input.requestId} outcome={part.output} />;
+      return (
+        <ActivityLine busy={toolBusy(part.state)} failed={part.state === "output-error"}>
+          {toolTitle(part.type)}
+        </ActivityLine>
+      );
+    }
+
+    // Adding a card: Crossmint's card form in a sheet.
+    case "tool-await_saved_card":
+      if (part.state === "input-available" || part.state === "output-available") {
+        return (
+          <AddCardInThread
+            output={part.state === "output-available" ? part.output : undefined}
+            onAdd={() => onAddCard(part.toolCallId)}
+            bubbleClassName="max-w-[85%] px-3.5 py-2 text-[15px] leading-snug"
+            className="max-w-none"
+          />
+        );
+      }
+      return (
+        <ActivityLine busy={toolBusy(part.state)} failed={part.state === "output-error"}>
+          {toolTitle(part.type)}
+        </ActivityLine>
+      );
+
+    // The store asks for a password: Crossmint's field in a sheet, never words.
+    case "tool-await_protected_input": {
+      const request = passwordRequestOf(part, watches);
+      if (request && (part.state === "input-available" || part.state === "output-available")) {
+        return (
+          <PasswordInThread
+            domain={request.domain}
+            output={part.state === "output-available" ? part.output : undefined}
+            onEnter={() => onEnterPassword({ toolCallId: part.toolCallId, ...request })}
+            bubbleClassName="max-w-[85%] px-3.5 py-2 text-[15px] leading-snug"
+            className="max-w-none"
+          />
+        );
       }
       return (
         <ActivityLine busy={toolBusy(part.state)} failed={part.state === "output-error"}>
@@ -511,6 +599,24 @@ function CompactPart({
           );
         }
       }
+      {
+        // A checkout that went through: the receipt, under the agent's line on it.
+        const message = receiptMessageOf(part);
+        const receipt = receiptOf(part);
+        if (message || receipt) {
+          return (
+            <>
+              {message ? (
+                <AgentBubble
+                  text={message}
+                  className="max-w-[85%] px-3.5 py-2 text-[15px] leading-snug"
+                />
+              ) : null}
+              {receipt ? <Receipt receipt={receipt} className="max-w-[85%]" /> : null}
+            </>
+          );
+        }
+      }
       if (part.type.startsWith("tool-")) {
         const tool = part as { type: string; state: string; output?: unknown };
         const failed =
@@ -526,44 +632,6 @@ function CompactPart({
       return null;
     }
   }
-}
-
-/** "Looking at your saved cards", with a spinner while it runs and a check when it is done. */
-function ActivityLine({
-  busy,
-  failed,
-  children,
-}: {
-  busy?: boolean;
-  failed?: boolean;
-  children: ReactNode;
-}) {
-  return (
-    <div
-      className={cn(
-        "flex items-center gap-2 text-xs text-muted-foreground",
-        failed && "text-destructive",
-      )}
-    >
-      {busy ? (
-        <Spinner className="size-3" />
-      ) : failed ? (
-        <CircleAlert className="size-3.5" />
-      ) : (
-        <CircleCheck className="size-3.5 text-success" />
-      )}
-      <span className="truncate">{children}</span>
-    </div>
-  );
-}
-
-function ApprovalCard({ title, action }: { title: string; action?: ReactNode }) {
-  return (
-    <div className="flex flex-col gap-3 rounded-2xl bg-card p-4 ring-1 ring-foreground/10">
-      <p className="text-sm leading-snug font-medium text-balance">{title}</p>
-      {action}
-    </div>
-  );
 }
 
 function Notice({
@@ -600,10 +668,24 @@ function Notice({
 // The composer
 // ---------------------------------------------------------------------------
 
+/** The most lines the message box grows to before it scrolls. */
+const COMPOSER_MAX_LINES = 3;
+
 function Composer({ chat, disabled }: { chat: AgentChat; disabled: boolean }) {
   const [text, setText] = useState("");
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
   const canSend = !chat.busy && !disabled && text.trim().length > 0;
+
+  // The box grows with its text, a line at a time, up to three lines; past that it scrolls.
+  useLayoutEffect(() => {
+    const box = inputRef.current;
+    if (!box) return;
+    const style = getComputedStyle(box);
+    const line = parseFloat(style.lineHeight) || 24;
+    const padding = parseFloat(style.paddingTop) + parseFloat(style.paddingBottom);
+    box.style.height = "auto";
+    box.style.height = `${Math.min(box.scrollHeight, line * COMPOSER_MAX_LINES + padding)}px`;
+  }, [text]);
 
   function submit() {
     if (!canSend) return;
@@ -612,7 +694,7 @@ function Composer({ chat, disabled }: { chat: AgentChat; disabled: boolean }) {
     inputRef.current?.focus();
   }
 
-  function onKeyDown(e: KeyboardEvent<HTMLInputElement>) {
+  function onKeyDown(e: KeyboardEvent<HTMLTextAreaElement>) {
     if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
       e.preventDefault();
       submit();
@@ -627,16 +709,18 @@ function Composer({ chat, disabled }: { chat: AgentChat; disabled: boolean }) {
         submit();
       }}
     >
-      <div className="flex h-12 items-center gap-2 rounded-full bg-muted pr-1.5 pl-4">
-        <input
+      {/* 24px corners: a pill at one line, a rounded box as it grows. */}
+      <div className="flex min-h-12 items-end gap-2 rounded-3xl bg-muted py-1.5 pr-1.5 pl-4">
+        <textarea
           ref={inputRef}
+          rows={1}
           value={text}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={onKeyDown}
           disabled={disabled}
           placeholder="Ask the agent to buy something"
           aria-label="Message"
-          className="min-w-0 flex-1 bg-transparent text-base text-foreground outline-none placeholder:text-muted-foreground disabled:opacity-50"
+          className="min-w-0 flex-1 resize-none bg-transparent py-1.5 text-base leading-6 text-foreground outline-none scrollbar-none placeholder:text-muted-foreground disabled:opacity-50"
         />
         {chat.busy ? (
           <button

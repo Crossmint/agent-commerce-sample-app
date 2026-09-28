@@ -47,6 +47,21 @@ export function useThreadScroll<T extends HTMLElement>(opts: ThreadScroll) {
     // The first message must not slide: there is nothing to scroll from yet.
     box.scrollTo({ top: box.scrollHeight, behavior: box.scrollTop === 0 ? "auto" : "smooth" });
   }, [bottomDep]);
+  // Entries keep growing after they land: a checkout card adds a row per
+  // step, an approval opens its card row when it settles. Follow the bottom
+  // while they do, or their newest lines end up under the composer. The
+  // growth is animated already, so the thread keeps pace with it at once.
+  const bottomMode = bottomDep !== null;
+  useEffect(() => {
+    const box = ref.current;
+    const list = box?.firstElementChild;
+    if (!box || !list || !bottomMode) return;
+    const follow = new ResizeObserver(() => {
+      box.scrollTop = box.scrollHeight;
+    });
+    follow.observe(list);
+    return () => follow.disconnect();
+  }, [bottomMode]);
   useEffect(() => {
     const box = ref.current;
     if (!box || bottomDep !== null) return;

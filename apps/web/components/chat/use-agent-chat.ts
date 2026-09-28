@@ -8,7 +8,12 @@ import {
   lastAssistantMessageIsCompleteWithToolCalls,
   type ChatStatus,
 } from "ai";
-import type { ApprovalOutcome, CheckoutOutcome } from "@/lib/chat/tools";
+import type {
+  ApprovalOutcome,
+  CheckoutOutcome,
+  ProtectedInputOutcome,
+  SavedCardOutcome,
+} from "@/lib/chat/tools";
 import type { Attachment, ChatMessage } from "@/lib/chat/types";
 import { useChatSounds } from "./use-chat-sounds";
 
@@ -28,6 +33,10 @@ export interface AgentChat {
   stop: () => void;
   /** Hand the approval screen's answer back to the `await_agent_card_approval` tool call. */
   onApprovalOutcome: (toolCallId: string, outcome: ApprovalOutcome) => void;
+  /** Hand the card form's result (saved or cancelled) back to the `await_saved_card` tool call. */
+  onCardSaved: (toolCallId: string, outcome: SavedCardOutcome) => void;
+  /** Hand the password field's answer (submitted or declined) back to the `await_protected_input` tool call. */
+  onPasswordOutcome: (toolCallId: string, outcome: ProtectedInputOutcome) => void;
   /** Hand a watched checkout's question or ending back to the `watch_checkout` tool call. Once per call. */
   onCheckoutOutcome: (toolCallId: string, outcome: CheckoutOutcome) => void;
   error: string | null;
@@ -62,6 +71,7 @@ export function useAgentChat({ id, initialMessages, persist }: UseAgentChatOptio
     status,
     stop,
     addToolOutput,
+    setMessages,
   } = useChat<ChatMessage>({
     id,
     messages: initialMessages,
@@ -72,6 +82,22 @@ export function useAgentChat({ id, initialMessages, persist }: UseAgentChatOptio
       if (persist) router.refresh();
     },
   });
+
+  /*
+   * One hook for every conversation, so the frame around it stays mounted
+   * when the user opens another chat. `useChat` starts a new chat when the id
+   * changes; what belongs to the old one is dropped here. A saved chat's
+   * history arrives after it opens, and lands as its messages while nothing
+   * has been said in it yet.
+   */
+  const [chatId, setChatId] = useState(id);
+  if (chatId !== id) {
+    setChatId(id);
+    setError(null);
+  }
+  useEffect(() => {
+    if (initialMessages.length) setMessages((now) => (now.length ? now : initialMessages));
+  }, [initialMessages, setMessages]);
 
   // One message per id, whatever the stream did: two copies would share a
   // React key and draw the turn twice.
@@ -86,29 +112,39 @@ export function useAgentChat({ id, initialMessages, persist }: UseAgentChatOptio
    * middle of that turn, and the two responses would both continue the same
    * message. Queued here, they go out one by one once the chat is idle.
    */
-  type Output =
-    | { tool: "await_agent_card_approval"; toolCallId: string; output: ApprovalOutcome }
-    | { tool: "watch_checkout"; toolCallId: string; output: CheckoutOutcome };
+  type Output = { chatId: string; toolCallId: string } & (
+    | { tool: "await_agent_card_approval"; output: ApprovalOutcome }
+    | { tool: "await_protected_input"; output: ProtectedInputOutcome }
+    | { tool: "await_saved_card"; output: SavedCardOutcome }
+    | { tool: "watch_checkout"; output: CheckoutOutcome }
+  );
   const queue = useRef<Output[]>([]);
   const [queued, setQueued] = useState(0);
   const idle = status === "ready" || status === "error";
   useEffect(() => {
+    // Outputs for a chat that is no longer open go with it.
+    queue.current = queue.current.filter((o) => o.chatId === id);
     if (!idle || !queue.current.length) return;
-    const next = queue.current.shift()!;
+    const { chatId, ...next } = queue.current.shift()!;
+    void chatId; // for the queue only
     setQueued(queue.current.length);
     void addToolOutput(next);
-  }, [idle, queued, addToolOutput]);
-  const hand = useCallback((out: Output) => {
-    queue.current.push(out);
-    setQueued(queue.current.length);
-  }, []);
+  }, [id, idle, queued, addToolOutput]);
+  const hand = useCallback(
+    (out: Omit<Output, "chatId">) => {
+      queue.current.push({ ...out, chatId: id } as Output);
+      setQueued(queue.current.length);
+    },
+    [id],
+  );
 
-  const urlSet = useRef(initialMessages.length > 0);
+  // The chat whose id is in the URL. A saved chat is there already: opening it put it there.
+  const inUrl = useRef(initialMessages.length > 0 ? id : null);
   const send = useCallback(
     (text: string, attachments: Attachment[] = []) => {
       setError(null);
-      if (persist && !urlSet.current) {
-        urlSet.current = true;
+      if (persist && inUrl.current !== id) {
+        inUrl.current = id;
         // Keep the frame in the URL; only the chat changes.
         const url = new URL(window.location.href);
         url.searchParams.set("chat", id);
@@ -137,6 +173,20 @@ export function useAgentChat({ id, initialMessages, persist }: UseAgentChatOptio
     [hand],
   );
 
+  const onCardSaved = useCallback(
+    (toolCallId: string, output: SavedCardOutcome) => {
+      hand({ tool: "await_saved_card", toolCallId, output });
+    },
+    [hand],
+  );
+
+  const onPasswordOutcome = useCallback(
+    (toolCallId: string, output: ProtectedInputOutcome) => {
+      hand({ tool: "await_protected_input", toolCallId, output });
+    },
+    [hand],
+  );
+
   // A run can end in front of more than one watcher (a card and a sheet), and
   // a watcher can remount. The model hears about each ending once.
   const reported = useRef(new Set<string>());
@@ -156,6 +206,8 @@ export function useAgentChat({ id, initialMessages, persist }: UseAgentChatOptio
     send,
     stop: () => void stop(),
     onApprovalOutcome,
+    onPasswordOutcome,
+    onCardSaved,
     onCheckoutOutcome,
     error,
     dismissError: () => setError(null),

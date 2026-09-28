@@ -98,7 +98,13 @@ export function AgentAppRun({ script, run = 0 }: { script: AppRunScript; run?: n
       <AgentAppScreen entries={entries} />
       {script.sheet ? (
         <AppSheet open={open} title="Approve">
+          {/*
+            Keyed by the run: its steps are CSS delays that play once, from
+            mount. Without a fresh mount each run, the second run's sheet
+            would open on "Approved." with the request long gone.
+          */}
           <ApprovalSheetBody
+            key={run}
             ready={script.sheet.ready}
             press={script.sheet.press}
             approved={script.sheet.approved}

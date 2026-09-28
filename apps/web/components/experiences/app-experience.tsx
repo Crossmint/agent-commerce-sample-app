@@ -14,7 +14,6 @@ import { SiteHeader } from "@/components/frame/site-header";
 import { type MessagingApp, type View } from "@/components/frame/views";
 import type { ChatMessage, ChatSummary } from "@/lib/chat/types";
 import { cn } from "@/lib/cn";
-import { CliPanel } from "./cli-panel";
 import { DesktopApp } from "./desktop-app";
 import { McpPanel } from "./mcp-panel";
 import { MessagingApp as MessagingAppView } from "./messaging-app";
@@ -297,10 +296,9 @@ export function AppExperience({
         </span>
       </div>
 
-      {/* Keyed so a change of conversation starts a fresh `useChat`. While the
-          messages load, the key differs too, so they land as initial messages. */}
+      {/* Not keyed by the conversation: the frame stays mounted when another
+          chat opens, and the chat hook starts the new one itself. */}
       <ChatHost
-        key={thread.loading ? `${thread.id}:loading` : thread.id}
         id={thread.id}
         initialMessages={thread.messages}
         persist={persist}
@@ -331,8 +329,8 @@ function ChatHost({
   const chat = useAgentChat({ id, initialMessages, persist });
   const props: ExperienceProps = { ...shared, chat };
   const phone = shared.view === "mobile" || shared.view === "messaging";
-  // These two fill a phone screen edge to edge, so they take no page gutter.
-  const fullBleed = shared.view === "mcp" || shared.view === "cli";
+  // The MCP panel fills a phone screen edge to edge, so it takes no page gutter.
+  const fullBleed = shared.view === "mcp";
 
   return (
     <div
@@ -349,9 +347,9 @@ function ChatHost({
       ) : shared.view === "messaging" ? (
         <MessagingAppView {...props} />
       ) : (
-        // The panels are cards, not devices: the brand goes on the card itself, so the wrapper paints nothing of its own.
+        // The panel is a card, not a device: the brand goes on the card itself, so the wrapper paints nothing of its own.
         <div data-brand={brandAttr(shared.brand)} className="contents">
-          {shared.view === "mcp" ? <McpPanel {...props} /> : <CliPanel {...props} />}
+          <McpPanel {...props} />
         </div>
       )}
     </div>

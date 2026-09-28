@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, type ComponentProps, type FormEvent } from "react";
-import { MapPin, Pencil } from "lucide-react";
+import { Pencil, UserRound } from "lucide-react";
 import type { BuyerProfile, BuyerProfileInput } from "@agent-commerce/core";
 import {
   Button,
@@ -70,7 +70,7 @@ function Summary({
       )}
     >
       <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
-        <MapPin className="size-4" />
+        <UserRound className="size-4" />
       </span>
       <div className="flex min-w-0 flex-1 flex-col gap-0.5 text-sm">
         <p className="font-medium text-foreground">

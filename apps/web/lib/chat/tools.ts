@@ -1,9 +1,18 @@
 import { tool } from "ai";
-import { describeTool, PARAM_DOCS, paramDoc, type ToolNameFor } from "@agent-commerce/core";
+import {
+  describeTool,
+  PARAM_DOCS,
+  paramDoc,
+  type BuyerProfile,
+  type BuyerProfileInput,
+  type PaymentMethod,
+  type ToolNameFor,
+} from "@agent-commerce/core";
 import { z } from "zod";
 import { CHAT_REQUESTER } from "./config";
 import { AgentCommerceToolError, type AgentCommerceClient } from "./api-client";
 import { lookUpProducts, searchProducts } from "./shopify-catalog";
+import { RECEIPT_KINDS, type ReceiptKind } from "@/lib/receipt";
 
 /**
  * The max cost of a checkout when the user gave no limit. The run's payment
@@ -68,6 +77,19 @@ export const approvalOutcomeSchema = z.object({
 });
 export type ApprovalOutcome = z.infer<typeof approvalOutcomeSchema>;
 
+/** What `await_saved_card` hands back: whether a card was saved, and which, by network and last four digits only. */
+export const savedCardOutcomeSchema = z.object({
+  status: z.enum(["saved", "cancelled"]),
+  card: z.object({ paymentMethodId: z.string(), brand: z.string(), last4: z.string() }).optional(),
+});
+export type SavedCardOutcome = z.infer<typeof savedCardOutcomeSchema>;
+
+/** What `await_protected_input` hands back: whether the user gave the password. Never the password, never its id. */
+export const protectedInputOutcomeSchema = z.object({
+  status: z.enum(["submitted", "declined"]),
+});
+export type ProtectedInputOutcome = z.infer<typeof protectedInputOutcomeSchema>;
+
 /** One thing the store's agent wrote while a checkout ran, shown to the user as a chat message. */
 export const checkoutUpdateSchema = z.object({ id: z.string(), text: z.string() });
 export type CheckoutUpdate = z.infer<typeof checkoutUpdateSchema>;
@@ -86,6 +108,7 @@ export const checkoutOutcomeSchema = z.object({
     "cancelled",
     "awaiting_input",
     "awaiting_payment",
+    "awaiting_password",
   ]),
   updates: z.array(checkoutUpdateSchema),
   /** When the chat started and stopped following this stretch, ISO 8601: its card shows how long it took. */
@@ -98,6 +121,8 @@ export const checkoutOutcomeSchema = z.object({
       question: z.string(),
       expiresAt: z.string().optional(),
       responseSchema: z.record(z.string(), z.unknown()),
+      /** Set when the question asks for a password in a plain form, which is never answered with values. */
+      note: z.string().optional(),
     })
     .optional(),
   /**
@@ -114,6 +139,18 @@ export const checkoutOutcomeSchema = z.object({
       merchant: z.object({ name: z.string(), url: z.string() }).optional(),
     })
     .optional(),
+  /**
+   * On `awaiting_password`: the store asks for the password of the user's
+   * account there. `requestId` is what await_protected_input takes. The
+   * password itself never reaches the chat.
+   */
+  password: z
+    .object({
+      requestId: z.string(),
+      question: z.string(),
+      domain: z.string().optional(),
+    })
+    .optional(),
   total: z.object({ amount: z.string(), currency: z.string() }).optional(),
   merchantOrderId: z.string().optional(),
   summary: z.string().optional(),
@@ -122,6 +159,100 @@ export const checkoutOutcomeSchema = z.object({
 export type CheckoutOutcome = z.infer<typeof checkoutOutcomeSchema>;
 
 /** Turn a Agent Commerce API error into a plain tool result the model can read and explain. */
+type BuyerProfileChange = {
+  firstName?: string;
+  lastName?: string;
+  email?: string;
+  phone?: string;
+  addressLines?: string[];
+  city?: string;
+  region?: string;
+  postalCode?: string;
+  countryCode?: string;
+  label?: string;
+};
+
+/**
+ * The saved buyer details with a change laid over them: what the user said
+ * now wins, and everything they did not mention is kept. Another country
+ * drops the old state or province unless one came with it, so a move abroad
+ * does not keep a region from the old country. Returns what is still missing
+ * when there is no whole profile yet.
+ */
+export function mergeBuyerProfile(
+  saved: BuyerProfile | null | undefined,
+  change: BuyerProfileChange,
+  userEmail?: string,
+): { profile: BuyerProfileInput } | { missing: string[] } {
+  const moved =
+    Boolean(change.countryCode) &&
+    change.countryCode!.toUpperCase() !== saved?.shipping.countryCode.toUpperCase();
+  const first = change.firstName ?? saved?.name.first;
+  const last = change.lastName ?? saved?.name.last;
+  const email = change.email ?? saved?.contact.email ?? userEmail;
+  const phone = change.phone ?? saved?.contact.phone;
+  const addressLines = change.addressLines ?? saved?.shipping.addressLines;
+  const city = change.city ?? saved?.shipping.locality;
+  const region = change.region ?? (moved ? undefined : saved?.shipping.administrativeAreaCode);
+  const postalCode = change.postalCode ?? saved?.shipping.postalCode;
+  const countryCode = change.countryCode ?? saved?.shipping.countryCode;
+
+  const missing = Object.entries({
+    "first name": first,
+    "last name": last,
+    email,
+    "phone number": phone,
+    street: addressLines?.length ? addressLines : undefined,
+    city,
+    "postal code": postalCode,
+    country: countryCode,
+  })
+    .filter(([, v]) => !v)
+    .map(([k]) => k);
+  if (missing.length) return { missing };
+
+  return {
+    profile: {
+      label: change.label ?? saved?.label ?? "Home",
+      name: { first: first!, last: last! },
+      contact: { email: email!, phone: phone! },
+      shipping: {
+        addressLines: addressLines!,
+        locality: city!,
+        ...(region ? { administrativeAreaCode: region.toUpperCase() } : {}),
+        postalCode: postalCode!,
+        countryCode: countryCode!.toUpperCase(),
+      },
+    },
+  };
+}
+
+/** A receipt the chat draws: what the model said, and what the checkout verified. */
+export interface ShownReceipt {
+  kind: ReceiptKind;
+  merchant: string;
+  title?: string;
+  details?: Array<{ label: string; value: string }>;
+  items?: Array<{ label: string; amount?: string }>;
+  /** The run's site: "opentable.com". */
+  host?: string;
+  reference?: string;
+  total?: { amount: string; currency: string };
+  /** The currency of the item amounts. */
+  currency: string;
+  paymentMethod?: PaymentMethod;
+}
+
+/** "www.opentable.com/r/nopa" → "opentable.com". */
+function hostOf(url: string | undefined): string | undefined {
+  if (!url) return undefined;
+  try {
+    return new URL(url).hostname.replace(/^www\./, "");
+  } catch {
+    return undefined;
+  }
+}
+
 async function guard<T>(fn: () => Promise<T>): Promise<T | { error: string; code: string }> {
   try {
     return await fn();
@@ -238,6 +369,26 @@ export function createChatTools(api: AgentCommerceClient, opts: { userEmail?: st
       outputSchema: approvalOutcomeSchema,
     }),
 
+    // Client-side tool: no `execute`. The chat shows Crossmint's card form;
+    // the model hears only which card was saved, never its number.
+    await_saved_card: tool({
+      description: describeTool("await_saved_card"),
+      inputSchema: z.object({}),
+      outputSchema: savedCardOutcomeSchema,
+    }),
+
+    // Client-side tool: no `execute`. The chat shows Crossmint's password
+    // field; the app answers the run with what it returns, and the model
+    // only hears whether the user did.
+    await_protected_input: tool({
+      description: describeTool("await_protected_input"),
+      inputSchema: z.object({
+        checkoutId: z.string().min(1).describe(paramDoc("await_protected_input", "checkoutId")),
+        requestId: z.string().min(1).describe(paramDoc("await_protected_input", "requestId")),
+      }),
+      outputSchema: protectedInputOutcomeSchema,
+    }),
+
     reveal_agent_card: tool({
       description: describeTool(
         "reveal_agent_card",
@@ -334,9 +485,16 @@ export function createChatTools(api: AgentCommerceClient, opts: { userEmail?: st
         void action; // for the site card only
         // The store's agent asks for an email on most checkouts. Give it the
         // user's up front, so nobody is asked for what the app already knows.
+        // It is a contact address: an account named in the task is the one to
+        // sign in with, and must not be swapped for it.
         const task =
           opts.userEmail && !input.task?.includes(opts.userEmail)
-            ? [input.task, `The buyer's email is ${opts.userEmail}.`].filter(Boolean).join(" ")
+            ? [
+                input.task,
+                `The buyer's contact email is ${opts.userEmail}. It is not a store login: to sign in, use the account the task names, if any.`,
+              ]
+                .filter(Boolean)
+                .join(" ")
             : input.task;
         return guard(() =>
           api.createCheckout({
@@ -428,21 +586,114 @@ export function createChatTools(api: AgentCommerceClient, opts: { userEmail?: st
         }),
     }),
 
+    // Chat only: the receipt for a checkout that went through. The model says
+    // what it was; the total, the reference and the card come from the run.
+    show_receipt: tool({
+      description: describeTool(
+        "show_receipt",
+        "The chat draws it as a receipt card under your message; do not repeat it in text.",
+      ),
+      inputSchema: z.object({
+        checkoutId: z.string().min(1).describe(paramDoc("show_receipt", "checkoutId")),
+        kind: z.enum(RECEIPT_KINDS).describe(paramDoc("show_receipt", "kind")),
+        merchant: z.string().min(1).max(60).describe(paramDoc("show_receipt", "merchant")),
+        title: z.string().max(60).optional().describe(paramDoc("show_receipt", "title")),
+        details: z
+          .array(z.object({ label: z.string().min(1).max(20), value: z.string().min(1).max(60) }))
+          .max(6)
+          .optional()
+          .describe(paramDoc("show_receipt", "details")),
+        items: z
+          .array(
+            z.object({
+              label: z.string().min(1).max(60),
+              amount: z
+                .string()
+                .regex(/^\d+(\.\d{1,2})?$/)
+                .optional()
+                .describe(paramDoc("show_receipt", "itemAmount")),
+            }),
+          )
+          .max(10)
+          .optional()
+          .describe(paramDoc("show_receipt", "items")),
+        currency: z.string().length(3).optional().describe(paramDoc("show_receipt", "currency")),
+        reference: z.string().max(40).optional().describe(paramDoc("show_receipt", "reference")),
+        // Chat only: the line above the receipt, so it always shows first.
+        message: z
+          .string()
+          .min(1)
+          .max(300)
+          .optional()
+          .describe(
+            "What to say to the user, shown right above the receipt: one or two sentences on how it went. When you pass it, write no other text.",
+          ),
+      }),
+      execute: ({ checkoutId, message, currency, reference, ...shown }) =>
+        guard(async (): Promise<ShownReceipt | { error: string; code: string }> => {
+          void message; // for the chat only
+          const view = await api.getCheckout(checkoutId);
+          if (view.status !== "succeeded") {
+            return {
+              error: `The checkout has not succeeded (it is ${view.status}). Say how it went in words instead.`,
+              code: "checkout_not_succeeded",
+            };
+          }
+          // The card that paid, for its artwork and label, and what it was
+          // made for: the exact total the payment step asked for.
+          const card = view.agentCardId
+            ? await api.getAgentCard(view.agentCardId).catch(() => undefined)
+            : undefined;
+          const method = card
+            ? (await api.listPaymentMethods().catch(() => [])).find(
+                (m) => m.paymentMethodId === card.paymentMethodId,
+              )
+            : undefined;
+          const total =
+            view.receipt?.total ??
+            (card ? { amount: card.amount.total, currency: card.amount.currency } : undefined);
+          const host = hostOf(view.startUrl);
+          const ref = view.receipt?.merchantOrderId ?? reference;
+          return {
+            ...shown,
+            ...(host ? { host } : {}),
+            ...(ref ? { reference: ref } : {}),
+            ...(total ? { total } : {}),
+            currency: (total?.currency ?? currency ?? "USD").toUpperCase(),
+            ...(method ? { paymentMethod: method } : {}),
+          };
+        }),
+    }),
+
     save_buyer_profile: tool({
       description: describeTool("save_buyer_profile"),
+      // Every field optional: a save adds to what is saved, it does not start over.
       inputSchema: z.object({
-        firstName: z.string().min(1).describe(paramDoc("save_buyer_profile", "firstName")),
-        lastName: z.string().min(1).describe(paramDoc("save_buyer_profile", "lastName")),
+        firstName: z
+          .string()
+          .min(1)
+          .optional()
+          .describe(paramDoc("save_buyer_profile", "firstName")),
+        lastName: z.string().min(1).optional().describe(paramDoc("save_buyer_profile", "lastName")),
         email: z.string().email().optional().describe(paramDoc("save_buyer_profile", "email")),
-        phone: z.string().min(3).describe(paramDoc("save_buyer_profile", "phone")),
+        phone: z.string().min(3).optional().describe(paramDoc("save_buyer_profile", "phone")),
         addressLines: z
           .array(z.string().min(1))
           .min(1)
+          .optional()
           .describe(paramDoc("save_buyer_profile", "addressLines")),
-        city: z.string().min(1).describe(paramDoc("save_buyer_profile", "city")),
+        city: z.string().min(1).optional().describe(paramDoc("save_buyer_profile", "city")),
         region: z.string().min(2).optional().describe(paramDoc("save_buyer_profile", "region")),
-        postalCode: z.string().min(1).describe(paramDoc("save_buyer_profile", "postalCode")),
-        countryCode: z.string().length(2).describe(paramDoc("save_buyer_profile", "countryCode")),
+        postalCode: z
+          .string()
+          .min(1)
+          .optional()
+          .describe(paramDoc("save_buyer_profile", "postalCode")),
+        countryCode: z
+          .string()
+          .length(2)
+          .optional()
+          .describe(paramDoc("save_buyer_profile", "countryCode")),
         label: z
           .string()
           .min(1)
@@ -452,25 +703,21 @@ export function createChatTools(api: AgentCommerceClient, opts: { userEmail?: st
       }),
       execute: (input) =>
         guard(async () => {
-          const email = input.email ?? opts.userEmail;
-          if (!email) {
-            return { error: "No email to save. Ask the user for one.", code: "invalid_request" };
+          const saved = await api.getBuyerProfile();
+          const merged = mergeBuyerProfile(saved, input, opts.userEmail);
+          if ("missing" in merged) {
+            return {
+              error: `Nothing saved yet: still missing ${merged.missing.join(", ")}. Ask the user for ${merged.missing.length > 1 ? "them" : "it"}, then save again with only what they give you.`,
+              code: "invalid_request",
+            };
           }
-          const saved = await api.createBuyerProfile({
-            label: input.label ?? "Home",
-            name: { first: input.firstName, last: input.lastName },
-            contact: { email, phone: input.phone },
-            shipping: {
-              addressLines: input.addressLines,
-              locality: input.city,
-              ...(input.region ? { administrativeAreaCode: input.region.toUpperCase() } : {}),
-              postalCode: input.postalCode,
-              countryCode: input.countryCode.toUpperCase(),
-            },
-          });
+          const created = await api.createBuyerProfile(merged.profile);
           return {
-            buyerProfileId: saved.id,
+            buyerProfileId: created.id,
             saved: true,
+            kept: saved
+              ? "Every field you did not pass was kept from the saved details."
+              : undefined,
             note: "Later checkouts start with these details. The one running now already has its answers from you.",
           };
         }),

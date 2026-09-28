@@ -5,6 +5,7 @@ import {
   formatAmount,
   PARAM_DOCS,
   paramDoc,
+  asksPasswordInForm,
   renderPendingAction,
   TOOL_DOCS,
   toDecimalString,
@@ -296,7 +297,7 @@ export function registerAgentCommerceTools(
       title: title("get_checkout"),
       description: describeTool(
         "get_checkout",
-        "Here paymentRequest carries an approvalUrl: show it to the user, then keep polling until they have chosen.",
+        "Here paymentRequest carries an approvalUrl: show it to the user, then keep polling until they have chosen. passwordRequest carries a url the same way: the store asks for the user's password there, which they type on that page; never ask for it yourself.",
       ),
       inputSchema: { checkoutId: z.string().describe(paramDoc("get_checkout", "checkoutId")) },
       annotations: { readOnlyHint: true, openWorldHint: true },
@@ -470,6 +471,11 @@ function describeCredential(
 
 function renderedAction(checkout: CheckoutView): RenderedAction | undefined {
   if (checkout.rendered) return checkout.rendered;
+  // A password has no form: the user types it on the page passwordRequest links to.
+  if (checkout.passwordRequest || checkout.pendingUserAction?.protected) return undefined;
+  // Nor does a password asked for in a plain form: it is declined, never filled in.
+  if (checkout.pendingUserAction && asksPasswordInForm(checkout.pendingUserAction))
+    return undefined;
   if (checkout.pendingUserAction) {
     try {
       return renderPendingAction(checkout.pendingUserAction);
@@ -513,6 +519,22 @@ function describeCheckout(checkout: CheckoutView): string {
       `Then keep polling get_checkout. Do not answer this with answer_checkout, and never send card fields. Request status: ${pr.status}.`,
     );
   }
+  const pending = checkout.pendingUserAction;
+  if (pending && asksPasswordInForm(pending)) {
+    lines.push(
+      `Password in a form (requestId "${pending.id}"): ${pending.question}`,
+      `The store asks for the user's password in a plain form. Never ask for it and never send it: it would pass through you, and the store's agent does not use a password sent that way. Tell the user this store wants them to sign in, which cannot be done safely here, and offer to check out as a guest (answer_checkout with action "alternative") or stop (action "decline").`,
+    );
+  }
+  if (checkout.passwordRequest) {
+    const pw = checkout.passwordRequest;
+    const store = pw.merchantDomain ?? "the store";
+    lines.push(
+      `Password request (requestId "${pw.requestId}"): ${store} asks for the password of the user's account there. Show the user this link, where they type it into a secure field and the app answers the checkout: ${pw.url}`,
+      `Never ask for the password and never send it, not in answer_checkout or anywhere else. Then keep polling get_checkout. If the user would rather not sign in, call answer_checkout with action "decline", or "alternative" with text such as checking out as a guest.`,
+    );
+    if (pw.expiresAt) lines.push(`The user has until ${pw.expiresAt}, or the checkout fails.`);
+  }
   if (checkout.embedUrl)
     lines.push(`The user can watch the agent's browser at: ${checkout.embedUrl}`);
   if (checkout.receipt) {
@@ -535,7 +557,8 @@ function describeCheckout(checkout: CheckoutView): string {
     );
   }
   if (checkout.spentUsd) lines.push(`Spent so far: ${checkout.spentUsd} USD.`);
-  if (!action && !checkout.failure && checkout.status !== "succeeded") {
+  const waitingOnUser = checkout.passwordRequest || (pending && asksPasswordInForm(pending));
+  if (!action && !waitingOnUser && !checkout.failure && checkout.status !== "succeeded") {
     lines.push("Still running. Poll get_checkout again in a few seconds.");
   }
   return lines.join("\n");

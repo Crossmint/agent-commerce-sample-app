@@ -1,8 +1,10 @@
 "use client";
 
-import { Lock } from "lucide-react";
-import { delay, FauxButton, RunMark, RunStep } from "./bits";
-import { ReceiptCard } from "./receipt-card";
+import { useEffect, useState, type ReactNode } from "react";
+import { ChevronDown } from "lucide-react";
+import { Badge } from "@agent-commerce/ui";
+import { CardBadge, delay, FauxButton, RunStep } from "./bits";
+import { ReceiptCard, StarbucksMark } from "./receipt-card";
 import { Approved, RequestForm } from "./screen-approve";
 import type { AppEntry } from "./screen-agent-app";
 import { STORY } from "./story";
@@ -35,9 +37,7 @@ export const lookedAtCardsEntry = (): AppEntry => ({
 export const replyEntry = (): AppEntry => ({
   kind: "agent",
   key: "reply",
-  text: (
-    <>I can do that. I need a {STORY.amount} budget on your card for this — approve it below.</>
-  ),
+  text: <>I can do that. I need a {STORY.amount} budget on your card for this.</>,
 });
 
 export const requestEntry = (opts: { settleAt?: number; reviewPress?: number }): AppEntry => ({
@@ -83,10 +83,13 @@ export const receiptEntry = (): AppEntry => ({
 /* ---------- The pieces the entries are made of ---------- */
 
 /**
- * The budget request in the thread, as the real app's `ApprovalCard` shows
- * it: the ask in one line, then Review. With `settleAt` the card settles into
- * its outcome in place — same card, new state — rather than a second one
- * landing under it. Without it the card stays on Review.
+ * The budget request in the thread, drawn as the app's `ApprovalInThread`
+ * draws it at the landing phone's scale: the agent asks in its bubble, and
+ * the request sits under it as one card, what it is for with Pending, the
+ * limit and the store, then Review. With `settleAt`, the same card settles
+ * in place: Pending turns to Approved, the card behind it appears, and
+ * Review folds away. Settled at 0, it is there already settled; without
+ * `settleAt` it stays on Review.
  */
 export function ApprovalThreadCard({
   settleAt,
@@ -95,42 +98,80 @@ export function ApprovalThreadCard({
   settleAt?: number;
   reviewPress?: number;
 }) {
-  const settles = settleAt !== undefined;
+  const settled = settleAt === 0;
+  const settles = settleAt !== undefined && settleAt > 0;
+  const at = settles ? delay(settleAt) : undefined;
+  const badge = "px-1.5 py-px text-[10px]";
   return (
-    <div className="flex flex-col gap-2.5 rounded-2xl bg-card p-3 text-card-foreground ring-1 ring-foreground/10">
-      <div className="flex items-start justify-between gap-2">
-        <p className="text-[12px] leading-snug font-medium text-balance">
-          {STORY.agent} wants to spend up to{" "}
-          <span className="font-display tabular-nums">{STORY.amount}</span> for{" "}
-          {STORY.purpose.toLowerCase()}
-        </p>
-        {settles ? (
-          <span
-            className="landing-fade inline-flex shrink-0 items-center rounded-full bg-success/10 px-2 py-0.5 text-[9.5px] font-medium text-success"
-            style={delay(settleAt)}
-          >
-            active
-          </span>
-        ) : null}
-      </div>
-      <div className="relative">
-        <div
-          className={settles ? "landing-vanish" : undefined}
-          style={settles ? delay(settleAt) : undefined}
-        >
-          <FauxButton press={reviewPress} className="h-9 w-full rounded-full text-[12px]">
-            Review
-          </FauxButton>
-        </div>
-        {settles ? (
-          <p
-            className="landing-fade absolute inset-x-0 top-0 text-[10.5px] text-muted-foreground"
-            style={delay(settleAt + 120)}
-          >
-            Up to {STORY.amount} at {STORY.merchant} until {STORY.expires}
+    <div className="flex flex-col gap-2">
+      <p className="w-fit max-w-[85%] rounded-2xl rounded-bl-md bg-muted px-3 py-[7px] text-[12.5px] leading-snug text-foreground">
+        Can you approve this request to use your card?
+      </p>
+      <div className="flex flex-col gap-2.5 rounded-2xl bg-card p-[13px] text-card-foreground ring-1 ring-foreground/10">
+        <div className="flex items-start justify-between gap-2.5">
+          <p className="min-w-0 text-[11.5px] leading-snug font-medium text-balance">
+            {STORY.purpose}
           </p>
-        ) : null}
+          {/* Both badges share one cell, so the swap does not move the title. */}
+          <span className="grid shrink-0 justify-items-end">
+            {settled ? null : (
+              <Badge
+                variant="muted"
+                className={`${badge} [grid-area:1/1] ${settles ? "landing-vanish" : ""}`}
+                style={at}
+              >
+                Pending
+              </Badge>
+            )}
+            {settled || settles ? (
+              <Badge
+                variant="success"
+                className={`${badge} [grid-area:1/1] ${settles ? "landing-pop" : ""}`}
+                style={at}
+              >
+                Approved
+              </Badge>
+            ) : null}
+          </span>
+        </div>
+        <dl className="flex flex-col gap-1.5 text-[11.5px]">
+          <Fact label="Limit">
+            <span className="font-medium tabular-nums">{STORY.amount}</span>
+          </Fact>
+          {settled || settles ? (
+            <div className={settles ? "landing-grow" : undefined} style={at}>
+              <div>
+                <Fact label="Card">
+                  <span className="flex min-w-0 items-center justify-end gap-1.5">
+                    <CardBadge className="w-[30px]" />
+                    <span className="truncate">{STORY.card}</span>
+                  </span>
+                </Fact>
+              </div>
+            </div>
+          ) : null}
+          <Fact label="Store">{STORY.merchant}</Fact>
+        </dl>
+        {settled ? null : (
+          <div className={settles ? "landing-shrink" : undefined} style={at}>
+            <div>
+              <FauxButton press={reviewPress} className="h-[46px] rounded-[13px] text-[13px]">
+                Review
+              </FauxButton>
+            </div>
+          </div>
+        )}
       </div>
+    </div>
+  );
+}
+
+/** One line of the request card: the name on the left, the value on the right. */
+function Fact({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="flex items-center justify-between gap-3">
+      <dt className="shrink-0 text-muted-foreground">{label}</dt>
+      <dd className="min-w-0 truncate text-right">{children}</dd>
     </div>
   );
 }
@@ -162,26 +203,66 @@ export function ApprovalSheetBody({
 
 /* ---------- The checkout card ---------- */
 
-/** The checkout running: the store, then five steps that check off one by one. */
+/**
+ * How much faster the story runs than a real checkout, for the card's clock:
+ * five steps land in three seconds here, and a real run takes most of a minute.
+ */
+const CLOCK_SPEEDUP = 12;
+
+/**
+ * The checkout running, drawn as the app's `CheckoutRunCard` draws it at the
+ * landing phone's scale, opened to all its steps: the store's icon, the task
+ * and the store, how long it has taken, then each step as it lands, ticking
+ * off as the next one starts.
+ */
 export function ProgressCard({ from, steps }: { from: number; steps: number[] }) {
   const last = steps[steps.length - 1] ?? from;
   return (
-    <div className="flex w-full flex-col gap-1.5 rounded-2xl bg-card px-3 py-2.5 text-[11.5px] text-card-foreground ring-1 ring-foreground/10">
-      <div className="flex items-center justify-between text-[10px] font-semibold tracking-wide text-muted-foreground uppercase">
-        <span className="inline-flex items-center gap-1">
-          <Lock className="size-2.5" strokeWidth={2.5} />
-          {STORY.domain}
+    <div className="flex w-full flex-col gap-2.5 rounded-2xl bg-card p-3 text-card-foreground ring-1 ring-foreground/10">
+      <div className="flex items-start gap-2">
+        <StarbucksMark size={18} />
+        <span className="flex min-w-0 flex-1 flex-col">
+          <span className="truncate text-[11.5px] font-medium">{STORY.action}</span>
+          <span className="truncate text-[9px] text-muted-foreground">{STORY.domain}</span>
         </span>
-        <RunMark from={from} at={last} size="size-3" />
-      </div>
-      {STORY.checkoutSteps.map((label, i) => (
-        <RunStep
-          key={label}
-          label={label}
-          from={i === 0 ? from : (steps[i - 1] ?? from)}
-          at={steps[i] ?? last}
+        <RunClock
+          from={from}
+          until={last}
+          className="mt-0.5 shrink-0 text-[9px] leading-[13px] text-muted-foreground"
         />
-      ))}
+        <ChevronDown
+          aria-hidden
+          className="mt-0.5 size-[13px] shrink-0 rotate-180 text-muted-foreground"
+        />
+      </div>
+      <div className="flex flex-col text-[11.5px]">
+        {STORY.checkoutSteps.map((label, i) => {
+          const start = i === 0 ? from : (steps[i - 1] ?? from);
+          return (
+            <div key={label} className="landing-grow" style={delay(start)}>
+              <div className={i === 0 ? undefined : "pt-2"}>
+                <RunStep label={label} from={start} at={steps[i] ?? last} />
+              </div>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
+}
+
+/** The card's clock: seconds since the run started, sped up to a real run's pace, stopping when it ends. */
+function RunClock({ from, until, className }: { from: number; until: number; className?: string }) {
+  const [ms, setMs] = useState(0);
+  useEffect(() => {
+    const mounted = Date.now();
+    const t = setInterval(() => {
+      const run = Math.min(Math.max(Date.now() - mounted - from, 0), until - from);
+      setMs(run);
+      if (run >= until - from) clearInterval(t);
+    }, 100);
+    return () => clearInterval(t);
+  }, [from, until]);
+  const secs = Math.round((ms * CLOCK_SPEEDUP) / 1000);
+  return <span className={`tabular-nums ${className ?? ""}`}>{secs}s</span>;
 }

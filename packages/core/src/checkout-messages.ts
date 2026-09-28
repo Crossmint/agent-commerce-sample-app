@@ -33,6 +33,16 @@ export function paymentResponse(requestId: string, orderIntentId: string): Input
   return { type: "input_response", requestId, action: "submit", response: { kind: "payment", orderIntentId } };
 }
 
+/**
+ * The answer to a protected input request, such as a password: the id of
+ * what the buyer typed into Crossmint's own field. The secret never passes
+ * through here; Agent Checkouts reads it from Crossmint's vault on the
+ * merchant's sign-in page alone.
+ */
+export function protectedResponse(requestId: string, protectedInputId: string): InputResponsePart {
+  return { type: "input_response", requestId, action: "submit", response: { kind: "protected", protectedInputId } };
+}
+
 export function declineResponse(requestId: string): InputResponsePart {
   return { type: "input_response", requestId, action: "decline" };
 }
@@ -62,6 +72,14 @@ export function pendingActionOf(checkout: Pick<Checkout, "status" | "requiredAct
           payment: {
             method: interaction.method ?? "card",
             ...(interaction.amount ? { amount: interaction.amount } : {}),
+            ...(interaction.merchant ? { merchant: interaction.merchant } : {}),
+          },
+        }
+      : {}),
+    ...(interaction?.kind === "protected"
+      ? {
+          protected: {
+            purpose: interaction.purpose ?? "password",
             ...(interaction.merchant ? { merchant: interaction.merchant } : {}),
           },
         }

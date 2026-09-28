@@ -1,8 +1,10 @@
 import { readFileSync } from "node:fs";
 import type { Command } from "commander";
 import {
+  asksPasswordInForm,
   type BuyerProfileInput,
   isTerminalCheckout,
+  type PendingUserAction,
   pollUntil,
   toDecimalString,
 } from "@agent-commerce/core";
@@ -235,7 +237,11 @@ async function waitForCheckout(
   timeoutS: number | undefined,
 ): Promise<CheckoutView> {
   const done = (v: CheckoutView) =>
-    isTerminalCheckout(v) || pendingAction(v) !== undefined || v.paymentRequest !== undefined;
+    isTerminalCheckout(v) ||
+    pendingAction(v) !== undefined ||
+    v.paymentRequest !== undefined ||
+    v.passwordRequest !== undefined ||
+    passwordInForm(v) !== undefined;
   if (done(initial)) return initial;
   let last = initial;
   try {
@@ -260,10 +266,18 @@ async function waitForCheckout(
   return last;
 }
 
+/** The open request, when it asks for a password in a plain form. */
+function passwordInForm(view: CheckoutView): PendingUserAction | undefined {
+  const pending = view.pendingUserAction as PendingUserAction | undefined;
+  return pending && asksPasswordInForm(pending) ? pending : undefined;
+}
+
 /** Print the view. Exit 2 with instructions when a question waits, 1 when the run did not buy. */
 function report(ctx: CliContext, view: CheckoutView, json: boolean | undefined): void {
   const action = pendingAction(view);
   const payment = view.paymentRequest;
+  const password = view.passwordRequest;
+  const formPassword = passwordInForm(view);
   if (json) {
     ctx.out(toJson(view));
   } else {
@@ -279,10 +293,46 @@ function report(ctx: CliContext, view: CheckoutView, json: boolean | undefined):
         `  ${pc.dim(`It mints an agent card for up to ${payment.amount.value} ${payment.amount.currency}. Then run: agent-commerce checkout get ${view.id} --wait`)}`,
       );
     }
+    if (password) {
+      // A secret never goes through the CLI: the user types it in a browser.
+      ctx.out("");
+      ctx.out(
+        `  ${pc.bold("Password needed.")} ${password.merchantDomain ?? "The store"} asks for the password of your account there. Open this to type it into a secure field:`,
+      );
+      ctx.out(`  ${password.url}`);
+      ctx.out(
+        `  ${pc.dim(`Never pass the password to this CLI. Then run: agent-commerce checkout get ${view.id} --wait`)}`,
+      );
+    }
+    if (formPassword) {
+      ctx.out("");
+      ctx.out(
+        `  ${pc.bold("Password asked in a form.")} The store wants the user to sign in, but asks in a plain form, which is never filled in. Do not ask for the password and never pass it to this CLI.`,
+      );
+      ctx.out(
+        `  ${pc.dim(`Offer a guest checkout: agent-commerce checkout answer ${view.id} ${formPassword.id} --alternative "check out as a guest". Or --decline.`)}`,
+      );
+    }
     if (action) {
       ctx.out("");
       for (const line of describeAction(view.id, action)) ctx.out(line);
     }
+  }
+  if (formPassword && !action) {
+    throw new CliExit(
+      EXIT.NEEDS_USER_ACTION,
+      json
+        ? `Checkout ${view.id} asks for a password in a plain form (request ${formPassword.id}). Decline it or suggest a guest checkout.`
+        : "",
+      "password_in_form",
+    );
+  }
+  if (password && !action) {
+    throw new CliExit(
+      EXIT.NEEDS_USER_ACTION,
+      json ? `Checkout ${view.id} is waiting for the user's password at ${password.url}.` : "",
+      "password_needed",
+    );
   }
   if (payment && !action) {
     throw new CliExit(

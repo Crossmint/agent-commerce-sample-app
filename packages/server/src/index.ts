@@ -38,7 +38,7 @@ import {
 import { Router } from "./router.js";
 import type { AgentCommerceServerConfig } from "./types.js";
 
-export type { CheckoutView } from "./handlers/checkouts.js";
+export type { CheckoutPasswordRequest, CheckoutView } from "./handlers/checkouts.js";
 export { buildPublicConfig } from "./handlers/config.js";
 export { HttpError, type ErrorCode } from "./errors.js";
 export { routePath } from "./router.js";
