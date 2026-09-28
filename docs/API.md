@@ -207,6 +207,7 @@ Optional `messageId` (≤200 chars) makes a retry idempotent. → `CheckoutView`
 `POST /v1/checkouts/:id/actions/:actionId` body `{ "values": {...} }` → `CheckoutView`. Older route, same as a `submit` message with `requestId = actionId`.
 
 `POST /v1/buyer-profiles` body `BuyerProfileInput` (core) → `{ "id": "…" }`. Save the user's name, contact and shipping address. The newest profile is the one every later checkout starts with: `POST /v1/checkouts` attaches it when the caller names no `buyerProfileId`, so the store fills those fields itself instead of asking.
+The server trims every field and writes a bare state as ISO 3166-2 (`CA` with `US` becomes `US-CA`). Details a store cannot ship to fail with `400 invalid_request`: `message` says what to fix, and `details.problems` lists `{ field, message }` per field (`firstName`, `lastName`, `email`, `phone`, `addressLine1`, `city`, `region`, `postalCode`, `countryCode`). US and Canadian addresses need a real state or province and postal code.
 
 `GET /v1/buyer-profile` → `{ "buyerProfile": BuyerProfile | null }`. The saved details later checkouts start with.
 

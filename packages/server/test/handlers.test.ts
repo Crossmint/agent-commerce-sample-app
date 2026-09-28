@@ -1608,6 +1608,43 @@ describe("saved buyer details", () => {
       buyerProfile: { id: "byp_saved", name: { first: "Ada", last: "Lovelace" } },
     });
   });
+
+  it("refuses details a store cannot ship to, field by field, without calling Crossmint", async () => {
+    const { handlers, calls } = makeServer([]);
+    const res = await call(handlers, "POST", "/v1/buyer-profiles", {
+      body: {
+        ...details,
+        name: { first: " ", last: "Lovelace" },
+        shipping: { ...details.shipping, postalCode: "627" },
+      },
+    });
+    expect(res.status).toBe(400);
+    const { error } = await res.json();
+    expect(error.code).toBe("invalid_request");
+    expect(error.message).toBe("Enter a first name. Enter a 5-digit ZIP code, such as 94103.");
+    expect(error.details.problems.map((p: { field: string }) => p.field)).toEqual([
+      "firstName",
+      "postalCode",
+    ]);
+    expect(findCall(calls, "POST", "/buyer-profiles")).toBeUndefined();
+  });
+
+  it("saves the state as ISO 3166-2", async () => {
+    const { handlers, calls } = makeServer([
+      {
+        method: "POST",
+        path: "/unstable/agent-checkouts/buyer-profiles",
+        reply: { status: 201, body: { id: "byp_saved" } },
+      },
+    ]);
+    const res = await call(handlers, "POST", "/v1/buyer-profiles", {
+      body: { ...details, shipping: { ...details.shipping, administrativeAreaCode: "il", countryCode: "us" } },
+    });
+    expect(res.status).toBe(201);
+    expect(findCall(calls, "POST", "/buyer-profiles")!.body).toMatchObject({
+      shipping: { administrativeAreaCode: "US-IL", countryCode: "US" },
+    });
+  });
 });
 
 describe("GET /v1/reveals", () => {

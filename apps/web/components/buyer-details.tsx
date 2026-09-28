@@ -2,7 +2,12 @@
 
 import { useState, type ComponentProps, type FormEvent } from "react";
 import { Pencil, UserRound } from "lucide-react";
-import type { BuyerProfile, BuyerProfileInput } from "@agent-commerce/core";
+import {
+  buyerProfileProblems,
+  normalizeBuyerProfile,
+  type BuyerProfile,
+  type BuyerProfileField,
+} from "@agent-commerce/core";
 import {
   Button,
   Input,
@@ -128,30 +133,48 @@ function DetailsForm({
     postalCode: initial?.shipping.postalCode ?? "",
     country: initial?.shipping.countryCode ?? "US",
   }));
-  const set = (key: keyof typeof v) => (e: { target: { value: string } }) =>
+  const [problems, setProblems] = useState<Partial<Record<FormKey, string>>>({});
+  const set = (key: FormKey) => (e: { target: { value: string } }) => {
     setV((prev) => ({ ...prev, [key]: e.target.value }));
+    // A field the user is fixing stops showing its problem. The state is
+    // checked against the country, so a new country clears it too.
+    const cleared: FormKey[] = key === "country" ? [key, "region"] : [key];
+    setProblems((prev) =>
+      cleared.some((k) => prev[k])
+        ? { ...prev, ...Object.fromEntries(cleared.map((k) => [k, undefined])) }
+        : prev,
+    );
+  };
+  const country = v.country.trim().toUpperCase();
+  const regionLabel =
+    country === "US" ? "State" : country === "CA" ? "Province" : "State or province (optional)";
 
-  async function submit(e: FormEvent) {
+  async function submit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    setBusy(true);
     setError(null);
-    const country = v.country.trim().toUpperCase();
-    const region = v.region.trim().toUpperCase();
-    const input: BuyerProfileInput = {
+    // Trimmed, with the state as ISO 3166-2 ("CA" in the US is "US-CA"), the form Crossmint wants.
+    const input = normalizeBuyerProfile({
       label: "Home",
-      name: { first: v.first.trim(), last: v.last.trim() },
-      contact: { email: v.email.trim(), phone: v.phone.trim() },
+      name: { first: v.first, last: v.last },
+      contact: { email: v.email, phone: v.phone },
       shipping: {
-        addressLines: [v.line1.trim(), v.line2.trim()].filter(Boolean),
-        locality: v.city.trim(),
-        // ISO 3166-2, the form Crossmint wants: "CA" in the US is "US-CA".
-        ...(region
-          ? { administrativeAreaCode: region.includes("-") ? region : `${country}-${region}` }
-          : {}),
-        postalCode: v.postalCode.trim(),
-        countryCode: country,
+        addressLines: [v.line1, v.line2],
+        locality: v.city,
+        administrativeAreaCode: v.region,
+        postalCode: v.postalCode,
+        countryCode: v.country,
       },
-    };
+    });
+    const found = buyerProfileProblems(input, { requirePhone: true });
+    if (found.length) {
+      setProblems(Object.fromEntries(found.map((p) => [FORM_KEY[p.field], p.message])));
+      e.currentTarget
+        .querySelector<HTMLInputElement>(`#${fieldId(FORM_KEY[found[0]!.field])}`)
+        ?.focus();
+      return;
+    }
+    setProblems({});
+    setBusy(true);
     try {
       await api.createBuyerProfile(input);
       await onSaved();
@@ -162,91 +185,52 @@ function DetailsForm({
     }
   }
 
+  const field = (key: FormKey) => ({
+    id: fieldId(key),
+    value: v[key],
+    onChange: set(key),
+    error: problems[key],
+  });
+
   return (
     <form
       onSubmit={submit}
+      noValidate
       className={cn(
         "flex flex-col gap-4 rounded-2xl bg-card p-4 ring-1 ring-foreground/10 sm:p-5",
         className,
       )}
     >
       <div className="grid grid-cols-2 gap-3">
-        <Field
-          label="First name"
-          value={v.first}
-          onChange={set("first")}
-          required
-          autoComplete="given-name"
-        />
-        <Field
-          label="Last name"
-          value={v.last}
-          onChange={set("last")}
-          required
-          autoComplete="family-name"
-        />
+        <Field label="First name" {...field("first")} required autoComplete="given-name" />
+        <Field label="Last name" {...field("last")} required autoComplete="family-name" />
       </div>
-      <Field
-        label="Email"
-        type="email"
-        value={v.email}
-        onChange={set("email")}
-        required
-        autoComplete="email"
-      />
+      <Field label="Email" type="email" {...field("email")} required autoComplete="email" />
       {/* Stores ask for a phone on most checkouts, for the delivery. */}
-      <Field
-        label="Phone"
-        type="tel"
-        value={v.phone}
-        onChange={set("phone")}
-        required
-        autoComplete="tel"
-      />
-      <Field
-        label="Address"
-        value={v.line1}
-        onChange={set("line1")}
-        required
-        autoComplete="address-line1"
-      />
-      <Field
-        label="Apartment, suite (optional)"
-        value={v.line2}
-        onChange={set("line2")}
-        autoComplete="address-line2"
-      />
+      <Field label="Phone" type="tel" {...field("phone")} required autoComplete="tel" />
+      <Field label="Address" {...field("line1")} required autoComplete="address-line1" />
+      <Field label="Apartment, suite (optional)" {...field("line2")} autoComplete="address-line2" />
       <div className="grid grid-cols-2 gap-3">
+        <Field label="City" {...field("city")} required autoComplete="address-level2" />
         <Field
-          label="City"
-          value={v.city}
-          onChange={set("city")}
-          required
-          autoComplete="address-level2"
-        />
-        <Field
-          label="State (optional)"
-          value={v.region}
-          onChange={set("region")}
+          label={regionLabel}
+          {...field("region")}
+          required={country === "US" || country === "CA"}
           autoComplete="address-level1"
         />
       </div>
       <div className="grid grid-cols-2 gap-3">
         <Field
           label="ZIP or postal code"
-          value={v.postalCode}
-          onChange={set("postalCode")}
+          {...field("postalCode")}
           required
           autoComplete="postal-code"
         />
         <Field
           label="Country code"
-          value={v.country}
-          onChange={set("country")}
+          {...field("country")}
           required
           maxLength={2}
-          pattern="[A-Za-z]{2}"
-          title="Two letters, such as US"
           autoComplete="country"
         />
       </div>
@@ -266,14 +250,57 @@ function DetailsForm({
   );
 }
 
-function Field({ label, ...input }: { label: string } & ComponentProps<typeof Input>) {
-  const id = `buyer-${label.toLowerCase().replace(/[^a-z]+/g, "-")}`;
+/** The form's own names for its inputs. */
+type FormKey =
+  | "first"
+  | "last"
+  | "email"
+  | "phone"
+  | "line1"
+  | "line2"
+  | "city"
+  | "region"
+  | "postalCode"
+  | "country";
+
+/** Which input shows each problem the checks find. */
+const FORM_KEY: Record<BuyerProfileField, FormKey> = {
+  firstName: "first",
+  lastName: "last",
+  email: "email",
+  phone: "phone",
+  addressLine1: "line1",
+  city: "city",
+  region: "region",
+  postalCode: "postalCode",
+  countryCode: "country",
+};
+
+const fieldId = (key: FormKey) => `buyer-${key}`;
+
+function Field({
+  label,
+  id,
+  error,
+  ...input
+}: { label: string; id: string; error?: string } & ComponentProps<typeof Input>) {
+  const errorId = `${id}-error`;
   return (
     <div className="flex min-w-0 flex-col gap-1.5">
       <Label htmlFor={id} className="text-xs text-muted-foreground">
         {label}
       </Label>
-      <Input id={id} {...input} />
+      <Input
+        id={id}
+        aria-invalid={error ? true : undefined}
+        aria-describedby={error ? errorId : undefined}
+        {...input}
+      />
+      {error ? (
+        <p id={errorId} className="text-xs text-destructive">
+          {error}
+        </p>
+      ) : null}
     </div>
   );
 }

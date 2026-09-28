@@ -8,3 +8,4 @@ export * from "./pending-action.js";
 export * from "./poll.js";
 export * from "./tool-docs.js";
 export * from "./amount.js";
+export * from "./buyer-profile.js";
