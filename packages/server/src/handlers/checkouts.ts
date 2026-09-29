@@ -157,6 +157,11 @@ export async function createCheckout(req: Request, ctx: Ctx): Promise<Response> 
   // for them again. A caller that names a profile keeps its own.
   const buyerProfileId =
     body.buyerProfileId ?? (await currentBuyerProfile(ctx, cctx, user.userId))?.id;
+  const diagnosticId = newMessageId();
+  console.info("[sdk-evaluation] checkout.create", JSON.stringify({
+    at: ctx.now().toISOString(), diagnosticId,
+    maxCost: { amount: body.maxCost.amount, currency: body.maxCost.currency },
+  }));
   const checkout = await ctx.crossmint.checkouts.create(cctx, {
     request: { startUrl: (body.startUrl ?? body.url)!, ...(task ? { task } : {}) },
     constraints: { maxCost: body.maxCost },
@@ -164,6 +169,10 @@ export async function createCheckout(req: Request, ctx: Ctx): Promise<Response> 
     ...(browserProfileId ? { browserProfileId } : {}),
     ...(body.merchantGuidance ? { merchantGuidance: body.merchantGuidance } : {}),
   });
+  console.info("[sdk-evaluation] checkout.created", JSON.stringify({
+    at: ctx.now().toISOString(), diagnosticId, checkoutId: checkout.runId,
+    returnedMaxCost: checkout.input?.constraints?.maxCost ?? null,
+  }));
   await ctx.checkouts.linkCheckout(checkout.runId, user.userId, {
     ...(body.agentCardId ? { agentCardId: body.agentCardId } : {}),
     ...(body.purpose ? { purpose: body.purpose } : {}),
@@ -576,6 +585,35 @@ function paymentAmount(action: PendingUserAction, checkout: Checkout): Amount {
  * read answers the run with it.
  */
 const paymentSettlements = new WeakMap<Ctx, Map<string, Promise<CheckoutView>>>();
+// Retain only a bounded fingerprint per run to avoid repeating the same poll diagnostic.
+const observedPaymentRequests = new Map<string, string>();
+
+function logPaymentRequest(ctx: Ctx, checkout: Checkout, action: PendingUserAction): void {
+  const raw = checkout.requiredAction?.request.interaction;
+  const amount = raw?.amount;
+  const maxCost = checkout.input?.constraints?.maxCost;
+  const evidence = {
+    checkoutId: checkout.runId,
+    requestId: action.id,
+    messageId: checkout.requiredAction?.messageId ?? null,
+    interactionKind: raw?.kind ?? null,
+    // Allowlist only payment metadata; never log forms, messages, tokens or card data.
+    crossmintAmount: amount ? { kind: amount.kind, value: amount.value, currency: amount.currency } : null,
+    checkoutMaxCost: maxCost ? { amount: maxCost.amount, currency: maxCost.currency } : null,
+    source: action.payment?.amount ? "crossmint_payment_request" : maxCost ? "checkout_max_cost_fallback" : "default_fallback",
+    authorizationAmount: paymentAmount(action, checkout),
+    previousAnswer: answeredPayments.get(checkout.runId) ?? null,
+  };
+  const fingerprint = JSON.stringify(evidence);
+  if (observedPaymentRequests.get(checkout.runId) === fingerprint) return;
+  if (!observedPaymentRequests.has(checkout.runId) && observedPaymentRequests.size >= 500) {
+    const oldest = observedPaymentRequests.keys().next().value;
+    if (oldest !== undefined) observedPaymentRequests.delete(oldest);
+  }
+  observedPaymentRequests.set(checkout.runId, fingerprint);
+  console.info("[sdk-evaluation] checkout.payment_required", JSON.stringify({ at: ctx.now().toISOString(), ...evidence }));
+}
+
 function settlePayment(
   ctx: Ctx,
   user: AuthenticatedUser,
@@ -606,6 +644,7 @@ async function settlePaymentOnce(
   const action = pendingActionOf(checkout);
   if (!action || !isPaymentAction(action))
     return toView(ctx.config.webBaseUrl, checkout, link?.agentCardId);
+  logPaymentRequest(ctx, checkout, action);
   const answered = answeredPayments.get(checkout.runId);
   if (answered?.requestId === action.id)
     return toView(ctx.config.webBaseUrl, checkout, link?.agentCardId, { hidePayment: true });
@@ -632,6 +671,10 @@ async function settlePaymentOnce(
     agentCardId: orderIntentId,
   });
   await ctx.crossmint.checkouts.payWithOrderIntent(cctx, checkout.runId, action.id, orderIntentId);
+  console.info("[sdk-evaluation] checkout.payment_response_accepted", JSON.stringify({
+    at: ctx.now().toISOString(), checkoutId: checkout.runId,
+    requestId: action.id, orderIntentId,
+  }));
   rememberAnswered(checkout.runId, action.id, orderIntentId);
   const refreshed = await waitForConsumption(ctx, cctx, checkout.runId, action.id);
   return toView(ctx.config.webBaseUrl, refreshed, orderIntentId, { hidePayment: true });
@@ -700,6 +743,12 @@ async function paymentStepRequest(
     approvalUrl: `${ctx.config.webBaseUrl.replace(/\/$/, "")}/approve/${id}`,
   };
   const created = await ctx.store.create(row);
+  console.info("[sdk-evaluation] checkout.approval_requested", JSON.stringify({
+    at: ctx.now().toISOString(), checkoutId: checkout.runId,
+    paymentRequestId: action.id, approvalRequestId: id,
+    amount: { value: amount.value, currency: amount.currency },
+    previousOrderIntentId: spent ?? null,
+  }));
   await ctx.checkouts.linkCheckout(checkout.runId, user.userId, { agentCardRequestId: id });
   return created;
 }
