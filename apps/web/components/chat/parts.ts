@@ -54,12 +54,22 @@ export function isToolError(value: unknown): value is ToolError {
   return Boolean(value) && typeof value === "object" && typeof (value as ToolError).error === "string";
 }
 
-/** The request the approval part refers to, found in the same message. */
+/**
+ * The request the approval part refers to, found in the same message: made
+ * by `request_agent_card`, or by `create_checkout` when the user chose to
+ * pay by card and it sent the agent to have the new card approved first.
+ */
 export function findRequest(message: ChatMessage, requestId: string): RequestSummary | undefined {
   for (const part of message.parts) {
-    if (part.type !== "tool-request_agent_card" || part.state !== "output-available") continue;
-    const output = part.output as RequestSummary | ToolError;
-    if (!isToolError(output) && output.requestId === requestId) return output;
+    if (part.type === "tool-request_agent_card" && part.state === "output-available") {
+      const output = part.output as RequestSummary | ToolError;
+      if (!isToolError(output) && output.requestId === requestId) return output;
+    } else if (part.type === "tool-create_checkout" && part.state === "output-available") {
+      const output = part.output as Partial<RequestSummary> & { code?: string };
+      if (output.code === "agent_card_approval_required" && output.requestId === requestId) {
+        return output as RequestSummary;
+      }
+    }
   }
   return undefined;
 }
@@ -192,6 +202,8 @@ export interface WatchIndex {
   absorbed: Set<string>;
   /** What such a watch takes over, by its tool call id: the earlier steps, when the card began, and the watch that began it. */
   carried: Map<string, { updates: CheckoutUpdate[]; startedAt?: string; chainStart: string }>;
+  /** Every product the thread has shown, by page URL: a payment choice shows the one it is for. */
+  products: Map<string, FoundProduct>;
 }
 
 /** Parts that show the user nothing between two stretches of a checkout. */
@@ -212,6 +224,7 @@ export function watchIndex(messages: ChatMessage[]): WatchIndex {
     passwords: new Map(),
     absorbed: new Set(),
     carried: new Map(),
+    products: new Map(),
   };
   for (const m of messages) {
     // The last watch of each checkout in this message, while nothing visible has come after it.
@@ -239,6 +252,7 @@ export function watchIndex(messages: ChatMessage[]): WatchIndex {
       }
     }
     for (const part of m.parts) {
+      for (const p of productsOf(part) ?? []) index.products.set(p.url, p);
       const site = checkoutSiteOf(part);
       if (site?.checkoutId) index.sites.set(site.checkoutId, site);
       if (part.type !== "tool-watch_checkout") continue;
@@ -420,6 +434,61 @@ export function checkoutSiteOf(part: ChatMessagePart): CheckoutSite | undefined 
   return { checkoutId: checkoutOf(part)?.id, host, action: input.action?.trim() || undefined };
 }
 
+/**
+ * The product a payment choice is for, from the cards the thread showed. The
+ * agent may pass the page without its variant, so a match on the page alone
+ * is the fallback.
+ */
+export function productFor(watches: WatchIndex, url: string): FoundProduct | undefined {
+  const exact = watches.products.get(url);
+  if (exact) return exact;
+  const page = pageOf(url);
+  for (const [key, product] of watches.products) if (pageOf(key) === page) return product;
+  return undefined;
+}
+
+function pageOf(url: string): string {
+  try {
+    const u = new URL(url);
+    return `${u.hostname.replace(/^www\./, "")}${u.pathname.replace(/\/$/, "")}`;
+  } catch {
+    return url;
+  }
+}
+
+/**
+ * The newest call of a client tool that still waits for the user, by tool
+ * call id: the one a frame opens its sheet for.
+ */
+export function pendingCall(
+  messages: ChatMessage[],
+  type: "tool-await_buyer_details" | "tool-await_payment_choice",
+): string | undefined {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const m = messages[i]!;
+    if (m.role !== "assistant") continue;
+    for (let j = m.parts.length - 1; j >= 0; j--) {
+      const part = m.parts[j]!;
+      if (part.type === type && part.state === "input-available") return part.toolCallId;
+    }
+  }
+  return undefined;
+}
+
+/**
+ * A checkout sent back for something the user gives first: their details,
+ * or the approval of the agent card they chose to pay with. The agent asks
+ * and starts again, so it is not worth a line of its own.
+ */
+export function sentBackFirst(part: ChatMessagePart): boolean {
+  if (part.type !== "tool-create_checkout" || part.state !== "output-available") return false;
+  const out = part.output as unknown;
+  return (
+    isToolError(out) &&
+    (out.code === "buyer_details_required" || out.code === "agent_card_approval_required")
+  );
+}
+
 /** The pending `watch_checkout` calls in a thread, for a surface that watches them out of sight. */
 export function pendingWatches(messages: ChatMessage[]): Array<{ toolCallId: string; checkoutId: string }> {
   const out: Array<{ toolCallId: string; checkoutId: string }> = [];
@@ -477,6 +546,8 @@ export function toolTitle(type: string): string {
     "tool-await_agent_card_approval": "Waiting for your approval",
     "tool-await_protected_input": "Waiting for your password",
     "tool-await_saved_card": "Waiting for your card",
+    "tool-await_buyer_details": "Waiting for your details",
+    "tool-await_payment_choice": "Waiting for how you want to pay",
     "tool-watch_checkout": "Following the checkout",
     "tool-pay_checkout_with_agent_card": "Paying with your agent card",
     "tool-save_buyer_profile": "Saving your details for next time",

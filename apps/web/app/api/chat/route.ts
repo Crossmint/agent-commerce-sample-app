@@ -46,7 +46,13 @@ export async function POST(req: Request): Promise<Response> {
 
   const validated = await safeValidateUIMessages<ChatMessage>({ messages: parsed.data.messages, tools });
   if (!validated.success) return error(400, `Bad messages: ${validated.error.message}`);
-  const messages = validated.data;
+  const once = oncePerItem(validated.data);
+  if (once.dropped) {
+    console.warn(
+      `[chat] dropped ${once.dropped} duplicate message(s) or item(s) from chat ${chatId}`,
+    );
+  }
+  const messages = once.messages;
   const last = messages.at(-1);
   if (!last || (last.role !== "user" && last.role !== "assistant")) return error(400, "Bad messages.");
 
@@ -104,6 +110,54 @@ export async function DELETE(req: Request): Promise<Response> {
   if (!db) return error(501, "No database. Set DATABASE_URL to keep chat history.");
   const ok = await deleteChat(db, id, session.userId);
   return ok ? new Response(null, { status: 204 }) : error(404, "No such chat.");
+}
+
+/**
+ * The conversation with each message once, and each OpenAI item once. The
+ * client can hand back a turn twice (its own list keeps both copies, while
+ * the frames draw one), and OpenAI's Responses API refuses a conversation
+ * that names one item twice: "Duplicate item found". A message keeps its
+ * newest form at its first place; a text part whose item came already is
+ * dropped, since OpenAI keeps the whole item and reads it by its id.
+ * Anthropic parts carry no item ids and pass as they are.
+ */
+function oncePerItem(input: ChatMessage[]): { messages: ChatMessage[]; dropped: number } {
+  const latest = new Map<string, ChatMessage>();
+  for (const m of input) latest.set(m.id, m);
+  const seenMessages = new Set<string>();
+  const seenItems = new Set<string>();
+  const messages: ChatMessage[] = [];
+  let dropped = 0;
+  for (const m of input) {
+    if (seenMessages.has(m.id)) {
+      dropped++;
+      continue;
+    }
+    seenMessages.add(m.id);
+    const message = latest.get(m.id)!;
+    if (message.role !== "assistant") {
+      messages.push(message);
+      continue;
+    }
+    const parts = message.parts.filter((part) => {
+      const item = part.type === "text" ? openAiItemOf(part.providerMetadata) : undefined;
+      if (!item) return true;
+      if (seenItems.has(item)) {
+        dropped++;
+        return false;
+      }
+      seenItems.add(item);
+      return true;
+    });
+    messages.push(parts.length === message.parts.length ? message : { ...message, parts });
+  }
+  return { messages, dropped };
+}
+
+/** The OpenAI item a part was streamed from: "msg_…". */
+function openAiItemOf(metadata: unknown): string | undefined {
+  const id = (metadata as { openai?: { itemId?: unknown } } | undefined)?.openai?.itemId;
+  return typeof id === "string" ? id : undefined;
 }
 
 /** The user's saved buyer details, for the prompt. None is fine: the chat works without. */

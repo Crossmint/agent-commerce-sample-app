@@ -1,4 +1,4 @@
-import type { BuyerProfile, CheckoutContext } from "@agent-commerce/core";
+import { CrossmintApiError, type BuyerProfile, type CheckoutContext } from "@agent-commerce/core";
 import type { Ctx } from "./context.js";
 
 /**
@@ -52,6 +52,38 @@ export async function currentBuyerProfile(
 /** A profile just saved is the one to use from now on. */
 export function rememberBuyerProfile(ctx: Ctx, userId: string, profile: BuyerProfile): void {
   ctx.buyerProfiles.set(userId, profile);
+}
+
+/**
+ * Delete every buyer profile the user has, so the next checkout starts with
+ * none and the store asks again. All of them, not only the newest: with the
+ * newest gone, the one before it would take its place. Returns how many
+ * went. A profile already gone is not an error.
+ */
+export async function deleteBuyerProfiles(
+  ctx: Ctx,
+  cctx: CheckoutContext,
+  userId: string,
+): Promise<number> {
+  // Forgotten first: whatever happens next, no checkout starts with a deleted id.
+  ctx.buyerProfiles.delete(userId);
+  const ids: string[] = [];
+  let cursor: string | undefined;
+  do {
+    const page = await ctx.crossmint.checkouts.listBuyerProfiles(cctx, { limit: 100, cursor });
+    ids.push(...(page.data ?? []).map((p) => p.id));
+    cursor = page.nextCursor ?? undefined;
+  } while (cursor);
+  for (const id of ids) {
+    try {
+      await ctx.crossmint.checkouts.deleteBuyerProfile(cctx, id);
+    } catch (e) {
+      if (!(e instanceof CrossmintApiError && e.status === 404)) throw e;
+    }
+  }
+  // Again: a read while the deletes ran could have cached one of them.
+  ctx.buyerProfiles.delete(userId);
+  return ids.length;
 }
 
 /**

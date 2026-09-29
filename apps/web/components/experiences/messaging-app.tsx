@@ -14,6 +14,9 @@ import {
   AnswerPasswordRequest,
   ApproveAgentCard,
   SaveCard,
+  errorMessage,
+  useAgentCards,
+  useAgentCommerce,
   formatAmount,
   PAYMENT_STEP_ASK,
   type CheckoutStep,
@@ -34,7 +37,9 @@ import {
   findPaymentStep,
   findRequest,
   passwordRequestOf,
+  pendingCall,
   pendingWatches,
+  productFor,
   productsMessageOf,
   productsOf,
   receiptMessageOf,
@@ -52,6 +57,28 @@ import { pickMessage, ProductDetails, ProductImage } from "@/components/chat/pro
 import { CheckoutWatcher, runTitle, type LiveWatch } from "@/components/chat/checkout-card";
 import { STARTERS } from "@/components/chat/starters";
 import { savedCardOutcome } from "@/components/chat/add-card";
+import {
+  BUYER_DETAILS_NOTE,
+  BUYER_DETAILS_QUESTION,
+  BuyerDetailsSheetBody,
+} from "@/components/chat/buyer-details-request";
+import {
+  CARD_STEP_QUESTION,
+  OTHER_STEP_QUESTION,
+  SOMETHING_ELSE,
+  approvedCardOutcome,
+  cardOptions,
+  choiceSubject,
+  fittingCards,
+  optionKey,
+  otherOptions,
+  paymentChoiceLabel,
+  paymentChoiceOutcome,
+  paymentChoiceQuestion,
+  newCardRequest,
+  paymentOptions,
+  type PaymentOption,
+} from "@/components/chat/payment-choice";
 import { Receipt, type ReceiptData } from "@/components/receipt";
 import { useScrollToBottom } from "@/components/chat/use-scroll-to-bottom";
 import { DeviceFrame } from "@/components/frame/device-frame";
@@ -60,6 +87,9 @@ import { PhoneStatusBar } from "@/components/frame/phone-status-bar";
 import type { MessagingApp as MessagingAppId } from "@/components/frame/views";
 import { LoginForm } from "@/components/login-form";
 import type { FoundProduct } from "@/lib/chat/shopify-catalog";
+import type { AgentCard } from "@agent-commerce/core";
+import type { Money } from "@/lib/chat/payment-choice";
+import type { BuyerDetailsOutcome, PaymentChoiceOutcome } from "@/lib/chat/tools";
 import type { ChatMessage } from "@/lib/chat/types";
 import { cn } from "@/lib/cn";
 import {
@@ -122,6 +152,12 @@ export function MessagingApp(props: ExperienceProps) {
 
 type Side = "sent" | "recv";
 
+/** The product a payment choice is for, as `choiceSubject` reads it. */
+type ChoiceSubject = ReturnType<typeof choiceSubject>;
+
+/** Where a payment choice stands in the messaging thread, once it is one step on. */
+type ChoiceStep = "card" | "other";
+
 type Bubble =
   | { key: string; kind: "text"; side: Side; text: string }
   /** A link to one of our pages. `path` is shown under the agent's domain; the page itself opens in a sheet. */
@@ -179,11 +215,17 @@ interface ChoicesBubble {
 type PasswordAsk = { toolCallId: string; checkoutId: string; requestId: string; domain: string };
 
 type Approval = {
-  toolCallId: string;
   requestId: string;
   /** Set when a checkout's payment step raised this, so the sheet says so. */
   paying?: boolean;
-};
+} & (
+  | { toolCallId: string }
+  /** A new card made at a payment choice: its ending goes back to the choice. */
+  | { onDone: (outcome: ApproveOutcome) => void }
+);
+
+/** A new card made at a payment choice, waiting for or past its approval. */
+type NewCardAsk = { requestId: string; budget?: Money };
 
 /** The thread as a flat list of bubbles. A message with two text parts is two bubbles; a tool call is none. */
 function toBubbles(
@@ -193,6 +235,20 @@ function toBubbles(
   onReview: (a: Approval) => void,
   onEnterPassword: (ask: PasswordAsk) => void,
   onAddCard: (toolCallId: string) => void,
+  onAddDetails: (toolCallId: string) => void,
+  onBuyerDetails: (toolCallId: string, outcome: BuyerDetailsOutcome) => void,
+  onPaymentChoice: (toolCallId: string, outcome: PaymentChoiceOutcome) => void,
+  /** The user's agent cards, for the ones Card can offer again; undefined until they are in. */
+  agentCards: AgentCard[] | undefined,
+  /** The payment choices one step on, by tool call: Card or Another way was picked. */
+  choiceSteps: ReadonlyMap<string, ChoiceStep>,
+  onChoiceStep: (toolCallId: string, step: ChoiceStep) => void,
+  /** The new cards made at payment choices, by tool call. */
+  newCards: ReadonlyMap<string, NewCardAsk>,
+  /** Card with no agent card that fits, or New card: make one and open its approval. */
+  onNewCard: (toolCallId: string, subject: ChoiceSubject, option: PaymentOption) => void,
+  /** Open a new card's approval again, from its link. */
+  onReviewCard: (toolCallId: string) => void,
   onPick: (message: string) => void,
   onOpen: (product: FoundProduct) => void,
 ): Bubble[] {
@@ -273,6 +329,151 @@ function toBubbles(
           done,
           onOpen: done ? undefined : () => onAddCard(part.toolCallId),
         });
+        return;
+      }
+      // The first purchase: a link to the details form, and Not now as a quick reply.
+      if (
+        part.type === "tool-await_buyer_details" &&
+        (part.state === "input-available" || part.state === "output-available")
+      ) {
+        const done =
+          part.state === "output-available"
+            ? part.output.status === "saved"
+              ? "Saved"
+              : "Skipped"
+            : undefined;
+        out.push({ key: `${key}-text`, kind: "text", side: "recv", text: BUYER_DETAILS_QUESTION });
+        out.push({
+          key,
+          kind: "link",
+          side: "recv",
+          title: "Add your details",
+          path: "/details",
+          done,
+          onOpen: done ? undefined : () => onAddDetails(part.toolCallId),
+        });
+        out.push({
+          key: `${key}-later`,
+          kind: "choices",
+          choices: [{ label: "Not now", message: "skip" }],
+          onPick: () => onBuyerDetails(part.toolCallId, { status: "skipped" }),
+          used: Boolean(done),
+        });
+        if (done === "Skipped") {
+          out.push({ key: `${key}-reply`, kind: "text", side: "sent", text: "Not now" });
+        }
+        return;
+      }
+      // How to pay for a Shopify product: the app's quick replies, and the
+      // pick as the user's own reply. Another way is asked in words.
+      if (
+        part.type === "tool-await_payment_choice" &&
+        (part.state === "input-available" || part.state === "output-available")
+      ) {
+        const subject = choiceSubject(part.input, productFor(watches, part.input.url));
+        const output = part.state === "output-available" ? part.output : undefined;
+        const fitting = fittingCards(agentCards, part.input.url, subject);
+        const step = choiceSteps.get(part.toolCallId);
+        const answer = (option: PaymentOption) =>
+          onPaymentChoice(part.toolCallId, paymentChoiceOutcome(option, subject.budget));
+        // A list of options as the app's quick replies. A tap hands its option to `onOption`.
+        const replies = (
+          replyKey: string,
+          options: PaymentOption[],
+          used: boolean,
+          onOption: (option: PaymentOption) => void,
+        ): Bubble => ({
+          key: replyKey,
+          kind: "choices",
+          choices: options.map((o) => ({
+            label: o.label,
+            message: optionKey(o),
+            description: o.detail,
+          })),
+          onPick: (picked) => {
+            const option = options.find((o) => optionKey(o) === picked);
+            if (option) onOption(option);
+          },
+          used,
+        });
+        out.push({
+          key: `${key}-text`,
+          kind: "text",
+          side: "recv",
+          text: paymentChoiceQuestion(subject.item),
+        });
+        // Until the cards are in, so Card knows whether to ask about them.
+        if (!output && !agentCards) return;
+        const ways = paymentOptions(subject.budget);
+        // The new card, from this session or from the answer of a chat opened again.
+        const made =
+          newCards.get(part.toolCallId) ??
+          (output?.requestId ? { requestId: output.requestId, budget: output.budget } : undefined);
+        out.push(
+          replies(key, ways, Boolean(output || step || made), (option) => {
+            if (option.method === "card" && fitting.length) onChoiceStep(part.toolCallId, "card");
+            else if (option.method === "card") onNewCard(part.toolCallId, subject, option);
+            else if (option.method === "other") onChoiceStep(part.toolCallId, "other");
+            else answer(option);
+          }),
+        );
+        // One step on: the pick as the user's reply, the question, and its options.
+        if (step) {
+          out.push({
+            key: `${key}-step-reply`,
+            kind: "text",
+            side: "sent",
+            text: ways.find((o) => o.method === step)?.label ?? "",
+          });
+          out.push({
+            key: `${key}-step-text`,
+            kind: "text",
+            side: "recv",
+            text: step === "card" ? CARD_STEP_QUESTION : OTHER_STEP_QUESTION,
+          });
+          out.push(
+            replies(
+              `${key}-step`,
+              step === "card"
+                ? cardOptions(subject.budget, fitting)
+                : [...otherOptions(), SOMETHING_ELSE],
+              Boolean(output || made),
+              (option) =>
+                option.method === "card"
+                  ? onNewCard(part.toolCallId, subject, option)
+                  : answer(option),
+            ),
+          );
+        }
+        // A new card: the pick as the user's reply, and a link to approve it.
+        if (made) {
+          out.push({
+            key: `${key}-card-reply`,
+            kind: "text",
+            side: "sent",
+            text: step === "card" ? "New card" : "Card",
+          });
+          out.push({
+            key: `${key}-card`,
+            kind: "link",
+            side: "recv",
+            title: made.budget
+              ? `Approve up to ${formatAmount(made.budget.value, made.budget.currency)}`
+              : "Approve the new card",
+            path: `/approve/${made.requestId}`,
+            done: output ? (output.approval === "active" ? "Approved" : "Not approved") : undefined,
+            onOpen: output ? undefined : () => onReviewCard(part.toolCallId),
+          });
+        }
+        // The pick as the user's reply, unless the new card's link already carries it.
+        if (output && !made) {
+          out.push({
+            key: `${key}-reply`,
+            kind: "text",
+            side: "sent",
+            text: paymentChoiceLabel(output),
+          });
+        }
         return;
       }
       // A password: a link to the checkout's page, where Crossmint's field takes it.
@@ -756,7 +957,7 @@ function IMessageComposer(props: ComposerProps) {
           {...inputProps}
           placeholder="iMessage"
           aria-label="iMessage"
-          className="msg-input min-w-0 flex-1 bg-transparent text-[15px] outline-none disabled:opacity-60"
+          className="msg-input min-w-0 flex-1 bg-transparent text-[16px] outline-none disabled:opacity-60"
         />
         <button
           type="submit"
@@ -1157,7 +1358,7 @@ function InstagramComposer(props: ComposerProps) {
           {...inputProps}
           placeholder="Message..."
           aria-label="Message"
-          className="msg-input min-w-0 flex-1 bg-transparent text-[15px] outline-none disabled:opacity-60"
+          className="msg-input min-w-0 flex-1 bg-transparent text-[16px] outline-none disabled:opacity-60"
         />
         {typing ? (
           <button
@@ -1192,6 +1393,7 @@ const CHROMES: Record<MessagingAppId, Chrome> = {
 function SignedIn({
   chat,
   thread,
+  email,
   chatEnabled,
   brand,
   Chrome,
@@ -1233,7 +1435,8 @@ function SignedIn({
   }, []);
   const onApprovalDone = useCallback(
     (o: ApproveOutcome) => {
-      if (approval) chat.onApprovalOutcome(approval.toolCallId, toApprovalOutcome(o));
+      if (approval && "onDone" in approval) approval.onDone(o);
+      else if (approval) chat.onApprovalOutcome(approval.toolCallId, toApprovalOutcome(o));
       setTimeout(closeApproval, DONE_LINGER_MS);
     },
     [approval, chat, closeApproval],
@@ -1269,6 +1472,83 @@ function SignedIn({
     },
     [password, chat, closePassword],
   );
+  // The await_buyer_details call whose form is open, from its link.
+  const [details, setDetails] = useState<string | null>(null);
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const onAddDetails = useCallback((toolCallId: string) => {
+    setDetails(toolCallId);
+    setDetailsOpen(true);
+  }, []);
+  // The user's agent cards, read while a payment choice waits: it offers the ones that fit.
+  const choosing = Boolean(pendingCall(chat.messages, "tool-await_payment_choice"));
+  const agentCards = useAgentCards({ enabled: choosing });
+  const cardsIn = agentCards.data ?? (agentCards.error ? [] : undefined);
+  const [choiceSteps, setChoiceSteps] = useState<ReadonlyMap<string, ChoiceStep>>(
+    () => new Map(),
+  );
+  const onChoiceStep = useCallback((toolCallId: string, step: ChoiceStep) => {
+    setChoiceSteps((prev) => new Map(prev).set(toolCallId, step));
+  }, []);
+  // New cards made at payment choices. The choice answers once the approval
+  // ends: with the card, or that it was not approved.
+  const { api } = useAgentCommerce();
+  const [newCards, setNewCards] = useState<ReadonlyMap<string, NewCardAsk>>(() => new Map());
+  const reviewNewCard = useCallback(
+    (toolCallId: string, ask: NewCardAsk) => {
+      onReview({
+        requestId: ask.requestId,
+        // Approved, the card to pay with; not approved, the agent asks how else to pay.
+        onDone: (o) =>
+          chat.onPaymentChoice(
+            toolCallId,
+            approvedCardOutcome(o, ask.budget, ask.requestId) ?? {
+              method: "card",
+              requestId: ask.requestId,
+              approval: toApprovalOutcome(o).status,
+              ...(ask.budget ? { budget: ask.budget } : {}),
+            },
+          ),
+      });
+    },
+    [chat, onReview],
+  );
+  const onNewCard = useCallback(
+    async (toolCallId: string, subject: ChoiceSubject, option: PaymentOption) => {
+      const request = newCardRequest(subject);
+      // No price to budget from: the checkout's payment step approves the total.
+      if (!request) {
+        chat.onPaymentChoice(toolCallId, paymentChoiceOutcome(option, subject.budget));
+        return;
+      }
+      try {
+        const made = await api.createAgentCardRequest(request);
+        const ask = { requestId: made.id, budget: subject.budget };
+        // Its approval opens from the link, never by itself.
+        setNewCards((prev) => new Map(prev).set(toolCallId, ask));
+      } catch (err) {
+        chat.reportError(errorMessage(err));
+      }
+    },
+    [api, chat],
+  );
+  const onReviewCard = useCallback(
+    (toolCallId: string) => {
+      const ask = newCards.get(toolCallId);
+      if (ask) reviewNewCard(toolCallId, ask);
+    },
+    [newCards, reviewNewCard],
+  );
+  const closeDetails = useCallback(() => {
+    setDetailsOpen(false);
+    setTimeout(() => setDetails(null), PAGE_SHEET_TRANSITION_MS);
+  }, []);
+  const onDetailsDone = useCallback(
+    (outcome: BuyerDetailsOutcome) => {
+      if (details) chat.onBuyerDetails(details, outcome);
+      setTimeout(closeDetails, outcome.status === "saved" ? DONE_LINGER_MS : 0);
+    },
+    [details, chat, closeDetails],
+  );
 
   const bubbles: Bubble[] = [
     chatEnabled
@@ -1301,6 +1581,15 @@ function SignedIn({
       onReview,
       onEnterPassword,
       onAddCard,
+      onAddDetails,
+      chat.onBuyerDetails,
+      chat.onPaymentChoice,
+      cardsIn,
+      choiceSteps,
+      onChoiceStep,
+      newCards,
+      (toolCallId, subject, option) => void onNewCard(toolCallId, subject, option),
+      onReviewCard,
       chat.send,
       openProduct,
     ),
@@ -1381,6 +1670,24 @@ function SignedIn({
         ariaLabel="Add a card"
       >
         {addCard ? <SaveCard key={addCard} showResult={false} onSaved={onCardSavedHere} /> : null}
+      </BrowserSheet>
+
+      <BrowserSheet
+        open={detailsOpen}
+        path="/details"
+        brand={brand}
+        onDone={closeDetails}
+        ariaLabel="Your details"
+      >
+        {details ? (
+          <div className="flex flex-col gap-5">
+            <div className="flex flex-col gap-1.5">
+              <h2 className="text-[22px] leading-tight font-semibold">Your details</h2>
+              <p className="text-sm text-muted-foreground">{BUYER_DETAILS_NOTE}</p>
+            </div>
+            <BuyerDetailsSheetBody key={details} email={email} onOutcome={onDetailsDone} />
+          </div>
+        ) : null}
       </BrowserSheet>
 
       {pending.map((w) => (

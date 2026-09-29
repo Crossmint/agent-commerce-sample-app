@@ -18,6 +18,7 @@ import {
   cancelCheckout,
   setCheckoutAgentCard,
   createBuyerProfile,
+  deleteBuyerProfile,
   getBuyerProfile,
   deleteBrowserProfile,
   getBrowserProfile,
@@ -84,6 +85,7 @@ export function buildRouter(): Router<Ctx> {
     .post("/v1/checkouts/:id/actions/:actionId", submitCheckoutAction)
     .post("/v1/buyer-profiles", createBuyerProfile)
     .get("/v1/buyer-profile", getBuyerProfile)
+    .delete("/v1/buyer-profile", deleteBuyerProfile)
     .get("/v1/browser-profile", getBrowserProfile)
     .delete("/v1/browser-profile", deleteBrowserProfile);
 }

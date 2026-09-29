@@ -7,7 +7,9 @@ import { cn } from "@agent-commerce/ui";
 import { AgentAvatar } from "@/components/brand";
 import type {
   ApprovalOutcome,
+  BuyerDetailsOutcome,
   CheckoutOutcome,
+  PaymentChoiceOutcome,
   ProtectedInputOutcome,
   SavedCardOutcome,
 } from "@/lib/chat/tools";
@@ -15,7 +17,7 @@ import type { ChatMessage } from "@/lib/chat/types";
 import { Greeting } from "./greeting";
 import { Message, Thinking } from "./message";
 import { watchIndex } from "./parts";
-import { useScrollToBottom } from "./use-scroll-to-bottom";
+import { threadSize, useScrollToBottom } from "./use-scroll-to-bottom";
 
 export interface MessagesProps {
   messages: ChatMessage[];
@@ -23,8 +25,12 @@ export interface MessagesProps {
   onApprovalOutcome: (toolCallId: string, outcome: ApprovalOutcome) => void;
   onPasswordOutcome: (toolCallId: string, outcome: ProtectedInputOutcome) => void;
   onCardSaved: (toolCallId: string, outcome: SavedCardOutcome) => void;
+  onBuyerDetails: (toolCallId: string, outcome: BuyerDetailsOutcome) => void;
+  onPaymentChoice: (toolCallId: string, outcome: PaymentChoiceOutcome) => void;
   onCheckoutOutcome: (toolCallId: string, outcome: CheckoutOutcome) => void;
   onPickStarter: (text: string) => void;
+  /** The signed-in email, which the details form starts with. */
+  email?: string;
   /** Send a message as the user, for a tap on a product card. */
   onSend: (text: string) => void;
 }
@@ -36,11 +42,14 @@ export function Messages({
   onApprovalOutcome,
   onPasswordOutcome,
   onCardSaved,
+  onBuyerDetails,
+  onPaymentChoice,
   onCheckoutOutcome,
   onPickStarter,
   onSend,
+  email,
 }: MessagesProps) {
-  const { containerRef, isAtBottom, scrollToBottom } = useScrollToBottom(messages.length);
+  const { containerRef, isAtBottom, scrollToBottom } = useScrollToBottom(threadSize(messages));
   const last = messages.at(-1);
   const waiting = status === "submitted" && last?.role !== "assistant";
   const watches = useMemo(() => watchIndex(messages), [messages]);
@@ -61,9 +70,12 @@ export function Messages({
                 onApprovalOutcome={onApprovalOutcome}
                 onPasswordOutcome={onPasswordOutcome}
                 onCardSaved={onCardSaved}
+                onBuyerDetails={onBuyerDetails}
+                onPaymentChoice={onPaymentChoice}
                 onCheckoutOutcome={onCheckoutOutcome}
                 watches={watches}
                 onSend={onSend}
+                email={email}
               />
             </div>
           ))}

@@ -6,7 +6,9 @@ import { cn } from "@agent-commerce/ui";
 import { AgentAvatar } from "@/components/brand";
 import type {
   ApprovalOutcome,
+  BuyerDetailsOutcome,
   CheckoutOutcome,
+  PaymentChoiceOutcome,
   ProtectedInputOutcome,
   SavedCardOutcome,
 } from "@/lib/chat/tools";
@@ -14,6 +16,8 @@ import type { ChatMessage, ChatMessagePart } from "@/lib/chat/types";
 import { AgentCardApproval } from "./agent-card-approval";
 import { PasswordRequest } from "./password-request";
 import { AddCard } from "./add-card";
+import { BuyerDetailsRequest } from "./buyer-details-request";
+import { PaymentChoiceInThread } from "./payment-choice";
 import { AttachmentPreview } from "./attachment-preview";
 import { WatchRun } from "./checkout-card";
 import { CheckoutSiteLine } from "./checkout-site";
@@ -33,6 +37,8 @@ import {
   isCheckoutPart,
   messageText,
   passwordRequestOf,
+  productFor,
+  sentBackFirst,
   toolBusy,
   toolTitle,
   watchedHere,
@@ -48,11 +54,15 @@ export interface MessageProps {
   onApprovalOutcome: (toolCallId: string, outcome: ApprovalOutcome) => void;
   onPasswordOutcome: (toolCallId: string, outcome: ProtectedInputOutcome) => void;
   onCardSaved: (toolCallId: string, outcome: SavedCardOutcome) => void;
+  onBuyerDetails: (toolCallId: string, outcome: BuyerDetailsOutcome) => void;
+  onPaymentChoice: (toolCallId: string, outcome: PaymentChoiceOutcome) => void;
   onCheckoutOutcome: (toolCallId: string, outcome: CheckoutOutcome) => void;
   /** The thread's watched checkouts, from `watchIndex`. */
   watches: WatchIndex;
   /** Send a message as the user: what a tap on a product card does. */
   onSend: (text: string) => void;
+  /** The signed-in email, which the details form starts with. */
+  email?: string;
 }
 
 /**
@@ -65,9 +75,12 @@ export function Message({
   onApprovalOutcome,
   onPasswordOutcome,
   onCardSaved,
+  onBuyerDetails,
+  onPaymentChoice,
   onCheckoutOutcome,
   watches,
   onSend,
+  email,
 }: MessageProps) {
   if (message.role === "user") return <UserMessage message={message} />;
   if (message.role !== "assistant") return null;
@@ -91,9 +104,12 @@ export function Message({
               onApprovalOutcome={onApprovalOutcome}
               onPasswordOutcome={onPasswordOutcome}
               onCardSaved={onCardSaved}
+              onBuyerDetails={onBuyerDetails}
+              onPaymentChoice={onPaymentChoice}
               onCheckoutOutcome={onCheckoutOutcome}
               watches={watches}
               onSend={onSend}
+              email={email}
             />
           </div>
         ))}
@@ -179,9 +195,12 @@ function Part({
   onApprovalOutcome,
   onPasswordOutcome,
   onCardSaved,
+  onBuyerDetails,
+  onPaymentChoice,
   onCheckoutOutcome,
   watches,
   onSend,
+  email,
 }: {
   message: ChatMessage;
   part: ChatMessagePart;
@@ -189,9 +208,12 @@ function Part({
   onApprovalOutcome: MessageProps["onApprovalOutcome"];
   onPasswordOutcome: MessageProps["onPasswordOutcome"];
   onCardSaved: MessageProps["onCardSaved"];
+  onBuyerDetails: MessageProps["onBuyerDetails"];
+  onPaymentChoice: MessageProps["onPaymentChoice"];
   onCheckoutOutcome: MessageProps["onCheckoutOutcome"];
   watches: WatchIndex;
   onSend: MessageProps["onSend"];
+  email?: string;
 }) {
   switch (part.type) {
     case "text":
@@ -245,6 +267,43 @@ function Part({
         </ActivityLine>
       );
 
+    // The first purchase: Add details opens the form in a sheet; Not now skips it.
+    case "tool-await_buyer_details":
+      if (part.state === "input-available" || part.state === "output-available") {
+        return (
+          <BuyerDetailsRequest
+            toolCallId={part.toolCallId}
+            output={part.state === "output-available" ? part.output : undefined}
+            email={email}
+            onOutcome={onBuyerDetails}
+          />
+        );
+      }
+      return (
+        <ActivityLine busy={toolBusy(part.state)} failed={part.state === "output-error"}>
+          {toolTitle(part.type)}
+        </ActivityLine>
+      );
+
+    // A product on a Shopify store: card, Shop Pay or another way.
+    case "tool-await_payment_choice":
+      if (part.state === "input-available" || part.state === "output-available") {
+        return (
+          <PaymentChoiceInThread
+            input={part.input}
+            product={productFor(watches, part.input.url)}
+            output={part.state === "output-available" ? part.output : undefined}
+            onChoose={(outcome) => onPaymentChoice(part.toolCallId, outcome)}
+            buttonSize="lg"
+          />
+        );
+      }
+      return (
+        <ActivityLine busy={toolBusy(part.state)} failed={part.state === "output-error"}>
+          {toolTitle(part.type)}
+        </ActivityLine>
+      );
+
     // The store asks for a password: Crossmint's field in a dialog, never words.
     case "tool-await_protected_input": {
       const request = passwordRequestOf(part, watches);
@@ -288,6 +347,8 @@ function Part({
 
     default:
       if (isCheckoutPart(part)) {
+        // Sent back for the details or the card's approval: that follows, not a failure.
+        if (sentBackFirst(part)) return null;
         // Starting a checkout says, once, which site the agent went to.
         const site = checkoutSiteOf(part);
         const failed =

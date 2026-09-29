@@ -180,6 +180,8 @@ export function createAgentCommerceApi(opts: AgentCommerceApiOptions) {
     createBuyerProfile: (input: BuyerProfileInput) => request<{ id: string }>("POST", "/buyer-profiles", input),
     /** The saved details checkouts start with, or null when there are none. */
     getBuyerProfile: async () => (await request<{ buyerProfile: BuyerProfile | null }>("GET", "/buyer-profile")).buyerProfile,
+    /** Delete every saved profile: the next checkout starts with none, and the store asks again. */
+    deleteBuyerProfile: () => request<void>("DELETE", "/buyer-profile"),
   };
 }
 

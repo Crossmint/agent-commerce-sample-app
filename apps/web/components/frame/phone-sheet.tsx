@@ -33,6 +33,7 @@ export function PhoneSheet({
   dismissible = true,
   height = "h-[92%]",
   hideTitle = false,
+  action,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -50,6 +51,8 @@ export function PhoneSheet({
   dismissible?: boolean;
   /** Tailwind height class for the sheet. Default 92% of the screen. */
   height?: string;
+  /** A control in place of the close button, such as Not now. The scrim and Escape still close. */
+  action?: ReactNode;
 }) {
   const titleId = useId();
 
@@ -91,10 +94,12 @@ export function PhoneSheet({
           >
             {title}
           </h2>
-          <button type="button" onClick={() => onOpenChange(false)} className="ml-auto flex size-9 shrink-0 items-center justify-center rounded-full bg-muted">
-            <X className="size-4.5" />
-            <span className="sr-only">Close</span>
-          </button>
+          {action ?? (
+            <button type="button" onClick={() => onOpenChange(false)} className="ml-auto flex size-9 shrink-0 items-center justify-center rounded-full bg-muted">
+              <X className="size-4.5" />
+              <span className="sr-only">Close</span>
+            </button>
+          )}
         </div>
         <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-6 pb-8">{children}</div>
       </div>

@@ -211,6 +211,8 @@ The server trims every field and writes a bare state as ISO 3166-2 (`CA` with `U
 
 `GET /v1/buyer-profile` → `{ "buyerProfile": BuyerProfile | null }`. The saved details later checkouts start with.
 
+`DELETE /v1/buyer-profile` → `204`. Start over: delete every buyer profile the user has saved, not only the newest, so no older one takes its place. The next checkout starts with none, and the store asks for the details again. Crossmint needs the `agent-checkouts.buyer-profiles.delete` scope on the key; without it the call fails with Crossmint's error.
+
 `GET /v1/browser-profile` → `{ "browserProfile": { "id": "…" } | null }`. The user's saved merchant logins, as metadata: Crossmint returns no cookies or tokens, so there is nothing else to show. Null until a checkout has made the profile; reading does not create one.
 
 `DELETE /v1/browser-profile` → `204`. Sign out everywhere. Irreversible: it erases the stored browser state, not just the record. The next checkout starts signed out and saves whatever the user logs into then.

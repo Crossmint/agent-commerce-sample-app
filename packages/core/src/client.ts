@@ -343,6 +343,18 @@ export class CrossmintClient {
       ),
 
     /**
+     * Delete one saved buyer profile. A later checkout that names it fails,
+     * so drop any id kept for it. Needs the key scope
+     * `agent-checkouts.buyer-profiles.delete`.
+     */
+    deleteBuyerProfile: (ctx: CheckoutContext, profileId: string): Promise<void> =>
+      this.request<void>(
+        "DELETE",
+        `/unstable/agent-checkouts/buyer-profiles/${encodeURIComponent(profileId)}`,
+        { auth: this.checkoutAuth(ctx), baseUrl: this.checkoutsBaseUrl },
+      ),
+
+    /**
      * The user's saved merchant logins. At most one comes back, because a user
      * holds at most one profile.
      *

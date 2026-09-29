@@ -19,6 +19,10 @@ describe("tool docs", () => {
     expect(toolNamesFor("mcp")).not.toContain("watch_checkout");
     expect(toolNamesFor("chat")).toContain("pay_checkout_with_agent_card");
     expect(toolNamesFor("chat")).toContain("save_buyer_profile");
+    for (const name of ["await_buyer_details", "await_payment_choice"] as const) {
+      expect(toolNamesFor("chat")).toContain(name);
+      expect(toolNamesFor("mcp")).not.toContain(name);
+    }
     expect(toolNamesFor("chat")).toContain("search_products");
     expect(toolNamesFor("chat")).toContain("look_up_products");
     expect(toolNamesFor("chat")).toContain("show_receipt");

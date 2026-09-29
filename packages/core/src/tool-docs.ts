@@ -166,6 +166,28 @@ export const TOOL_DOCS = {
     params: {},
     surfaces: ["chat"],
   },
+  await_buyer_details: {
+    title: "Wait for the buyer's details",
+    summary:
+      "Ask the user for their name, email, phone number and shipping address, and wait. The chat shows a card with Add details, which opens a form the browser can fill in, and Not now. Every later checkout starts with these details, so stores do not ask. " +
+      "Call it before a purchase when no details are saved, with no text in between; for a Shopify product, right after await_payment_choice. The chat asks the user. It returns saved, or skipped when the user would rather not.",
+    params: {},
+    surfaces: ["chat"],
+  },
+  await_payment_choice: {
+    title: "Ask how to pay",
+    summary:
+      "Ask the user how to pay for a product on a Shopify store: by card, with Shop Pay, or another way (PayPal, Klarna or one they type). Card has them take an agent card they already have that fits the store, or approve a new one for the budget, before it returns: then it returns agent_card with the agentCardId to start the checkout with. Wait for the answer. " +
+      "Call it after the user picks a product and before anything else, with no text in between; the chat shows the product and the choices. " +
+      "It returns the method, the agentCardId of a card they already have, the name of another way when the user typed one, and a budget: the price with room for shipping and tax, when the price is known.",
+    params: {
+      url: "The product page URL, as search_products or look_up_products gave it.",
+      item: "The product, in a few words, e.g. IQBAR Chocolate Mint Chip bars.",
+      store: "The store's name, e.g. IQBAR.",
+      price: "The price the product card shows, as an amount and a currency.",
+    },
+    surfaces: ["chat"],
+  },
   await_protected_input: {
     title: "Wait for a password",
     summary:

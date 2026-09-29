@@ -10,7 +10,9 @@ import {
 } from "ai";
 import type {
   ApprovalOutcome,
+  BuyerDetailsOutcome,
   CheckoutOutcome,
+  PaymentChoiceOutcome,
   ProtectedInputOutcome,
   SavedCardOutcome,
 } from "@/lib/chat/tools";
@@ -37,6 +39,10 @@ export interface AgentChat {
   onCardSaved: (toolCallId: string, outcome: SavedCardOutcome) => void;
   /** Hand the password field's answer (submitted or declined) back to the `await_protected_input` tool call. */
   onPasswordOutcome: (toolCallId: string, outcome: ProtectedInputOutcome) => void;
+  /** Hand the details form's result (saved or skipped) back to the `await_buyer_details` tool call. */
+  onBuyerDetails: (toolCallId: string, outcome: BuyerDetailsOutcome) => void;
+  /** Hand the way the user chose to pay back to the `await_payment_choice` tool call. */
+  onPaymentChoice: (toolCallId: string, outcome: PaymentChoiceOutcome) => void;
   /** Hand a watched checkout's question or ending back to the `watch_checkout` tool call. Once per call. */
   onCheckoutOutcome: (toolCallId: string, outcome: CheckoutOutcome) => void;
   error: string | null;
@@ -116,6 +122,8 @@ export function useAgentChat({ id, initialMessages, persist }: UseAgentChatOptio
     | { tool: "await_agent_card_approval"; output: ApprovalOutcome }
     | { tool: "await_protected_input"; output: ProtectedInputOutcome }
     | { tool: "await_saved_card"; output: SavedCardOutcome }
+    | { tool: "await_buyer_details"; output: BuyerDetailsOutcome }
+    | { tool: "await_payment_choice"; output: PaymentChoiceOutcome }
     | { tool: "watch_checkout"; output: CheckoutOutcome }
   );
   const queue = useRef<Output[]>([]);
@@ -187,6 +195,26 @@ export function useAgentChat({ id, initialMessages, persist }: UseAgentChatOptio
     [hand],
   );
 
+  // One answer per question: a sheet and a card can both hand one back.
+  const answered = useRef(new Set<string>());
+  const onBuyerDetails = useCallback(
+    (toolCallId: string, output: BuyerDetailsOutcome) => {
+      if (answered.current.has(toolCallId)) return;
+      answered.current.add(toolCallId);
+      hand({ tool: "await_buyer_details", toolCallId, output });
+    },
+    [hand],
+  );
+
+  const onPaymentChoice = useCallback(
+    (toolCallId: string, output: PaymentChoiceOutcome) => {
+      if (answered.current.has(toolCallId)) return;
+      answered.current.add(toolCallId);
+      hand({ tool: "await_payment_choice", toolCallId, output });
+    },
+    [hand],
+  );
+
   // A run can end in front of more than one watcher (a card and a sheet), and
   // a watcher can remount. The model hears about each ending once.
   const reported = useRef(new Set<string>());
@@ -208,6 +236,8 @@ export function useAgentChat({ id, initialMessages, persist }: UseAgentChatOptio
     onApprovalOutcome,
     onPasswordOutcome,
     onCardSaved,
+    onBuyerDetails,
+    onPaymentChoice,
     onCheckoutOutcome,
     error,
     dismissError: () => setError(null),

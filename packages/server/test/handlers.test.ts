@@ -1629,6 +1629,66 @@ describe("saved buyer details", () => {
     expect(findCall(calls, "POST", "/buyer-profiles")).toBeUndefined();
   });
 
+  it("deletes every saved profile, so the next checkout starts with none", async () => {
+    const { handlers, calls } = makeServer([
+      createRoute,
+      // Two pages to delete, then nothing left.
+      {
+        method: "GET",
+        path: "/unstable/agent-checkouts/buyer-profiles",
+        once: true,
+        reply: { body: { data: [{ id: "byp_old", ...details }], nextCursor: "next" } },
+      },
+      {
+        method: "GET",
+        path: "/unstable/agent-checkouts/buyer-profiles",
+        once: true,
+        reply: { body: { data: [{ id: "byp_new", ...details }], nextCursor: null } },
+      },
+      {
+        method: "GET",
+        path: "/unstable/agent-checkouts/buyer-profiles",
+        reply: { body: { data: [], nextCursor: null } },
+      },
+      // One is gone already: that is no reason to fail.
+      { method: "DELETE", path: "/buyer-profiles/byp_old", reply: { status: 404, body: { message: "Not found" } } },
+      { method: "DELETE", path: "/buyer-profiles/byp_new", reply: { status: 204 } },
+      {
+        method: "POST",
+        path: "/unstable/agent-checkouts/buyer-profiles",
+        reply: { status: 201, body: { id: "byp_saved" } },
+      },
+    ]);
+    // A profile saved earlier is cached, and must not outlive the delete.
+    await call(handlers, "POST", "/v1/buyer-profiles", { body: details });
+
+    const res = await call(handlers, "DELETE", "/v1/buyer-profile");
+    expect(res.status).toBe(204);
+    expect(findCall(calls, "DELETE", "/buyer-profiles/byp_old")).toBeDefined();
+    expect(findCall(calls, "DELETE", "/buyer-profiles/byp_new")).toBeDefined();
+
+    const read = await call(handlers, "GET", "/v1/buyer-profile");
+    expect(await read.json()).toEqual({ buyerProfile: null });
+    calls.length = 0;
+    await call(handlers, "POST", "/v1/checkouts", { body });
+    expect(findCall(calls, "POST", /\/unstable\/agent-checkouts$/)!.body).not.toHaveProperty(
+      "buyerProfileId",
+    );
+  });
+
+  it("reports a delete Crossmint refuses", async () => {
+    const { handlers } = makeServer([
+      {
+        method: "GET",
+        path: "/unstable/agent-checkouts/buyer-profiles",
+        reply: { body: { data: [{ id: "byp_1", ...details }], nextCursor: null } },
+      },
+      { method: "DELETE", path: "/buyer-profiles/byp_1", reply: { status: 403, body: { message: "Missing scope" } } },
+    ]);
+    const res = await call(handlers, "DELETE", "/v1/buyer-profile");
+    expect(res.status).toBeGreaterThanOrEqual(400);
+  });
+
   it("saves the state as ISO 3166-2", async () => {
     const { handlers, calls } = makeServer([
       {

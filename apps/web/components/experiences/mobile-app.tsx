@@ -52,6 +52,8 @@ import {
   toolBusy,
   toolTitle,
   passwordRequestOf,
+  productFor,
+  sentBackFirst,
   toApprovalOutcome,
   watchIndex,
   watchedHere,
@@ -60,6 +62,13 @@ import {
 import { APPROVAL_DONE_LINGER_MS, ApprovalInThread } from "@/components/chat/agent-card-approval";
 import { PasswordInThread } from "@/components/chat/password-request";
 import { AddCardInThread, savedCardOutcome } from "@/components/chat/add-card";
+import {
+  BUYER_DETAILS_NOTE,
+  BUYER_DETAILS_TITLE,
+  BuyerDetailsInThread,
+  BuyerDetailsSheetBody,
+} from "@/components/chat/buyer-details-request";
+import { PaymentChoiceInThread } from "@/components/chat/payment-choice";
 import { WatchRun } from "@/components/chat/checkout-card";
 import { CheckoutSiteLine } from "@/components/chat/checkout-site";
 import { ProductCards, ProductDetails, pickMessage } from "@/components/chat/product-cards";
@@ -68,9 +77,10 @@ import { AgentBubble, ENTER, ENTER_SENT } from "@/components/chat/text";
 import { ActivityLine } from "@/components/chat/activity-line";
 import { StarterCards } from "@/components/chat/starters";
 import { type AgentChat } from "@/components/chat/use-agent-chat";
-import { useScrollToBottom } from "@/components/chat/use-scroll-to-bottom";
+import { threadSize, useScrollToBottom } from "@/components/chat/use-scroll-to-bottom";
+import type { BuyerProfile } from "@agent-commerce/core";
 import type { FoundProduct } from "@/lib/chat/shopify-catalog";
-import type { CheckoutOutcome } from "@/lib/chat/tools";
+import type { BuyerDetailsOutcome, CheckoutOutcome, PaymentChoiceOutcome } from "@/lib/chat/tools";
 import type { ChatMessage, ChatMessagePart } from "@/lib/chat/types";
 import { cn } from "@/lib/cn";
 import { brandAttr, initialOf, loginNext, type ExperienceProps } from "./types";
@@ -112,12 +122,19 @@ export function MobileApp(props: ExperienceProps) {
 /** A store's password request, open in the sheet. */
 type PasswordAsk = { toolCallId: string; checkoutId: string; requestId: string; domain: string };
 
+/** The details sheet: answering the agent's question, or changing the details from the account. */
+type DetailsSheet =
+  { toolCallId: string } | { key: string; initial?: BuyerProfile; saved: () => void };
+
 type Approval = {
-  toolCallId: string;
   requestId: string;
   /** Set when a checkout's payment step raised this, so the sheet says so. */
   paying?: boolean;
-};
+} & (
+  | { toolCallId: string }
+  /** A new card made at a payment choice: its ending goes back to the choice. */
+  | { onDone: (outcome: ApproveOutcome) => void }
+);
 
 function Home({
   screen,
@@ -135,11 +152,19 @@ function Home({
   const [addCard, setAddCard] = useState<string | null>(null);
   // The product whose details are open, over the chat.
   const [product, setProduct] = useState<FoundProduct | null>(null);
+  // The details sheet: the agent's question, from its card's Add details,
+  // or the account's Edit and Set up.
+  const [details, setDetails] = useState<DetailsSheet | null>(null);
+  const askDetails = useCallback((toolCallId: string) => setDetails({ toolCallId }), []);
+  const editDetails = useCallback((initial: BuyerProfile | undefined, saved: () => void) => {
+    setDetails({ key: `profile-${Date.now()}`, initial, saved });
+  }, []);
 
   const onApprovalDone = useCallback(
     (o: ApproveOutcome) => {
       if (!approval) return;
-      chat.onApprovalOutcome(approval.toolCallId, toApprovalOutcome(o));
+      if ("onDone" in approval) approval.onDone(o);
+      else chat.onApprovalOutcome(approval.toolCallId, toApprovalOutcome(o));
       setTimeout(() => setApproval(null), APPROVAL_DONE_LINGER_MS);
     },
     [approval, chat],
@@ -159,6 +184,15 @@ function Home({
       setTimeout(() => setPassword(null), APPROVAL_DONE_LINGER_MS);
     },
     [password, chat],
+  );
+  const onDetailsDone = useCallback(
+    (outcome: BuyerDetailsOutcome) => {
+      if (!details) return;
+      if ("toolCallId" in details) chat.onBuyerDetails(details.toolCallId, outcome);
+      else details.saved();
+      setTimeout(() => setDetails(null), outcome.status === "saved" ? APPROVAL_DONE_LINGER_MS : 0);
+    },
+    [details, chat],
   );
 
   return (
@@ -181,6 +215,7 @@ function Home({
         onReview={setApproval}
         onEnterPassword={setPassword}
         onAddCard={setAddCard}
+        onAddDetails={askDetails}
         onOpenProduct={setProduct}
       />
       <Composer chat={chat} disabled={!chatEnabled} />
@@ -196,7 +231,7 @@ function Home({
         title="Account"
         height="h-[80%]"
       >
-        <AccountSheetBody email={email} onSignOut={onSignOut} />
+        <AccountSheetBody email={email} onSignOut={onSignOut} onEditDetails={editDetails} />
       </PhoneSheet>
 
       <PhoneSheet
@@ -262,6 +297,26 @@ function Home({
       >
         {addCard ? <SaveCard key={addCard} showResult={false} onSaved={onCardSavedHere} /> : null}
       </PhoneSheet>
+
+      <PhoneSheet
+        open={details !== null}
+        onOpenChange={(open) => !open && setDetails(null)}
+        container={screen}
+        title={BUYER_DETAILS_TITLE}
+      >
+        {details ? (
+          <div className="flex flex-col gap-5">
+            <p className="text-sm text-muted-foreground">{BUYER_DETAILS_NOTE}</p>
+            <BuyerDetailsSheetBody
+              key={"toolCallId" in details ? details.toolCallId : details.key}
+              email={email}
+              initial={"toolCallId" in details ? undefined : details.initial}
+              submitLabel={"toolCallId" in details ? "Save and continue" : "Save details"}
+              onOutcome={onDetailsDone}
+            />
+          </div>
+        ) : null}
+      </PhoneSheet>
     </>
   );
 }
@@ -298,6 +353,7 @@ function Thread({
   onReview,
   onEnterPassword,
   onAddCard,
+  onAddDetails,
   onOpenProduct,
 }: {
   chat: AgentChat;
@@ -306,9 +362,10 @@ function Thread({
   onReview: (approval: Approval) => void;
   onEnterPassword: (ask: PasswordAsk) => void;
   onAddCard: (toolCallId: string) => void;
+  onAddDetails: (toolCallId: string) => void;
   onOpenProduct: (product: FoundProduct) => void;
 }) {
-  const { containerRef } = useScrollToBottom(chat.messages.length);
+  const { containerRef } = useScrollToBottom(threadSize(chat.messages));
   const last = chat.messages.at(-1);
   const waiting = chat.status === "submitted" && last?.role !== "assistant";
   const watches = useMemo(() => watchIndex(chat.messages), [chat.messages]);
@@ -359,6 +416,9 @@ function Thread({
               onReview={onReview}
               onEnterPassword={onEnterPassword}
               onAddCard={onAddCard}
+              onAddDetails={onAddDetails}
+              onPaymentChoice={chat.onPaymentChoice}
+              onBuyerDetails={chat.onBuyerDetails}
               onCheckoutOutcome={chat.onCheckoutOutcome}
               watches={watches}
               onSend={chat.send}
@@ -383,6 +443,9 @@ function CompactMessage({
   onReview,
   onEnterPassword,
   onAddCard,
+  onAddDetails,
+  onPaymentChoice,
+  onBuyerDetails,
   onCheckoutOutcome,
   watches,
   onSend,
@@ -393,6 +456,9 @@ function CompactMessage({
   onReview: (a: Approval) => void;
   onEnterPassword: (ask: PasswordAsk) => void;
   onAddCard: (toolCallId: string) => void;
+  onAddDetails: (toolCallId: string) => void;
+  onPaymentChoice: (toolCallId: string, outcome: PaymentChoiceOutcome) => void;
+  onBuyerDetails: (toolCallId: string, outcome: BuyerDetailsOutcome) => void;
   onCheckoutOutcome: (toolCallId: string, outcome: CheckoutOutcome) => void;
   watches: WatchIndex;
   onSend: (text: string) => void;
@@ -421,6 +487,9 @@ function CompactMessage({
         onReview={onReview}
         onEnterPassword={onEnterPassword}
         onAddCard={onAddCard}
+        onAddDetails={onAddDetails}
+        onPaymentChoice={onPaymentChoice}
+        onBuyerDetails={onBuyerDetails}
         onCheckoutOutcome={onCheckoutOutcome}
         watches={watches}
         onSend={onSend}
@@ -443,6 +512,9 @@ function CompactPart({
   onReview,
   onEnterPassword,
   onAddCard,
+  onAddDetails,
+  onPaymentChoice,
+  onBuyerDetails,
   onCheckoutOutcome,
   watches,
   onSend,
@@ -453,6 +525,9 @@ function CompactPart({
   onReview: (a: Approval) => void;
   onEnterPassword: (ask: PasswordAsk) => void;
   onAddCard: (toolCallId: string) => void;
+  onAddDetails: (toolCallId: string) => void;
+  onPaymentChoice: (toolCallId: string, outcome: PaymentChoiceOutcome) => void;
+  onBuyerDetails: (toolCallId: string, outcome: BuyerDetailsOutcome) => void;
   onCheckoutOutcome: (toolCallId: string, outcome: CheckoutOutcome) => void;
   watches: WatchIndex;
   onSend: (text: string) => void;
@@ -512,6 +587,46 @@ function CompactPart({
         </ActivityLine>
       );
 
+    // The first purchase: Add details opens the form in a sheet; Not now skips it.
+    case "tool-await_buyer_details":
+      if (part.state === "input-available" || part.state === "output-available") {
+        return (
+          <BuyerDetailsInThread
+            output={part.state === "output-available" ? part.output : undefined}
+            onOpen={() => onAddDetails(part.toolCallId)}
+            onSkip={() => onBuyerDetails(part.toolCallId, { status: "skipped" })}
+            bubbleClassName="max-w-[85%] px-3.5 py-2 text-[15px] leading-snug"
+            className="max-w-none"
+          />
+        );
+      }
+      return (
+        <ActivityLine busy={toolBusy(part.state)} failed={part.state === "output-error"}>
+          {toolTitle(part.type)}
+        </ActivityLine>
+      );
+
+    // A product on a Shopify store: card, Shop Pay or another way.
+    case "tool-await_payment_choice":
+      if (part.state === "input-available" || part.state === "output-available") {
+        return (
+          <PaymentChoiceInThread
+            input={part.input}
+            product={productFor(watches, part.input.url)}
+            output={part.state === "output-available" ? part.output : undefined}
+            onChoose={(outcome) => onPaymentChoice(part.toolCallId, outcome)}
+            onReview={(requestId, done) => onReview({ requestId, onDone: done })}
+            bubbleClassName="max-w-[85%] px-3.5 py-2 text-[15px] leading-snug"
+            className="max-w-none"
+          />
+        );
+      }
+      return (
+        <ActivityLine busy={toolBusy(part.state)} failed={part.state === "output-error"}>
+          {toolTitle(part.type)}
+        </ActivityLine>
+      );
+
     // The store asks for a password: Crossmint's field in a sheet, never words.
     case "tool-await_protected_input": {
       const request = passwordRequestOf(part, watches);
@@ -556,6 +671,8 @@ function CompactPart({
 
     default: {
       if (isCheckoutPart(part)) {
+        // Sent back for the details or the card's approval: that follows, not a failure.
+        if (sentBackFirst(part)) return null;
         // Starting a checkout says, once, which site the agent went to.
         const site = checkoutSiteOf(part);
         const failed =
@@ -959,7 +1076,14 @@ function SavedCardRows({ cards }: { cards: ReturnType<typeof usePaymentMethods> 
 // The Account sheet
 // ---------------------------------------------------------------------------
 
-function AccountSheetBody({ email, onSignOut }: Pick<ExperienceProps, "email" | "onSignOut">) {
+function AccountSheetBody({
+  email,
+  onSignOut,
+  onEditDetails,
+}: Pick<ExperienceProps, "email" | "onSignOut"> & {
+  /** Edit and Set up open the phone's own details sheet, over this one. */
+  onEditDetails: (initial: BuyerProfile | undefined, saved: () => void) => void;
+}) {
   const [busy, setBusy] = useState(false);
   return (
     <div className="flex min-h-full flex-col gap-8 pt-2">
@@ -974,7 +1098,7 @@ function AccountSheetBody({ email, onSignOut }: Pick<ExperienceProps, "email" | 
         <p className="text-xs text-muted-foreground">
           Every checkout starts with these, so stores do not ask. You can also tell the agent.
         </p>
-        <BuyerDetails email={email} />
+        <BuyerDetails email={email} onEdit={onEditDetails} />
       </div>
       <Button
         type="button"

@@ -33,7 +33,7 @@ import {
   forgetBrowserProfile,
   stickyBrowserProfileId,
 } from "../browser-profile.js";
-import { currentBuyerProfile, rememberBuyerProfile } from "../buyer-profile.js";
+import { currentBuyerProfile, deleteBuyerProfiles, rememberBuyerProfile } from "../buyer-profile.js";
 import { forbidden, HttpError, invalidRequest, json, noContent } from "../errors.js";
 import { agentCardRequestId } from "../ids.js";
 import type { Params } from "../router.js";
@@ -440,6 +440,18 @@ export async function getBuyerProfile(req: Request, ctx: Ctx): Promise<Response>
   const user = await requireUser(req, ctx);
   const profile = await currentBuyerProfile(ctx, checkoutContext(ctx, user), user.userId);
   return json({ buyerProfile: profile ?? null });
+}
+
+/**
+ * DELETE /v1/buyer-profile
+ *
+ * Start over: delete every saved buyer profile the user has. The next
+ * checkout starts with none, and the store asks for the details again.
+ */
+export async function deleteBuyerProfile(req: Request, ctx: Ctx): Promise<Response> {
+  const user = await requireUser(req, ctx);
+  await deleteBuyerProfiles(ctx, checkoutContext(ctx, user), user.userId);
+  return noContent();
 }
 
 // ---------------------------------------------------------------------------
