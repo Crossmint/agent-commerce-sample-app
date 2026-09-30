@@ -132,6 +132,53 @@ describe("agent card requests", () => {
     expect((await approve.json()).error.code).toBe("expired");
   });
 
+  it("says in plain words when Crossmint finds no rail for the card, with what registration reported", async () => {
+    vi.spyOn(console, "info").mockImplementation(() => {});
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    const { handlers } = makeServer([
+      {
+        method: "PUT",
+        path: "/order-intent-registration",
+        reply: {
+          body: {
+            paymentMethodId: "pm_1",
+            rails: [
+              { rail: "agentic-token", provider: "vic", status: "error", error: { code: "CARD_NOT_ELIGIBLE" } },
+            ],
+          },
+        },
+      },
+      {
+        method: "POST",
+        path: "/unstable/order-intents",
+        reply: {
+          status: 400,
+          body: {
+            error: true,
+            message: "Payment method pm_1 has no active order-intent rails.",
+            code: "ORDER_INTENT_PAYMENT_METHOD_NO_ACTIVE_RAILS",
+          },
+        },
+      },
+    ]);
+    const created = await (
+      await call(handlers, "POST", "/v1/agent-card-requests", { body: requestBody })
+    ).json();
+    const res = await call(handlers, "POST", `/v1/agent-card-requests/${created.id}/approve`, {
+      body: { paymentMethodId: "pm_1" },
+    });
+    expect(res.status).toBe(409);
+    const { error } = await res.json();
+    expect(error.code).toBe("no_usable_rail");
+    expect(error.message).toBe(
+      "This card can't be used by agents yet. Choose another saved card, or add a new one.",
+    );
+    expect(error.details.registration).toEqual([
+      { rail: "agentic-token", provider: "vic", status: "error", error: "CARD_NOT_ELIGIBLE" },
+    ]);
+    vi.restoreAllMocks();
+  });
+
   it("approve registers the card, creates the order intent, and goes active", async () => {
     const { handlers, calls } = makeServer([
       {

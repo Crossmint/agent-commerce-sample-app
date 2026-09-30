@@ -43,6 +43,12 @@ export interface AgentCommerceApiOptions {
   baseUrl?: string;
   /** Returns the user's JWT. Called on every request so it is always fresh. */
   getJwt: GetJwt;
+  /**
+   * Renews the session and returns the new JWT. Called once when a request
+   * comes back 401, which is what an expired JWT gets (a tab that slept past
+   * its lifetime); the request is then sent again with the new one.
+   */
+  renewJwt?: GetJwt;
   /** Override fetch, for tests or custom agents. */
   fetch?: typeof fetch;
 }
@@ -70,12 +76,22 @@ export function createAgentCommerceApi(opts: AgentCommerceApiOptions) {
       if (!jwt) throw new AgentCommerceApiError(401, { code: "unauthorized", message: "Not signed in." });
       headers.Authorization = `Bearer ${jwt}`;
     }
-    const res = await doFetch(`${baseUrl}/v1${path}`, {
-      method,
-      headers,
-      body: body === undefined ? undefined : JSON.stringify(body),
-      credentials: "same-origin",
-    });
+    const send = () =>
+      doFetch(`${baseUrl}/v1${path}`, {
+        method,
+        headers,
+        body: body === undefined ? undefined : JSON.stringify(body),
+        credentials: "same-origin",
+      });
+    let res = await send();
+    // An expired JWT: renew the session once, and send the request again.
+    if (res.status === 401 && auth && opts.renewJwt) {
+      const renewed = await Promise.resolve(opts.renewJwt()).catch(() => null);
+      if (renewed) {
+        headers.Authorization = `Bearer ${renewed}`;
+        res = await send();
+      }
+    }
     if (res.status === 204) return undefined as T;
     const text = await res.text();
     let json: unknown = undefined;

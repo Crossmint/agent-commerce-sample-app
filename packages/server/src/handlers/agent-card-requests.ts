@@ -1,5 +1,6 @@
 import type { AuthenticatedUser } from "@agent-commerce/auth";
 import {
+  CrossmintApiError,
   expiresInHours,
   isReadyForAgent,
   needsCvcRecollection,
@@ -95,18 +96,44 @@ export async function approveRequest(req: Request, ctx: Ctx, params: Params): Pr
   await revokePreviousCard(ctx, jwt, request);
 
   // Idempotent. Turns on the network rails the card supports.
-  await ctx.crossmint.paymentMethods.registerForOrderIntents(jwt, body.paymentMethodId, {
-    email,
-    countryCode: body.countryCode ?? "US",
+  const registration = await ctx.crossmint.paymentMethods.registerForOrderIntents(
+    jwt,
+    body.paymentMethodId,
+    { email, countryCode: body.countryCode ?? "US" },
+  );
+  // What Crossmint sees for this card: which network rails are on, and why not.
+  const rails = (registration.rails ?? []).map((r) => ({
+    rail: r.rail,
+    ...(r.provider ? { provider: r.provider } : {}),
+    status: r.status,
+    ...(r.error ? { error: r.error.code } : {}),
+  }));
+  console.info("[agent-commerce] card registration", {
+    paymentMethodId: body.paymentMethodId,
+    rails,
   });
 
-  const agentCard = await ctx.crossmint.orderIntents.create(jwt, {
-    paymentMethodId: body.paymentMethodId,
-    amount: request.amount,
-    description: request.description,
-    expiresAt: request.expiresAt,
-    ...(request.merchant ? { merchant: request.merchant } : {}),
-  });
+  let agentCard;
+  try {
+    agentCard = await ctx.crossmint.orderIntents.create(jwt, {
+      paymentMethodId: body.paymentMethodId,
+      amount: request.amount,
+      description: request.description,
+      expiresAt: request.expiresAt,
+      ...(request.merchant ? { merchant: request.merchant } : {}),
+    });
+  } catch (e) {
+    // No network rail, and Crossmint added no encrypted-card fallback.
+    if (e instanceof CrossmintApiError && e.code === "ORDER_INTENT_PAYMENT_METHOD_NO_ACTIVE_RAILS") {
+      throw new HttpError(
+        409,
+        "no_usable_rail",
+        "This card can't be used by agents yet. Choose another saved card, or add a new one.",
+        { paymentMethodId: body.paymentMethodId, registration: rails, crossmint: e.message },
+      );
+    }
+    throw e;
+  }
 
   // Active means an agent can pay with it: a card rail is live, or nothing is left to verify.
   const active = isReadyForAgent(agentCard);

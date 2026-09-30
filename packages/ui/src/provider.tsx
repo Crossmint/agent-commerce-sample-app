@@ -26,6 +26,8 @@ export interface AgentCommerceProviderProps {
   apiBaseUrl?: string;
   /** Returns the user's session JWT. Called on every API request, and polled for the Crossmint components. */
   getJwt: GetJwt;
+  /** Renews the session and returns the new JWT. Called once when a request comes back 401, then the request is sent again. */
+  renewJwt?: GetJwt;
   /** Crossmint client API key (`ck_...`). Needed for save card and verification. */
   crossmintClientApiKey?: string;
   crossmintEnvironment?: CrossmintEnvironment;
@@ -44,6 +46,7 @@ export interface AgentCommerceProviderProps {
 export function AgentCommerceProvider({
   apiBaseUrl = "/api/agent-commerce",
   getJwt,
+  renewJwt,
   crossmintClientApiKey,
   crossmintEnvironment = "staging",
   jwtRefreshMs = 30_000,
@@ -52,6 +55,8 @@ export function AgentCommerceProvider({
 }: AgentCommerceProviderProps) {
   const getJwtRef = React.useRef(getJwt);
   getJwtRef.current = getJwt;
+  const renewJwtRef = React.useRef(renewJwt);
+  renewJwtRef.current = renewJwt;
 
   const [jwt, setJwt] = React.useState<string | null>(null);
 
@@ -73,7 +78,17 @@ export function AgentCommerceProvider({
   }, [refreshJwt, jwtRefreshMs]);
 
   const api = React.useMemo(
-    () => createAgentCommerceApi({ baseUrl: apiBaseUrl, getJwt: () => getJwtRef.current() }),
+    () =>
+      createAgentCommerceApi({
+        baseUrl: apiBaseUrl,
+        getJwt: () => getJwtRef.current(),
+        renewJwt: async () => {
+          const renewed = (await renewJwtRef.current?.()) ?? null;
+          // The Crossmint components get the new one too.
+          if (renewed) setJwt(renewed);
+          return renewed;
+        },
+      }),
     [apiBaseUrl],
   );
 

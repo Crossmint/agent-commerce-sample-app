@@ -44,11 +44,12 @@ export function Providers({ crossmintClientApiKey, crossmintEnvironment, childre
 }
 
 function ApiBridge({ crossmintClientApiKey, crossmintEnvironment, children }: ProvidersProps) {
-  const { getJwt } = useSessionJwt();
+  const { getJwt, renewJwt } = useSessionJwt();
   return (
     <AgentCommerceProvider
       apiBaseUrl="/api/agent-commerce"
       getJwt={getJwt}
+      renewJwt={renewJwt}
       crossmintClientApiKey={crossmintClientApiKey}
       crossmintEnvironment={crossmintEnvironment}
       mascotSrc="/crossmint-mark.svg"

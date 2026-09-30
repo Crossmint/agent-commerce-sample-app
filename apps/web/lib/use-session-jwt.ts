@@ -17,8 +17,23 @@ export function useSessionJwt() {
     return tokens?.session_jwt ?? null;
   }, [stytch]);
 
+  /**
+   * A fresh JWT, for a request that came back 401: the one the SDK held had
+   * expired, as it does when a tab sleeps past its lifetime. Null when the
+   * session itself is gone.
+   */
+  const renewJwt = useCallback(async (): Promise<string | null> => {
+    try {
+      await stytch.session.authenticate();
+    } catch {
+      return null;
+    }
+    return stytch.session.getTokens()?.session_jwt ?? null;
+  }, [stytch]);
+
   return {
     getJwt,
+    renewJwt,
     session,
     /** False until the SDK has read its cookies. */
     ready: isInitialized,

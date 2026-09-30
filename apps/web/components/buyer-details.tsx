@@ -92,6 +92,17 @@ export function BuyerDetails({
   if (profile.loading && profile.data === undefined) {
     return <Skeleton className={cn("h-40 w-full rounded-2xl", className)} />;
   }
+  // A read that failed is not "no details": saying so would hide details
+  // that checkouts still use, and invite the user to type them again.
+  if (profile.error && profile.data === undefined) {
+    return (
+      <DetailsUnavailable
+        message={errorMessage(profile.error)}
+        onRetry={() => void profile.refetch()}
+        className={className}
+      />
+    );
+  }
   return (
     <>
       {saved ? (
@@ -183,6 +194,34 @@ export function BuyerDetailsSheet({
 }
 
 /** No details yet: what they are for, and Set up, which opens the sheet. */
+/** The details could not be read: what went wrong, and Try again. */
+function DetailsUnavailable({
+  message,
+  onRetry,
+  className,
+}: {
+  message: string;
+  onRetry: () => void;
+  className?: string;
+}) {
+  return (
+    <div
+      className={cn(
+        "flex flex-col items-start gap-4 rounded-2xl bg-card p-5 ring-1 ring-foreground/10",
+        className,
+      )}
+    >
+      <div className="flex flex-col gap-1">
+        <p className="text-base font-medium text-foreground">Could not load your details</p>
+        <p className="text-sm text-muted-foreground">{message}</p>
+      </div>
+      <Button type="button" size="lg" variant="secondary" onClick={onRetry}>
+        Try again
+      </Button>
+    </div>
+  );
+}
+
 function NoDetails({ onSetUp, className }: { onSetUp: () => void; className?: string }) {
   return (
     <div
