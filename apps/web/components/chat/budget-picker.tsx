@@ -364,6 +364,17 @@ export function BudgetInThread({
   const cards = useAgentCards({ enabled: forPurchase && !output });
   const cardsReady = !cards.loading || cards.data !== undefined;
   const budgets = generalBudgets(cards.data);
+  // The question is settled once, when the budgets are in, and kept: asked
+  // before they load it would change under the reader, and again on New budget.
+  const [asked, setAsked] = useState<string>();
+  const ready = !forPurchase || Boolean(output) || cardsReady;
+  const question =
+    asked ??
+    (ready
+      ? budgetAsk(input.purchase, output ? Boolean(output.existing) : budgets.length > 0)
+      : undefined);
+  // Stored on the render that first has it, React's way to keep a value once.
+  if (!asked && question) setAsked(question);
   const box = cn(
     "flex w-full max-w-lg flex-col overflow-hidden rounded-2xl bg-card ring-1 ring-foreground/10",
     className,
@@ -484,10 +495,7 @@ export function BudgetInThread({
 
   return (
     <>
-      <AgentBubble
-        text={budgetAsk(input.purchase, flow.phase === "choose" && budgets.length > 0)}
-        className={bubbleClassName}
-      />
+      {question ? <AgentBubble text={question} className={bubbleClassName} /> : null}
       <div className={box}>{body}</div>
 
       {flow.phase === "creating" && !output ? (
