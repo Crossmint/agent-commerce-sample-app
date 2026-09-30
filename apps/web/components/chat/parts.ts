@@ -548,6 +548,7 @@ export function toolTitle(type: string): string {
     "tool-await_saved_card": "Waiting for your card",
     "tool-await_buyer_details": "Waiting for your details",
     "tool-await_payment_choice": "Waiting for how you want to pay",
+    "tool-await_budget": "Waiting for your budget",
     "tool-watch_checkout": "Following the checkout",
     "tool-pay_checkout_with_agent_card": "Paying with your agent card",
     "tool-save_buyer_profile": "Saving your details for next time",

@@ -427,7 +427,7 @@ export async function createBuyerProfile(req: Request, ctx: Ctx): Promise<Respon
     body,
   );
   // Crossmint may answer with the id alone; what was saved is what was sent.
-  rememberBuyerProfile(ctx, user.userId, { ...body, ...profile });
+  await rememberBuyerProfile(ctx, user.userId, { ...body, ...profile });
   return json({ id: profile.id }, 201);
 }
 

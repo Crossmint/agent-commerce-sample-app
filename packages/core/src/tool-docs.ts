@@ -185,6 +185,20 @@ export const TOOL_DOCS = {
       item: "The product, in a few words, e.g. IQBAR Chocolate Mint Chip bars.",
       store: "The store's name, e.g. IQBAR.",
       price: "The price the product card shows, as an amount and a currency.",
+      category:
+        "What a new budget would cover, when the user picks Card: the broad kind of purchase this is, in one to three words, so the same budget pays for similar purchases later. E.g. Clothing for socks, Snacks for protein bars, Home goods for a lamp. Never the item or the store.",
+    },
+    surfaces: ["chat"],
+  },
+  await_budget: {
+    title: "Ask for a budget",
+    summary:
+      "Ask the user to set up a budget: an agent card for a kind of purchase, such as Groceries or Clothing, that the agent pays similar purchases from until it runs out or ends. The chat asks in its own words, shows what the budget covers (the user can change it), a few amounts ($20, $50, $100, or one they type) and how long it lasts (1, 7 or 30 days; 7 unless they change it), then has them approve it. Nothing is spent until they approve. It is never locked to one store. " +
+      "Call it with no text in between. It returns active with the agentCardId, what it covers, the amount and the days it lasts; denied, expired or failed when it was not approved; or cancelled when the user said Not now.",
+    params: {
+      category:
+        "What the budget covers: a broad kind of purchase in one to three words, e.g. Groceries, Clothing, Eating out. What the user said, or your best guess from the chat. Never a store.",
+      amount: "The amount the user named, if they named one: it is picked first.",
     },
     surfaces: ["chat"],
   },

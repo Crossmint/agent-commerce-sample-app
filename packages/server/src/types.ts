@@ -1,6 +1,7 @@
 import type { UserAuth } from "@agent-commerce/auth";
 import type {
   Amount,
+  BuyerProfile,
   CrossmintEnvironment,
   EncryptedCardKeyPair,
   Merchant,
@@ -173,6 +174,23 @@ export interface SessionStore {
 }
 
 // ---------------------------------------------------------------------------
+// Buyer profiles
+// ---------------------------------------------------------------------------
+
+/**
+ * The user's saved buyer details (name, contact, shipping), one per user, with
+ * the id of the Crossmint profile a checkout names. Crossmint holds the
+ * profile; this is where the server looks it up, so every instance finds the
+ * details the user saved once, without listing Crossmint's profiles.
+ */
+export interface BuyerProfileStore {
+  getBuyerProfile(userId: string): Promise<BuyerProfile | null>;
+  /** Replaces what the user had saved. */
+  putBuyerProfile(userId: string, profile: BuyerProfile): Promise<void>;
+  deleteBuyerProfile(userId: string): Promise<void>;
+}
+
+// ---------------------------------------------------------------------------
 // Server config
 // ---------------------------------------------------------------------------
 
@@ -213,9 +231,14 @@ export interface AgentCommerceServerConfig {
   userAuth: UserAuth;
   /**
    * Request store. Add the `CheckoutStore` methods to persist checkout links and the
-   * `SessionStore` methods to persist exchanged agent sessions. Both fall back to memory.
+   * `SessionStore` methods to persist exchanged agent sessions, and the
+   * `BuyerProfileStore` methods to keep saved buyer details. Each falls back to memory.
    */
-  store: RequestStore & Partial<CheckoutStore> & Partial<SessionStore> & Partial<RevealStore>;
+  store: RequestStore &
+    Partial<CheckoutStore> &
+    Partial<SessionStore> &
+    Partial<RevealStore> &
+    Partial<BuyerProfileStore>;
   /** Enables the encrypted-card rail. */
   encryptedCardPrivateJwk?: PrivateJwk;
   /** For `approvalUrl`. No trailing slash. */

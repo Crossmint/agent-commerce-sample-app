@@ -33,6 +33,13 @@ const PURCHASE_TERMS =
   "This is a one-time purchase: when the store offers a subscription or a repeat delivery (such as Subscribe and save), choose the one-time option, unless this task asks for a subscription. When the store asks for a billing address, use the shipping address: billing is the same as shipping.";
 
 /**
+ * Added to the task of a run that only changes a cart. The cart stays in the
+ * user's browser profile at the store, so a later run can check it out.
+ */
+const CART_TERMS =
+  "Only change the cart as this task asks. Do not check out and do not pay. When you are done, say what is in the cart now, with the prices and the cart total.";
+
+/**
  * Agent Commerce tools for the chat model. Every tool runs in process against the Agent Commerce
  * handlers with the user's own session JWT, so the model can do exactly what
  * the user could do from the wallet page, and nothing more.
@@ -110,12 +117,30 @@ export const buyerDetailsOutcomeSchema = z.object({
 });
 export type BuyerDetailsOutcome = z.infer<typeof buyerDetailsOutcomeSchema>;
 
+/**
+ * What `await_budget` hands back: the budget the user picked and approved,
+ * or how it ended when it was not. `cancelled`: they closed it with Not now.
+ */
+export const budgetOutcomeSchema = z.object({
+  status: z.enum(["active", "denied", "expired", "failed", "cancelled"]),
+  /** When active: the agent card to pay similar purchases from. */
+  agentCardId: z.string().optional(),
+  /** The request the picker made: the chat draws its approval from it. */
+  requestId: z.string().optional(),
+  /** What the budget covers, as the user left it. */
+  category: z.string().optional(),
+  amount: z.object({ value: z.string(), currency: z.string() }).optional(),
+  /** How many days the budget lasts. */
+  days: z.number().optional(),
+});
+export type BudgetOutcome = z.infer<typeof budgetOutcomeSchema>;
+
 /** What `await_payment_choice` hands back: how the user wants to pay, and the most it may cost. */
 export const paymentChoiceOutcomeSchema = z.object({
   method: z.enum(PAYMENT_CHOICE_METHODS),
   /** For `agent_card`: the card to pay with, to pass to create_checkout. */
   agentCardId: z.string().optional(),
-  /** For `agent_card`: made just now for this purchase, for the budget, and approved. */
+  /** For `agent_card`: a budget made just now, with this purchase as its first, and approved. */
   newCard: z.boolean().optional(),
   /** The request of the new card, when one was made: the chat draws its approval from it. */
   requestId: z.string().optional(),
@@ -126,8 +151,13 @@ export const paymentChoiceOutcomeSchema = z.object({
    * did not say. For `agent_card`: what the card is for.
    */
   name: z.string().optional(),
-  /** The price with room for shipping and tax, when the price is known. */
+  /**
+   * The price with room for shipping and tax, when the price is known. For a
+   * new card, the budget the user picked for it.
+   */
   budget: z.object({ value: z.string(), currency: z.string() }).optional(),
+  /** For a new card: how many days the budget lasts. */
+  days: z.number().optional(),
 });
 export type PaymentChoiceOutcome = z.infer<typeof paymentChoiceOutcomeSchema>;
 
@@ -562,8 +592,25 @@ export function createChatTools(api: AgentCommerceClient, opts: { userEmail?: st
           })
           .optional()
           .describe(paramDoc("await_payment_choice", "price")),
+        category: z
+          .string()
+          .min(1)
+          .max(60)
+          .optional()
+          .describe(paramDoc("await_payment_choice", "category")),
       }),
       outputSchema: paymentChoiceOutcomeSchema,
+    }),
+
+    // Client-side tool: no `execute`. The chat shows what the budget covers
+    // and a few amounts; the user picks, then approves the card it makes.
+    await_budget: tool({
+      description: describeTool("await_budget"),
+      inputSchema: z.object({
+        category: z.string().min(1).max(60).describe(paramDoc("await_budget", "category")),
+        amount: amountSchema.optional().describe(paramDoc("await_budget", "amount")),
+      }),
+      outputSchema: budgetOutcomeSchema,
     }),
 
     reveal_agent_card: tool({
@@ -629,6 +676,13 @@ export function createChatTools(api: AgentCommerceClient, opts: { userEmail?: st
             "What you are doing on the site, in a few words, shown to the user on the site card. Start with a verb. E.g. Buying a pouch of Sweet Fish, Booking a table for 2 at Nopa, Getting tickets for a show in Madrid.",
           ),
         task: z.string().max(20000).optional().describe(paramDoc("create_checkout", "task")),
+        // Chat only, and never sent to the API.
+        cartOnly: z
+          .boolean()
+          .optional()
+          .describe(
+            "True when the run only changes the user's cart at a store (add, remove, save for later, empty) and does not buy. It skips the buyer details and the payment choice, and tells the store's agent not to check out.",
+          ),
         agentCardId: z
           .string()
           .min(1)
@@ -658,8 +712,23 @@ export function createChatTools(api: AgentCommerceClient, opts: { userEmail?: st
           .describe(paramDoc("create_checkout", "buyerProfileId")),
         purpose: z.string().min(1).max(80).describe(paramDoc("create_checkout", "purpose")),
       }),
-      execute: async ({ action, currency, maxCost, ...input }, { messages }) => {
+      execute: async ({ action, cartOnly, currency, maxCost, ...input }, { messages }) => {
         void action; // for the site card only
+        if (cartOnly) {
+          // Nothing is paid, so no agent card goes with it.
+          const task = [input.task, CART_TERMS].filter(Boolean).join(" ");
+          return guard(() =>
+            api.createCheckout({
+              ...input,
+              agentCardId: undefined,
+              maxCost: maxCost ?? {
+                amount: CHECKOUT_CEILING,
+                currency: (currency ?? "USD").toUpperCase(),
+              },
+              task,
+            }),
+          );
+        }
         // A purchase with no saved details starts with the form, so the store
         // does not ask for them one by one. A user who skipped the form in
         // this chat goes on without, and the store asks what it needs.

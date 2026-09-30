@@ -1,7 +1,9 @@
+import type { BuyerProfile } from "@agent-commerce/core";
 import type {
   AgentCardRequest,
   AgentCardRequestPatch,
   AgentSession,
+  BuyerProfileStore,
   CheckoutLink,
   CheckoutStore,
   ListRevealsOptions,
@@ -14,12 +16,18 @@ import type {
 } from "../types.js";
 
 /** In-memory request store. For tests and a first `pnpm dev` without a database. */
-export function memoryRequestStore(): RequestStore & CheckoutStore & SessionStore & RevealStore {
+export function memoryRequestStore(): RequestStore &
+  CheckoutStore &
+  SessionStore &
+  RevealStore &
+  BuyerProfileStore {
   const requests = new Map<string, AgentCardRequest>();
   const checkouts = memoryCheckoutStore();
   const sessions = memorySessionStore();
   const reveals = memoryRevealStore();
+  const buyerProfiles = memoryBuyerProfileStore();
   return {
+    ...buyerProfiles,
     async create(req: NewAgentCardRequest) {
       const now = new Date().toISOString();
       const row: AgentCardRequest = { ...req, createdAt: now, updatedAt: now };
@@ -109,6 +117,23 @@ export function memoryCheckoutStore(): CheckoutStore {
     async getCheckout(checkoutId) {
       const row = links.get(checkoutId);
       return row ? { ...row } : null;
+    },
+  };
+}
+
+/** In-memory saved buyer details, by user. Lost on restart. */
+export function memoryBuyerProfileStore(): BuyerProfileStore {
+  const profiles = new Map<string, BuyerProfile>();
+  return {
+    async getBuyerProfile(userId) {
+      const row = profiles.get(userId);
+      return row ? structuredClone(row) : null;
+    },
+    async putBuyerProfile(userId, profile) {
+      profiles.set(userId, structuredClone(profile));
+    },
+    async deleteBuyerProfile(userId) {
+      profiles.delete(userId);
     },
   };
 }

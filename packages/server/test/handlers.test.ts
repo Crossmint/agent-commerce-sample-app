@@ -1609,6 +1609,36 @@ describe("saved buyer details", () => {
     });
   });
 
+  it("finds details saved on another instance, even when Crossmint lists none", async () => {
+    const routes = [
+      createRoute,
+      {
+        method: "GET",
+        path: "/unstable/agent-checkouts/buyer-profiles",
+        reply: { body: { data: [], nextCursor: null } },
+      },
+      {
+        method: "POST",
+        path: "/unstable/agent-checkouts/buyer-profiles",
+        reply: { status: 201, body: { id: "byp_saved" } },
+      },
+    ];
+    const first = makeServer(routes);
+    await call(first.handlers, "POST", "/v1/buyer-profiles", { body: details });
+
+    // A second instance: its own memory, the same store.
+    const second = makeServer(routes, { store: first.store });
+    const read = await call(second.handlers, "GET", "/v1/buyer-profile");
+    expect(await read.json()).toMatchObject({
+      buyerProfile: { id: "byp_saved", name: { first: "Ada", last: "Lovelace" } },
+    });
+    await call(second.handlers, "POST", "/v1/checkouts", { body });
+    expect(findCall(second.calls, "POST", /\/unstable\/agent-checkouts$/)!.body).toMatchObject({
+      buyerProfileId: "byp_saved",
+    });
+    expect(findCall(second.calls, "GET", "/buyer-profiles")).toBeUndefined();
+  });
+
   it("refuses details a store cannot ship to, field by field, without calling Crossmint", async () => {
     const { handlers, calls } = makeServer([]);
     const res = await call(handlers, "POST", "/v1/buyer-profiles", {

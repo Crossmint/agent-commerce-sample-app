@@ -7,6 +7,7 @@ import { cn } from "@agent-commerce/ui";
 import { AgentAvatar } from "@/components/brand";
 import type {
   ApprovalOutcome,
+  BudgetOutcome,
   BuyerDetailsOutcome,
   CheckoutOutcome,
   PaymentChoiceOutcome,
@@ -27,6 +28,7 @@ export interface MessagesProps {
   onCardSaved: (toolCallId: string, outcome: SavedCardOutcome) => void;
   onBuyerDetails: (toolCallId: string, outcome: BuyerDetailsOutcome) => void;
   onPaymentChoice: (toolCallId: string, outcome: PaymentChoiceOutcome) => void;
+  onBudget: (toolCallId: string, outcome: BudgetOutcome) => void;
   onCheckoutOutcome: (toolCallId: string, outcome: CheckoutOutcome) => void;
   onPickStarter: (text: string) => void;
   /** The signed-in email, which the details form starts with. */
@@ -44,6 +46,7 @@ export function Messages({
   onCardSaved,
   onBuyerDetails,
   onPaymentChoice,
+  onBudget,
   onCheckoutOutcome,
   onPickStarter,
   onSend,
@@ -72,6 +75,7 @@ export function Messages({
                 onCardSaved={onCardSaved}
                 onBuyerDetails={onBuyerDetails}
                 onPaymentChoice={onPaymentChoice}
+                onBudget={onBudget}
                 onCheckoutOutcome={onCheckoutOutcome}
                 watches={watches}
                 onSend={onSend}

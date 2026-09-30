@@ -10,19 +10,18 @@ import type { Ctx } from "./context.js";
  * the first time a store asks; after that the server attaches the profile to
  * every run, and nobody has to type an address again.
  *
- * A user can hold several profiles. The one that counts is the newest: saving
- * again is how a user moves house.
+ * A user can hold several profiles at Crossmint. The one that counts is the
+ * one saved last, which the server keeps in its store: saving again is how a
+ * user moves house.
  */
-
-/**
- * The profile in use, by user, kept on the context rather than in this
- * module, as for browser profiles. The profile is durable at Crossmint; this
- * saves a round trip per checkout and per chat turn.
- */
-export type BuyerProfileCache = Map<string, BuyerProfile>;
 
 /**
  * The user's buyer profile, or undefined when they have saved none.
+ *
+ * Read from the server's own store, where saving puts it, so every instance
+ * finds details saved once. A user with nothing there may still have a
+ * profile at Crossmint, saved before the store kept them: the newest one is
+ * copied over, and read from the store from then on.
  *
  * Failure is quiet, like the browser profile's: saved details are a
  * convenience, and a purchase must not fall over for want of them. The run
@@ -33,12 +32,19 @@ export async function currentBuyerProfile(
   cctx: CheckoutContext,
   userId: string,
 ): Promise<BuyerProfile | undefined> {
-  const cached = ctx.buyerProfiles.get(userId);
-  if (cached) return cached;
+  try {
+    const kept = await ctx.buyerProfiles.getBuyerProfile(userId);
+    if (kept) return kept;
+  } catch (e) {
+    console.warn(
+      "[agent-commerce] could not read the saved buyer profile; asking Crossmint",
+      e instanceof Error ? e.message : e,
+    );
+  }
   try {
     const list = await ctx.crossmint.checkouts.listBuyerProfiles(cctx, { limit: 100 });
     const newest = newestOf(list.data ?? []);
-    if (newest) ctx.buyerProfiles.set(userId, newest);
+    if (newest) await rememberBuyerProfile(ctx, userId, newest);
     return newest;
   } catch (e) {
     console.warn(
@@ -49,9 +55,23 @@ export async function currentBuyerProfile(
   }
 }
 
-/** A profile just saved is the one to use from now on. */
-export function rememberBuyerProfile(ctx: Ctx, userId: string, profile: BuyerProfile): void {
-  ctx.buyerProfiles.set(userId, profile);
+/**
+ * A profile just saved is the one to use from now on. A failure to keep it
+ * is logged, not thrown: the profile is saved at Crossmint either way.
+ */
+export async function rememberBuyerProfile(
+  ctx: Ctx,
+  userId: string,
+  profile: BuyerProfile,
+): Promise<void> {
+  try {
+    await ctx.buyerProfiles.putBuyerProfile(userId, profile);
+  } catch (e) {
+    console.warn(
+      "[agent-commerce] could not keep the saved buyer profile",
+      e instanceof Error ? e.message : e,
+    );
+  }
 }
 
 /**
@@ -66,7 +86,7 @@ export async function deleteBuyerProfiles(
   userId: string,
 ): Promise<number> {
   // Forgotten first: whatever happens next, no checkout starts with a deleted id.
-  ctx.buyerProfiles.delete(userId);
+  await ctx.buyerProfiles.deleteBuyerProfile(userId);
   const ids: string[] = [];
   let cursor: string | undefined;
   do {
@@ -81,8 +101,8 @@ export async function deleteBuyerProfiles(
       if (!(e instanceof CrossmintApiError && e.status === 404)) throw e;
     }
   }
-  // Again: a read while the deletes ran could have cached one of them.
-  ctx.buyerProfiles.delete(userId);
+  // Again: a read while the deletes ran could have copied one of them back.
+  await ctx.buyerProfiles.deleteBuyerProfile(userId);
   return ids.length;
 }
 

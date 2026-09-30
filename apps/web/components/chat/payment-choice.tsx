@@ -19,10 +19,9 @@ import {
   useAgentCards,
   useAgentCommerce,
   type ApproveOutcome,
-  type CreateAgentCardRequestInput,
 } from "@agent-commerce/ui";
 import { PLATFORM_NAME } from "@/components/brand";
-import { CHAT_REQUESTER } from "@/lib/chat/requester";
+import { budgetQuestion } from "@/lib/chat/budget";
 import {
   budgetFor,
   parsePrice,
@@ -32,6 +31,7 @@ import {
 import type { FoundProduct } from "@/lib/chat/shopify-catalog";
 import type { ApprovalOutcome, PaymentChoiceOutcome } from "@/lib/chat/tools";
 import { APPROVAL_DONE_LINGER_MS, ApprovalInThread, approvalQuestion } from "./agent-card-approval";
+import { BudgetChosen, BudgetPicker, budgetRequest, type BudgetPick } from "./budget-picker";
 import { toApprovalOutcome } from "./parts";
 import { ProductImage } from "./product-cards";
 import { AgentBubble } from "./text";
@@ -42,6 +42,8 @@ export interface PaymentChoiceInput {
   item: string;
   store?: string;
   price?: { amount: string; currency: string };
+  /** What a new budget would cover: Clothing, Snacks. */
+  category?: string;
 }
 
 /** The product the choice is for: what the agent said, filled in from the card the thread showed. */
@@ -147,22 +149,20 @@ export function fittingCards(
     .slice(0, 2);
 }
 
-/** A new agent card for this purchase: the limit is the budget. */
-function newCardOption(budget: Money | undefined, label: string): PaymentOption {
+/** A new budget from a saved card, with this purchase as its first. */
+function newCardOption(label: string): PaymentOption {
   return {
     method: "card",
     label,
-    detail: budget
-      ? `Approve up to ${formatAmount(budget.value, budget.currency)} from a saved card`
-      : "Approve the total from a saved card",
+    detail: "Set a budget on a saved card, for this and similar purchases",
     icon: CreditCard,
   };
 }
 
 /** The three ways to pay, in order. Card and Another way each ask one more thing. */
-export function paymentOptions(budget: Money | undefined): PaymentOption[] {
+export function paymentOptions(): PaymentOption[] {
   return [
-    newCardOption(budget, "Card"),
+    newCardOption("Card"),
     {
       method: "shop_pay",
       label: "Shop Pay",
@@ -202,7 +202,7 @@ export function cardOptions(budget: Money | undefined, cards: AgentCard[]): Paym
         icon: WalletCards,
       };
     }),
-    newCardOption(budget, "New card"),
+    newCardOption("New budget"),
   ];
 }
 
@@ -237,42 +237,36 @@ export const SOMETHING_ELSE: PaymentOption = {
   icon: Wallet,
 };
 
-/** How long a new agent card made at the choice lasts: the rest of the checkout, not a budget. */
-const NEW_CARD_HOURS = 2;
-
 /**
- * The request for a new agent card, as Card makes it: for the budget, with
- * the item as what it is for, and no store lock, since the checkout locks
- * the card to the store itself. Undefined with no price to budget from.
+ * The choice once the new budget's approval ended: approved, that card, for
+ * the checkout; not approved, Card with how it ended, so the agent asks how
+ * else to pay. Either way it carries the budget, so the thread draws it again.
  */
-export function newCardRequest(subject: {
-  item: string;
-  budget?: Money;
-}): CreateAgentCardRequestInput | undefined {
-  if (!subject.budget) return undefined;
-  return {
-    amount: subject.budget,
-    description: subject.item,
-    expiresInHours: NEW_CARD_HOURS,
-    requester: CHAT_REQUESTER,
-  };
-}
-
-/** The choice once the new card is approved: that card, for the checkout. Undefined when it was not. */
-export function approvedCardOutcome(
+export function newBudgetOutcome(
   outcome: ApproveOutcome,
-  budget: Money | undefined,
+  pick: BudgetPick,
   requestId: string,
-): PaymentChoiceOutcome | undefined {
+): PaymentChoiceOutcome {
   const agentCardId = outcome.agentCard?.orderIntentId ?? outcome.request.agentCardId;
-  if (outcome.status !== "active" || !agentCardId) return undefined;
+  if (outcome.status === "active" && agentCardId) {
+    return {
+      method: "agent_card",
+      agentCardId,
+      newCard: true,
+      requestId,
+      approval: "active",
+      name: pick.category,
+      budget: pick.amount,
+      ...(pick.days ? { days: pick.days } : {}),
+    };
+  }
   return {
-    method: "agent_card",
-    agentCardId,
-    newCard: true,
+    method: "card",
     requestId,
-    approval: "active",
-    ...(budget ? { budget } : {}),
+    approval: toApprovalOutcome(outcome).status,
+    name: pick.category,
+    budget: pick.amount,
+    ...(pick.days ? { days: pick.days } : {}),
   };
 }
 
@@ -291,7 +285,7 @@ export function paymentChoiceLabel(outcome: PaymentChoiceOutcome): string {
   if (outcome.method === "shop_pay") return "Shop Pay";
   if (outcome.method === "agent_card" && outcome.newCard) {
     return outcome.budget
-      ? `Card, up to ${formatAmount(outcome.budget.value, outcome.budget.currency)}`
+      ? `${outcome.name?.trim() || "Budget"}, up to ${formatAmount(outcome.budget.value, outcome.budget.currency)}`
       : "Card";
   }
   if (outcome.method === "agent_card") return outcome.name?.trim() || "My agent card";
@@ -315,12 +309,19 @@ export function paymentChoiceOutcome(
 
 /**
  * Where Card stands, after it is picked: the question about the agent cards
- * that fit, then the new card being made, then its approval.
+ * that fit, then the new budget being picked, then made, then its approval.
  */
 type CardFlow =
   | { phase: "reuse" }
-  | { phase: "creating"; fromReuse: boolean }
-  | { phase: "approve"; requestId: string; fromReuse: boolean; outcome?: ApprovalOutcome };
+  | { phase: "budget"; fromReuse: boolean; error?: string }
+  | { phase: "creating"; fromReuse: boolean; pick: BudgetPick }
+  | {
+      phase: "approve";
+      requestId: string;
+      fromReuse: boolean;
+      pick: BudgetPick;
+      outcome?: ApprovalOutcome;
+    };
 
 /**
  * Choosing how to pay, in the thread, for the desktop and the phone: the
@@ -330,11 +331,12 @@ type CardFlow =
  *
  * Card is picked for good, with no way back, and what follows comes as the
  * agent's next messages: whether to use an agent card the user already has
- * that fits, when there is one, and else the budget of a new card to
- * review, the same approval card the chat shows for any other. The choice
- * answers once the card is settled: the card to pay with, or that the new
- * one was not approved. The answer names the request, so a chat opened
- * again draws the same messages.
+ * that fits, when there is one; else a new budget, which the user sets up
+ * (what it covers and how much, at least this purchase), then reviews on
+ * the same approval card the chat shows for any other. The choice answers
+ * once the card is settled: the card to pay with, or that the new one was
+ * not approved. The answer names the request and the budget, so a chat
+ * opened again draws the same messages.
  */
 export function PaymentChoiceInThread({
   input,
@@ -401,51 +403,52 @@ export function PaymentChoiceInThread({
           }
         : undefined;
 
+  // The new budget: being set up, or picked, live or from the answer.
+  const newBudget =
+    flow && flow.phase !== "reuse"
+      ? { pick: flow.phase === "budget" ? undefined : flow.pick }
+      : answer?.requestId && (answer.newCard || answer.method === "card")
+        ? { pick: { category: answer.name, amount: answer.budget, days: answer.days } }
+        : undefined;
+
   // The approval ended: approved is the card to pay with; not approved, the
   // agent asks how else to pay.
-  const approvalDone = (requestId: string, o: ApproveOutcome) => {
+  const approvalDone = (requestId: string, pick: BudgetPick, o: ApproveOutcome) => {
     const outcome = toApprovalOutcome(o);
     setFlow((f) => (f?.phase === "approve" ? { ...f, outcome } : f));
-    choose(
-      approvedCardOutcome(o, subject.budget, requestId) ?? {
-        method: "card",
-        requestId,
-        approval: outcome.status,
-        ...(subject.budget ? { budget: subject.budget } : {}),
-      },
-    );
+    choose(newBudgetOutcome(o, pick, requestId));
   };
 
-  function review(requestId: string) {
-    if (onReview) onReview(requestId, (o) => approvalDone(requestId, o));
+  function review(requestId: string, pick: BudgetPick) {
+    if (onReview) onReview(requestId, (o) => approvalDone(requestId, pick, o));
     else setDialogOpen(true);
   }
 
-  // A new card: made now, for the budget. Its approval opens from Review.
-  // With no price to budget from, the checkout's payment step approves the total.
-  async function newCard(option: PaymentOption, fromReuse: boolean) {
-    const request = newCardRequest(subject);
-    if (!request) {
-      choose(paymentChoiceOutcome(option, subject.budget));
-      return;
-    }
+  // A new budget: the user sets it up first, and it is made on Continue.
+  function newCard(fromReuse: boolean) {
     setNote(undefined);
-    setFlow({ phase: "creating", fromReuse });
+    setFlow({ phase: "budget", fromReuse });
+  }
+
+  // Made now, for what the user picked, and its approval opens.
+  async function createBudget(pick: BudgetPick, fromReuse: boolean) {
+    setFlow({ phase: "creating", fromReuse, pick });
     try {
-      const made = await api.createAgentCardRequest(request);
-      setFlow({ phase: "approve", requestId: made.id, fromReuse });
+      const made = await api.createAgentCardRequest(budgetRequest(pick));
+      setFlow({ phase: "approve", requestId: made.id, fromReuse, pick });
+      // The approval opens at once; Review opens it again.
+      review(made.id, pick);
     } catch (err) {
-      // Nothing was made: the ways come back, with what went wrong.
-      setFlow(undefined);
-      setNote(errorMessage(err));
+      // Nothing was made: the form comes back, with what went wrong.
+      setFlow({ phase: "budget", fromReuse, error: errorMessage(err) });
     }
   }
 
   function pickWay(option: PaymentOption) {
-    // Card asks about the agent cards that fit; with none, it is a new card
+    // Card asks about the agent cards that fit; with none, it is a new budget
     // at once. Tapped before the cards are in, its question waits for them.
     if (option.method === "card") {
-      if (noneFit) void newCard(option, false);
+      if (noneFit) newCard(false);
       else setFlow({ phase: "reuse" });
     } else if (option.method === "other" && !option.name) {
       setStep("other");
@@ -456,7 +459,7 @@ export function PaymentChoiceInThread({
 
   function pickCard(option: PaymentOption) {
     if (option.method === "agent_card") choose(paymentChoiceOutcome(option, subject.budget));
-    else void newCard(option, true);
+    else newCard(true);
   }
 
   function submitTyped(e: FormEvent) {
@@ -534,7 +537,7 @@ export function PaymentChoiceInThread({
         ) : (
           <div className="border-t border-border/60">
             {note ? <p className="px-3 pt-3 text-sm text-destructive">{note}</p> : null}
-            <OptionRows options={paymentOptions(subject.budget)} onPick={pickWay} />
+            <OptionRows options={paymentOptions()} onPick={pickWay} />
           </div>
         )}
       </div>
@@ -554,7 +557,7 @@ export function PaymentChoiceInThread({
                 first
               />
             ) : flow && flow.phase !== "reuse" ? (
-              <ChosenRow mark={{ icon: CreditCard }} label="New card" first />
+              <ChosenRow mark={{ icon: CreditCard }} label="New budget" first />
             ) : cardsReady ? (
               <OptionRows options={cardOptions(subject.budget, fitting)} onPick={pickCard} />
             ) : (
@@ -568,7 +571,28 @@ export function PaymentChoiceInThread({
         </>
       ) : null}
 
-      {/* The agent's next message: the new card's budget, to review. */}
+      {/* The agent's next message: the new budget, to set up. */}
+      {newBudget ? (
+        <>
+          <AgentBubble text={budgetQuestion()} className={bubbleClassName} />
+          <div className={box}>
+            {newBudget.pick ? (
+              <BudgetChosen pick={newBudget.pick} />
+            ) : (
+              <BudgetPicker
+                category={input.category}
+                currency={subject.price?.currency ?? "USD"}
+                floor={subject.budget}
+                error={flow?.phase === "budget" ? flow.error : undefined}
+                onSubmit={(pick) => void createBudget(pick, flow?.phase === "budget" && flow.fromReuse)}
+                buttonSize={buttonSize}
+              />
+            )}
+          </div>
+        </>
+      ) : null}
+
+      {/* The agent's next message after that: the new budget, to review. */}
       {flow?.phase === "creating" ? (
         <>
           <AgentBubble text={approvalQuestion(false)} className={bubbleClassName} />
@@ -582,7 +606,9 @@ export function PaymentChoiceInThread({
           requestId={approval.requestId}
           output={approval.outcome}
           paying={false}
-          onReview={() => review(approval.requestId)}
+          onReview={() => {
+            if (flow?.phase === "approve") review(flow.requestId, flow.pick);
+          }}
           bubbleClassName={bubbleClassName}
           buttonSize={buttonSize}
           className={className}
@@ -599,7 +625,7 @@ export function PaymentChoiceInThread({
                 variant="plain"
                 platformName={PLATFORM_NAME}
                 onDone={(o) => {
-                  approvalDone(flow.requestId, o);
+                  approvalDone(flow.requestId, flow.pick, o);
                   // The ending shows for a moment before the dialog goes.
                   setTimeout(() => setDialogOpen(false), APPROVAL_DONE_LINGER_MS);
                 }}

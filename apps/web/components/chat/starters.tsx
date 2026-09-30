@@ -6,6 +6,7 @@ import {
   CreditCard,
   Plane,
   ShoppingBag,
+  ShoppingCart,
   Soup,
   Ticket,
   UtensilsCrossed,
@@ -14,8 +15,9 @@ import { cn } from "@agent-commerce/ui";
 
 /**
  * The ways a new chat offers to start, so a first-time user sees what the
- * agent can do: add a card, buy a product, order food from their own
- * account, book a table, get event tickets, or book flights and hotels. Each one sends a plain
+ * agent can do: add a card, buy a product, manage a store cart, order food
+ * from their own account, book a table, get event tickets, or book flights
+ * and hotels. Each one sends a plain
  * message; from there the user talks to the agent, which asks for what it
  * still needs. The prompt knows each of them (see `prompt.ts`).
  */
@@ -30,6 +32,7 @@ export interface Starter {
 export const STARTERS: Starter[] = [
   { id: "card", title: "Add a card", message: "Add a card", icon: CreditCard },
   { id: "something", title: "Buy me something", message: "Buy me something", icon: ShoppingBag },
+  { id: "cart", title: "Manage my cart", message: "Manage my cart", icon: ShoppingCart },
   { id: "food", title: "Order me food", message: "Order me food", icon: Soup },
   {
     id: "table",

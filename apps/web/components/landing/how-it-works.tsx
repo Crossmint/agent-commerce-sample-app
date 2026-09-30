@@ -58,6 +58,7 @@ const STEPS: Step[] = [
     summary: "A product, a table, a flight or a ticket. Crossmint does the rest.",
     body: "Crossmint's Agent Checkouts API finds the best way to complete a purchase on any website: order from a store, book a table, book a flight, or get tickets for an event.",
     facts: [
+      "Manage a store cart without checking out: add items, remove them or empty it, and buy later.",
       "Supports UCP and any browser checkout.",
       "Works with any payment method, from agent cards to saved cards on the merchant to Shop Pay.",
       "Bring your own browser sessions and re-use them across Agent Checkouts.",

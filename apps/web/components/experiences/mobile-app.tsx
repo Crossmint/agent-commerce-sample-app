@@ -69,6 +69,7 @@ import {
   BuyerDetailsSheetBody,
 } from "@/components/chat/buyer-details-request";
 import { PaymentChoiceInThread } from "@/components/chat/payment-choice";
+import { BudgetInThread } from "@/components/chat/budget-picker";
 import { WatchRun } from "@/components/chat/checkout-card";
 import { CheckoutSiteLine } from "@/components/chat/checkout-site";
 import { ProductCards, ProductDetails, pickMessage } from "@/components/chat/product-cards";
@@ -80,7 +81,12 @@ import { type AgentChat } from "@/components/chat/use-agent-chat";
 import { threadSize, useScrollToBottom } from "@/components/chat/use-scroll-to-bottom";
 import type { BuyerProfile } from "@agent-commerce/core";
 import type { FoundProduct } from "@/lib/chat/shopify-catalog";
-import type { BuyerDetailsOutcome, CheckoutOutcome, PaymentChoiceOutcome } from "@/lib/chat/tools";
+import type {
+  BudgetOutcome,
+  BuyerDetailsOutcome,
+  CheckoutOutcome,
+  PaymentChoiceOutcome,
+} from "@/lib/chat/tools";
 import type { ChatMessage, ChatMessagePart } from "@/lib/chat/types";
 import { cn } from "@/lib/cn";
 import { brandAttr, initialOf, loginNext, type ExperienceProps } from "./types";
@@ -418,6 +424,7 @@ function Thread({
               onAddCard={onAddCard}
               onAddDetails={onAddDetails}
               onPaymentChoice={chat.onPaymentChoice}
+              onBudget={chat.onBudget}
               onBuyerDetails={chat.onBuyerDetails}
               onCheckoutOutcome={chat.onCheckoutOutcome}
               watches={watches}
@@ -445,6 +452,7 @@ function CompactMessage({
   onAddCard,
   onAddDetails,
   onPaymentChoice,
+  onBudget,
   onBuyerDetails,
   onCheckoutOutcome,
   watches,
@@ -458,6 +466,7 @@ function CompactMessage({
   onAddCard: (toolCallId: string) => void;
   onAddDetails: (toolCallId: string) => void;
   onPaymentChoice: (toolCallId: string, outcome: PaymentChoiceOutcome) => void;
+  onBudget: (toolCallId: string, outcome: BudgetOutcome) => void;
   onBuyerDetails: (toolCallId: string, outcome: BuyerDetailsOutcome) => void;
   onCheckoutOutcome: (toolCallId: string, outcome: CheckoutOutcome) => void;
   watches: WatchIndex;
@@ -489,6 +498,7 @@ function CompactMessage({
         onAddCard={onAddCard}
         onAddDetails={onAddDetails}
         onPaymentChoice={onPaymentChoice}
+        onBudget={onBudget}
         onBuyerDetails={onBuyerDetails}
         onCheckoutOutcome={onCheckoutOutcome}
         watches={watches}
@@ -514,6 +524,7 @@ function CompactPart({
   onAddCard,
   onAddDetails,
   onPaymentChoice,
+  onBudget,
   onBuyerDetails,
   onCheckoutOutcome,
   watches,
@@ -527,6 +538,7 @@ function CompactPart({
   onAddCard: (toolCallId: string) => void;
   onAddDetails: (toolCallId: string) => void;
   onPaymentChoice: (toolCallId: string, outcome: PaymentChoiceOutcome) => void;
+  onBudget: (toolCallId: string, outcome: BudgetOutcome) => void;
   onBuyerDetails: (toolCallId: string, outcome: BuyerDetailsOutcome) => void;
   onCheckoutOutcome: (toolCallId: string, outcome: CheckoutOutcome) => void;
   watches: WatchIndex;
@@ -615,6 +627,26 @@ function CompactPart({
             product={productFor(watches, part.input.url)}
             output={part.state === "output-available" ? part.output : undefined}
             onChoose={(outcome) => onPaymentChoice(part.toolCallId, outcome)}
+            onReview={(requestId, done) => onReview({ requestId, onDone: done })}
+            bubbleClassName="max-w-[85%] px-3.5 py-2 text-[15px] leading-snug"
+            className="max-w-none"
+          />
+        );
+      }
+      return (
+        <ActivityLine busy={toolBusy(part.state)} failed={part.state === "output-error"}>
+          {toolTitle(part.type)}
+        </ActivityLine>
+      );
+
+    // A budget: what it covers and how much, then its approval in the sheet.
+    case "tool-await_budget":
+      if (part.state === "input-available" || part.state === "output-available") {
+        return (
+          <BudgetInThread
+            input={part.input}
+            output={part.state === "output-available" ? part.output : undefined}
+            onOutcome={(outcome) => onBudget(part.toolCallId, outcome)}
             onReview={(requestId, done) => onReview({ requestId, onDone: done })}
             bubbleClassName="max-w-[85%] px-3.5 py-2 text-[15px] leading-snug"
             className="max-w-none"

@@ -6,6 +6,7 @@ import { cn } from "@agent-commerce/ui";
 import { AgentAvatar } from "@/components/brand";
 import type {
   ApprovalOutcome,
+  BudgetOutcome,
   BuyerDetailsOutcome,
   CheckoutOutcome,
   PaymentChoiceOutcome,
@@ -18,6 +19,7 @@ import { PasswordRequest } from "./password-request";
 import { AddCard } from "./add-card";
 import { BuyerDetailsRequest } from "./buyer-details-request";
 import { PaymentChoiceInThread } from "./payment-choice";
+import { BudgetInThread } from "./budget-picker";
 import { AttachmentPreview } from "./attachment-preview";
 import { WatchRun } from "./checkout-card";
 import { CheckoutSiteLine } from "./checkout-site";
@@ -56,6 +58,7 @@ export interface MessageProps {
   onCardSaved: (toolCallId: string, outcome: SavedCardOutcome) => void;
   onBuyerDetails: (toolCallId: string, outcome: BuyerDetailsOutcome) => void;
   onPaymentChoice: (toolCallId: string, outcome: PaymentChoiceOutcome) => void;
+  onBudget: (toolCallId: string, outcome: BudgetOutcome) => void;
   onCheckoutOutcome: (toolCallId: string, outcome: CheckoutOutcome) => void;
   /** The thread's watched checkouts, from `watchIndex`. */
   watches: WatchIndex;
@@ -77,6 +80,7 @@ export function Message({
   onCardSaved,
   onBuyerDetails,
   onPaymentChoice,
+  onBudget,
   onCheckoutOutcome,
   watches,
   onSend,
@@ -106,6 +110,7 @@ export function Message({
               onCardSaved={onCardSaved}
               onBuyerDetails={onBuyerDetails}
               onPaymentChoice={onPaymentChoice}
+              onBudget={onBudget}
               onCheckoutOutcome={onCheckoutOutcome}
               watches={watches}
               onSend={onSend}
@@ -197,6 +202,7 @@ function Part({
   onCardSaved,
   onBuyerDetails,
   onPaymentChoice,
+  onBudget,
   onCheckoutOutcome,
   watches,
   onSend,
@@ -210,6 +216,7 @@ function Part({
   onCardSaved: MessageProps["onCardSaved"];
   onBuyerDetails: MessageProps["onBuyerDetails"];
   onPaymentChoice: MessageProps["onPaymentChoice"];
+  onBudget: MessageProps["onBudget"];
   onCheckoutOutcome: MessageProps["onCheckoutOutcome"];
   watches: WatchIndex;
   onSend: MessageProps["onSend"];
@@ -294,6 +301,24 @@ function Part({
             product={productFor(watches, part.input.url)}
             output={part.state === "output-available" ? part.output : undefined}
             onChoose={(outcome) => onPaymentChoice(part.toolCallId, outcome)}
+            buttonSize="lg"
+          />
+        );
+      }
+      return (
+        <ActivityLine busy={toolBusy(part.state)} failed={part.state === "output-error"}>
+          {toolTitle(part.type)}
+        </ActivityLine>
+      );
+
+    // A budget: what it covers and how much, then its approval.
+    case "tool-await_budget":
+      if (part.state === "input-available" || part.state === "output-available") {
+        return (
+          <BudgetInThread
+            input={part.input}
+            output={part.state === "output-available" ? part.output : undefined}
+            onOutcome={(outcome) => onBudget(part.toolCallId, outcome)}
             buttonSize="lg"
           />
         );

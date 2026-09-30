@@ -10,6 +10,7 @@ import {
 } from "ai";
 import type {
   ApprovalOutcome,
+  BudgetOutcome,
   BuyerDetailsOutcome,
   CheckoutOutcome,
   PaymentChoiceOutcome,
@@ -43,6 +44,8 @@ export interface AgentChat {
   onBuyerDetails: (toolCallId: string, outcome: BuyerDetailsOutcome) => void;
   /** Hand the way the user chose to pay back to the `await_payment_choice` tool call. */
   onPaymentChoice: (toolCallId: string, outcome: PaymentChoiceOutcome) => void;
+  /** Hand the budget the user set up (or Not now) back to the `await_budget` tool call. */
+  onBudget: (toolCallId: string, outcome: BudgetOutcome) => void;
   /** Hand a watched checkout's question or ending back to the `watch_checkout` tool call. Once per call. */
   onCheckoutOutcome: (toolCallId: string, outcome: CheckoutOutcome) => void;
   error: string | null;
@@ -124,6 +127,7 @@ export function useAgentChat({ id, initialMessages, persist }: UseAgentChatOptio
     | { tool: "await_saved_card"; output: SavedCardOutcome }
     | { tool: "await_buyer_details"; output: BuyerDetailsOutcome }
     | { tool: "await_payment_choice"; output: PaymentChoiceOutcome }
+    | { tool: "await_budget"; output: BudgetOutcome }
     | { tool: "watch_checkout"; output: CheckoutOutcome }
   );
   const queue = useRef<Output[]>([]);
@@ -215,6 +219,15 @@ export function useAgentChat({ id, initialMessages, persist }: UseAgentChatOptio
     [hand],
   );
 
+  const onBudget = useCallback(
+    (toolCallId: string, output: BudgetOutcome) => {
+      if (answered.current.has(toolCallId)) return;
+      answered.current.add(toolCallId);
+      hand({ tool: "await_budget", toolCallId, output });
+    },
+    [hand],
+  );
+
   // A run can end in front of more than one watcher (a card and a sheet), and
   // a watcher can remount. The model hears about each ending once.
   const reported = useRef(new Set<string>());
@@ -238,6 +251,7 @@ export function useAgentChat({ id, initialMessages, persist }: UseAgentChatOptio
     onCardSaved,
     onBuyerDetails,
     onPaymentChoice,
+    onBudget,
     onCheckoutOutcome,
     error,
     dismissError: () => setError(null),

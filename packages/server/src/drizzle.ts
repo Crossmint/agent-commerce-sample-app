@@ -2,7 +2,7 @@
  * Postgres schema and Drizzle store for `@agent-commerce/server`.
  * Import from "@agent-commerce/server/drizzle". Needs `drizzle-orm` installed.
  */
-import type { Amount, Merchant } from "@agent-commerce/core";
+import type { Amount, BuyerProfile, Merchant } from "@agent-commerce/core";
 import { and, desc, eq } from "drizzle-orm";
 import {
   boolean,
@@ -19,6 +19,7 @@ import type {
   AgentCardRequestPatch,
   AgentCardRequestStatus,
   AgentSession,
+  BuyerProfileStore,
   CheckoutLink,
   CheckoutLinkPatch,
   CheckoutStore,
@@ -101,7 +102,23 @@ export const reveals = pgTable(
   (t) => [index("reveals_user_id_created_at_idx").on(t.userId, t.createdAt)],
 );
 
-export const agentCommerceSchema = { agentCardRequests, checkouts, agentSessions, reveals };
+/**
+ * The user's saved buyer details, one row per user: a copy of the Crossmint
+ * profile with its id, so every server instance finds what the user saved.
+ */
+export const buyerProfiles = pgTable("buyer_profiles", {
+  userId: text("user_id").primaryKey(),
+  profile: jsonb("profile").$type<BuyerProfile>().notNull(),
+  updatedAt: timestamp("updated_at", tz).notNull().defaultNow(),
+});
+
+export const agentCommerceSchema = {
+  agentCardRequests,
+  checkouts,
+  agentSessions,
+  reveals,
+  buyerProfiles,
+};
 
 type RequestRow = typeof agentCardRequests.$inferSelect;
 
@@ -115,8 +132,29 @@ export type AnyPgDatabase = PgDatabase<PgQueryResultHKT, any, any>;
  */
 export function drizzleRequestStore(
   db: AnyPgDatabase,
-): RequestStore & CheckoutStore & SessionStore & RevealStore {
+): RequestStore & CheckoutStore & SessionStore & RevealStore & BuyerProfileStore {
   return {
+    async getBuyerProfile(userId: string): Promise<BuyerProfile | null> {
+      const [row] = await db
+        .select()
+        .from(buyerProfiles)
+        .where(eq(buyerProfiles.userId, userId))
+        .limit(1);
+      return row?.profile ?? null;
+    },
+
+    async putBuyerProfile(userId: string, profile: BuyerProfile): Promise<void> {
+      const updatedAt = new Date();
+      await db
+        .insert(buyerProfiles)
+        .values({ userId, profile, updatedAt })
+        .onConflictDoUpdate({ target: buyerProfiles.userId, set: { profile, updatedAt } });
+    },
+
+    async deleteBuyerProfile(userId: string): Promise<void> {
+      await db.delete(buyerProfiles).where(eq(buyerProfiles.userId, userId));
+    },
+
     async getSession(accessTokenHash: string): Promise<AgentSession | null> {
       const [row] = await db
         .select()
