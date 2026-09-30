@@ -7,7 +7,7 @@ export type ChatProvider = "anthropic" | "openai";
 
 const DEFAULT_MODEL: Record<ChatProvider, string> = {
   anthropic: "claude-sonnet-5",
-  openai: "gpt-5.4",
+  openai: "gpt-5.6-luna",
 };
 
 /** Which provider has a key. Anthropic wins when both are set. */
