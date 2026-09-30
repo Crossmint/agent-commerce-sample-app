@@ -32,6 +32,8 @@ export interface Ctx {
   buyerProfiles: BuyerProfileStore;
   requestTtlMinutes: number;
   defaultRequester: string;
+  /** The ceiling of a checkout with no maxCost and no agent card, as a decimal string. */
+  defaultMaxCost: string;
   railPreference: RailKind[];
   now(): Date;
 }
@@ -109,6 +111,7 @@ export function createContext(config: AgentCommerceServerConfig): Ctx {
     buyerProfiles,
     requestTtlMinutes: config.requestTtlMinutes ?? 15,
     defaultRequester: config.defaultRequester ?? "Agent",
+    defaultMaxCost: config.defaultMaxCost ?? "500.00",
     railPreference: config.railPreference ?? DEFAULT_RAIL_PREFERENCE,
     now: () => new Date(),
   };

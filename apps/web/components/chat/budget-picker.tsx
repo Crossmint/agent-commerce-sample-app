@@ -307,7 +307,14 @@ export function existingBudgetOutcome(card: AgentCard): BudgetOutcome {
 }
 
 /** What the agent asks over the budget: for a purchase, how to pay for it. */
-export function budgetAsk(purchase: string | undefined, hasBudgets: boolean): string {
+export function budgetAsk(
+  purchase: string | undefined,
+  hasBudgets: boolean,
+  total?: Money,
+): string {
+  if (total) {
+    return `The total came to ${formatAmount(total.value, total.currency)}, more than your budget has left. Set up a bigger one, or pay another way?`;
+  }
   if (!purchase) return budgetQuestion();
   return hasBudgets
     ? `How should I pay for ${purchase}? I can use a budget you have, or set up a new one.`
@@ -344,7 +351,7 @@ export function BudgetInThread({
   buttonSize = "xl",
   className,
 }: {
-  input: { category: string; amount?: Money; purchase?: string };
+  input: { category: string; amount?: Money; purchase?: string; total?: Money };
   output?: BudgetOutcome;
   onOutcome: (outcome: BudgetOutcome) => void;
   /** Open the approval in the frame's own sheet, and call `done` when it ends. Leave it out for a dialog. */
@@ -360,7 +367,13 @@ export function BudgetInThread({
   // The budgets the user has, read while a purchase waits on this.
   const cards = useAgentCards({ enabled: forPurchase && !output });
   const cardsReady = !cards.loading || cards.data !== undefined;
-  const budgets = generalBudgets(cards.data);
+  // After a run stopped over its total, only budgets that cover it.
+  const budgets = generalBudgets(cards.data).filter(
+    (c) =>
+      !input.total ||
+      (c.amount.currency.toUpperCase() === input.total.currency.toUpperCase() &&
+        Number.parseFloat(c.amount.available) >= Number.parseFloat(input.total.value)),
+  );
   const box = cn(
     "flex w-full max-w-lg flex-col overflow-hidden rounded-2xl bg-card ring-1 ring-foreground/10",
     className,
@@ -424,8 +437,9 @@ export function BudgetInThread({
   const form = (
     <BudgetPicker
       category={input.category}
-      currency={input.amount?.currency ?? "USD"}
+      currency={input.amount?.currency ?? input.total?.currency ?? "USD"}
       suggested={input.amount}
+      floor={input.total}
       error={flow.phase === "pick" ? flow.error : undefined}
       onSubmit={(pick) => void create(pick)}
       onCancel={forPurchase ? otherWay : () => onOutcome({ status: "cancelled" })}
@@ -482,7 +496,7 @@ export function BudgetInThread({
   return (
     <>
       <AgentBubble
-        text={budgetAsk(input.purchase, flow.phase === "choose" && budgets.length > 0)}
+        text={budgetAsk(input.purchase, flow.phase === "choose" && budgets.length > 0, input.total)}
         className={bubbleClassName}
       />
       <div className={box}>{body}</div>

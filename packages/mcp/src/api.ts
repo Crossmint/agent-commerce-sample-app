@@ -105,7 +105,10 @@ export interface CreateCheckoutInput {
   task?: string;
   /** Omit to let the user choose a payment method at the run's payment step. */
   agentCardId?: string;
-  maxCost: { amount: string; currency: string };
+  /** Omit to cap the run at what the agent card has left, or at the server's default. */
+  maxCost?: { amount: string; currency: string };
+  /** The store's currency, for the default ceiling when there is no maxCost. */
+  currency?: string;
   /** What the purchase is, in a few words: shown when the user approves the payment. */
   purpose?: string;
   buyerProfileId?: string;

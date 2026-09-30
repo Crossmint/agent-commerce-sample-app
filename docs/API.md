@@ -138,10 +138,12 @@ Wraps [Crossmint Agent Checkouts](https://docs.crossmint.com/api-reference/agent
 `POST /v1/checkouts` (agent) body:
 
 ```json
-{ "startUrl": "https://shop.example/p/1", "task"?: "medium, black", "purpose"?: "Black tee, medium", "agentCardId"?: "…", "maxCost": { "amount": "100.00", "currency": "USD" }, "buyerProfileId"?: "…", "browserProfileId"?: "…", "freshBrowser"?: false, "merchantGuidance"?: "…" }
+{ "startUrl": "https://shop.example/p/1", "task"?: "medium, black", "purpose"?: "Black tee, medium", "agentCardId"?: "…", "maxCost"?: { "amount": "100.00", "currency": "USD" }, "currency"?: "USD", "buyerProfileId"?: "…", "browserProfileId"?: "…", "freshBrowser"?: false, "merchantGuidance"?: "…" }
 ```
 
 `url` and `request` are accepted as older names for `startUrl` and `task`. `purpose` (up to 80 characters) is what the purchase is, in a few words: the agent card raised at the payment step carries it, so the user sees it when they approve. Without one it reads "Purchase at" and the store. → `201 CheckoutView`.
+
+`maxCost` is the most the run may cost, and it is enforced. When the store shows no total before its card form, the run asks for exactly this much, and Agent Checkouts mints the card for it, so the server keeps it payable: a run with an `agentCardId` costs at most what that card has left (or `maxCost` when lower), and a card with nothing left fails with `409 agent_card_unusable` before the run starts. Without an agent card or a `maxCost`, the ceiling is the server's `defaultMaxCost` (500 unless configured) in `currency` (USD by default). The view reports the ceiling it used as `maxCost`. A total above it stops the run as `blocked` (`policy.max_cost_exceeded`): start it again with a card, or a `maxCost`, that covers the total.
 
 Sessions are sticky: the server attaches the user's browser profile to every run, so a store they signed into once stays signed in. Callers need pass nothing. `browserProfileId` names a different profile; `freshBrowser: true` starts signed out, which is the way past a login that has gone stale. If the profile cannot be resolved the run still goes ahead, in a fresh browser — the convenience never fails a purchase.
 
@@ -149,6 +151,7 @@ Sessions are sticky: the server attaches the user's browser profile to every run
 interface CheckoutView {
   id: string;                            // Crossmint runId
   status: "queued" | "running" | "awaiting_input" | "succeeded" | "blocked" | "failed" | "cancelled";
+  maxCost?: { amount: string; currency: string };  // the ceiling the run started with
   agentCardId?: string;
   paymentRequest?: {                     // the run's payment step; the user picks a payment method
     requestId: string;                   // an agent card request: approve, deny and poll it as usual

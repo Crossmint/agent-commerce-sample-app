@@ -6,6 +6,7 @@ import {
   cardCredential,
   findCall,
   makeServer,
+  type FakeCall,
 } from "./helpers.js";
 
 describe("auth", () => {
@@ -632,6 +633,7 @@ describe("checkouts", () => {
       id: "run_1",
       status: "running",
       startUrl: "https://www.shop.example/products/tee",
+      maxCost: { amount: "30.00", currency: "USD" },
       agentCardId: "oi_1",
       embedUrl: "https://www.crossmint.com/embed/run_1",
       createdAt: "2026-09-17T00:00:00.000Z",
@@ -905,6 +907,7 @@ describe("checkouts", () => {
       id: "run_1",
       status: "succeeded",
       startUrl: "https://www.shop.example/products/tee",
+      maxCost: { amount: "30.00", currency: "USD" },
       agentCardId: "oi_1",
       result: {
         outcome: "succeeded",
@@ -928,6 +931,73 @@ describe("checkouts", () => {
   });
 
   const maxCost = { amount: "30.00", currency: "USD" };
+
+  describe("the run's ceiling", () => {
+    const createRoute = {
+      method: "POST",
+      path: /\/unstable\/agent-checkouts$/,
+      reply: { status: 202, body: run({ status: "queued" }) },
+    };
+    const card = (available: string) => ({
+      method: "GET",
+      path: "/unstable/order-intents/oi_1",
+      reply: {
+        body: activeOrderIntent({
+          amount: { currency: "USD", total: "50.00", available, reserved: "0.00", spent: "0.00" },
+        }),
+      },
+    });
+    const sentCeiling = (calls: FakeCall[]) =>
+      (findCall(calls, "POST", /\/unstable\/agent-checkouts$/)!.body as {
+        constraints: { maxCost: unknown };
+      }).constraints.maxCost;
+
+    it("is what the agent card has left, not a higher limit", async () => {
+      const { handlers, calls } = makeServer([createRoute, card("42.50")]);
+      const res = await call(handlers, "POST", "/v1/checkouts", {
+        body: {
+          startUrl: "https://shop.example/p/1",
+          agentCardId: "oi_1",
+          maxCost: { amount: "100000.00", currency: "USD" },
+        },
+      });
+      expect(res.status).toBe(201);
+      expect(sentCeiling(calls)).toEqual({ amount: "42.50", currency: "USD" });
+    });
+
+    it("keeps the caller's limit when it is lower than what the card has left", async () => {
+      const { handlers, calls } = makeServer([createRoute, card("42.50")]);
+      await call(handlers, "POST", "/v1/checkouts", {
+        body: { startUrl: "https://shop.example/p/1", agentCardId: "oi_1", maxCost },
+      });
+      expect(sentCeiling(calls)).toEqual({ amount: "30.00", currency: "USD" });
+    });
+
+    it("needs no maxCost: an agent card sets it, and without one the default does", async () => {
+      const withCard = makeServer([createRoute, card("42.50")]);
+      await call(withCard.handlers, "POST", "/v1/checkouts", {
+        body: { startUrl: "https://shop.example/p/1", agentCardId: "oi_1" },
+      });
+      expect(sentCeiling(withCard.calls)).toEqual({ amount: "42.50", currency: "USD" });
+
+      const without = makeServer([createRoute]);
+      const res = await call(without.handlers, "POST", "/v1/checkouts", {
+        body: { startUrl: "https://shop.example/p/1", currency: "eur" },
+      });
+      expect(res.status).toBe(201);
+      expect(sentCeiling(without.calls)).toEqual({ amount: "500.00", currency: "EUR" });
+    });
+
+    it("refuses an agent card with nothing left, before the run starts", async () => {
+      const { handlers, calls } = makeServer([createRoute, card("0.00")]);
+      const res = await call(handlers, "POST", "/v1/checkouts", {
+        body: { startUrl: "https://shop.example/p/1", agentCardId: "oi_1" },
+      });
+      expect(res.status).toBe(409);
+      expect((await res.json()).error.code).toBe("agent_card_unusable");
+      expect(findCall(calls, "POST", /\/unstable\/agent-checkouts$/)).toBeUndefined();
+    });
+  });
 
   it("answers a payment request once, even when another instance sees it again", async () => {
     vi.spyOn(console, "info").mockImplementation(() => {});

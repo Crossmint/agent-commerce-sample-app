@@ -253,7 +253,7 @@ export function registerAgentCommerceTools(
         task: z.string().max(20000).optional().describe(paramDoc("create_checkout", "task")),
         purpose: z.string().max(80).optional().describe(paramDoc("create_checkout", "purpose")),
         agentCardId: z.string().optional().describe(paramDoc("create_checkout", "agentCardId")),
-        maxCost: amountSchema.describe(paramDoc("create_checkout", "maxCost")),
+        maxCost: amountSchema.optional().describe(paramDoc("create_checkout", "maxCost")),
         currency: currencySchema.optional(),
         buyerProfileId: z
           .string()
@@ -278,10 +278,15 @@ export function registerAgentCommerceTools(
         task: args.task,
         purpose: args.purpose,
         agentCardId: args.agentCardId,
-        maxCost: {
-          amount: toDecimalString(args.maxCost),
-          currency: (args.currency ?? "USD").toUpperCase(),
-        },
+        ...(args.maxCost === undefined
+          ? {}
+          : {
+              maxCost: {
+                amount: toDecimalString(args.maxCost),
+                currency: (args.currency ?? "USD").toUpperCase(),
+              },
+            }),
+        ...(args.currency ? { currency: args.currency.toUpperCase() } : {}),
         buyerProfileId: args.buyerProfileId,
         browserProfileId: args.browserProfileId,
         freshBrowser: args.freshBrowser,

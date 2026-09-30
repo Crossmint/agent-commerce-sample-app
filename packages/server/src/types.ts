@@ -260,6 +260,12 @@ export interface AgentCommerceServerConfig {
   requestTtlMinutes?: number;
   /** Default "Agent". */
   defaultRequester?: string;
+  /**
+   * The most a checkout with no maxCost and no agent card may cost. Default
+   * 500 in the run's currency. A run asks for this much when the store shows
+   * no total before its card form, so keep it modest.
+   */
+  defaultMaxCost?: string;
   railPreference?: RailKind[];
   /** Shown in `GET /v1/config`. Default "Agent Commerce". */
   name?: string;

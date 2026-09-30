@@ -18,13 +18,6 @@ import { lookUpProducts, searchProducts } from "./shopify-catalog";
 import { RECEIPT_KINDS, type ReceiptKind } from "@/lib/receipt";
 
 /**
- * The max cost of a checkout when the user gave no limit. The run's payment
- * step states the exact total, and the order intent is made for that total, so
- * the agent does not need to guess one.
- */
-const CHECKOUT_CEILING = "100000.00";
-
-/**
  * What every checkout tells the store's agent, so it does not stop to ask:
  * buy once, not on a subscription, and bill the shipping address. A task
  * that asks for a subscription says so, and wins.
@@ -622,6 +615,7 @@ export function createChatTools(api: AgentCommerceClient, opts: { userEmail?: st
         category: z.string().min(1).max(60).describe(paramDoc("await_budget", "category")),
         amount: amountSchema.optional().describe(paramDoc("await_budget", "amount")),
         purchase: z.string().min(1).max(80).optional().describe(paramDoc("await_budget", "purchase")),
+        total: amountSchema.optional().describe(paramDoc("await_budget", "total")),
       }),
       outputSchema: budgetOutcomeSchema,
     }),
@@ -718,7 +712,7 @@ export function createChatTools(api: AgentCommerceClient, opts: { userEmail?: st
           })
           .optional()
           .describe(
-            "Only when the user gave a spending limit: the most to pay, including shipping and tax. Enforced. Otherwise leave it out and do not estimate one: the store states the exact total at the payment step, and the payment is authorized for that total only.",
+            "Only when the user gave a spending limit, or to try again above a total that stopped a run: the most to pay, including shipping and tax. Enforced. Otherwise leave it out: a run paid from a budget costs at most what the budget has left, and any other run at most the app's default.",
           ),
         currency: z
           .string()
@@ -744,10 +738,8 @@ export function createChatTools(api: AgentCommerceClient, opts: { userEmail?: st
             api.createCheckout({
               ...input,
               agentCardId: undefined,
-              maxCost: maxCost ?? {
-                amount: CHECKOUT_CEILING,
-                currency: (currency ?? "USD").toUpperCase(),
-              },
+              ...(maxCost ? { maxCost } : {}),
+              ...(currency ? { currency: currency.toUpperCase() } : {}),
               task,
             }),
           );
@@ -829,16 +821,15 @@ export function createChatTools(api: AgentCommerceClient, opts: { userEmail?: st
             ? `The buyer's contact email is ${opts.userEmail}. It is not a store login: to sign in, use the account the task names, if any.`
             : undefined;
         const task = [input.task, PURCHASE_TERMS, email].filter(Boolean).join(" ");
-        // Only the user's own limit caps the run. A budget with too little
-        // left does not stop it: the payment step asks for another way.
+        // The server sets the ceiling: what the budget has left, the user's
+        // own limit when lower, or its default. A store that shows no total
+        // before its card form asks for exactly that much.
         return guard(() =>
           api.createCheckout({
             ...input,
             ...(agentCardId ? { agentCardId } : {}),
-            maxCost: maxCost ?? {
-              amount: CHECKOUT_CEILING,
-              currency: (currency ?? "USD").toUpperCase(),
-            },
+            ...(maxCost ? { maxCost } : {}),
+            ...(currency ? { currency: currency.toUpperCase() } : {}),
             task,
           }),
         );

@@ -60,10 +60,17 @@ export const createCheckoutSchema = z
     agentCardId: z.string().min(1).optional(),
     // What the purchase is, in a few words: shown when the user approves the payment.
     purpose: z.string().trim().min(1).max(80).optional(),
-    maxCost: z.object({
-      amount: decimalAmount,
-      currency: z.string().length(3),
-    }),
+    // The most the run may cost, including shipping and tax. Optional: a run
+    // paid from an agent card costs at most what the card has left, and any
+    // other run at most the server's default ceiling.
+    maxCost: z
+      .object({
+        amount: decimalAmount,
+        currency: z.string().length(3),
+      })
+      .optional(),
+    /** The store's currency, for the default ceiling when there is no maxCost and no agent card. */
+    currency: z.string().length(3).optional(),
     buyerProfileId: z.string().min(1).optional(),
     /** Overrides the user's own profile, which the server otherwise attaches. */
     browserProfileId: z.string().min(1).optional(),

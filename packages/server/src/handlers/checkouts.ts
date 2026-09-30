@@ -88,6 +88,8 @@ export interface CheckoutView {
   status: CheckoutStatus;
   /** The page the run started from, for the site it runs on. */
   startUrl?: string;
+  /** The most the run may cost: what the agent card had left, the caller's limit, or the default. */
+  maxCost?: { amount: string; currency: string };
   agentCardId?: string;
   /**
    * The run is waiting on a payment method. Show the user their saved cards
@@ -154,9 +156,10 @@ export async function createCheckout(req: Request, ctx: Ctx): Promise<Response> 
   // for them again. A caller that names a profile keeps its own.
   const buyerProfileId =
     body.buyerProfileId ?? (await currentBuyerProfile(ctx, cctx, user.userId))?.id;
+  const maxCost = await runCeiling(ctx, user, body);
   const checkout = await ctx.crossmint.checkouts.create(cctx, {
     request: { startUrl: (body.startUrl ?? body.url)!, ...(task ? { task } : {}) },
-    constraints: { maxCost: body.maxCost },
+    constraints: { maxCost },
     ...(buyerProfileId ? { buyerProfileId } : {}),
     ...(browserProfileId ? { browserProfileId } : {}),
     ...(body.merchantGuidance ? { merchantGuidance: body.merchantGuidance } : {}),
@@ -168,6 +171,54 @@ export async function createCheckout(req: Request, ctx: Ctx): Promise<Response> 
   const link = (await ctx.checkouts.getCheckout(checkout.runId)) ?? undefined;
   const view = await settlePayment(ctx, user, cctx, checkout, link);
   return json(view, 201);
+}
+
+/**
+ * The most a run may cost. When the store shows no total before its card
+ * form, the run asks for exactly this much, and Agent Checkouts mints the
+ * card for it: so it has to be an amount that can be paid.
+ *
+ * - With an agent card: what the card has left, or the caller's limit when
+ *   that is lower. A card with nothing left is refused.
+ * - Without one: the caller's limit, else the server's default ceiling.
+ *
+ * A card that cannot be read leaves the caller's limit, or the default.
+ */
+async function runCeiling(
+  ctx: Ctx,
+  user: AuthenticatedUser,
+  body: {
+    agentCardId?: string;
+    maxCost?: { amount: string; currency: string };
+    currency?: string;
+  },
+): Promise<{ amount: string; currency: string }> {
+  const fallback = body.maxCost ?? {
+    amount: ctx.defaultMaxCost,
+    currency: (body.currency ?? "USD").toUpperCase(),
+  };
+  if (!body.agentCardId) return fallback;
+  let card: { amount: { available: string; currency: string } };
+  try {
+    card = await ctx.crossmint.orderIntents.get({ jwt: user.jwt }, body.agentCardId);
+  } catch {
+    return fallback;
+  }
+  const available = Math.floor(Number.parseFloat(card.amount.available) * 100) / 100;
+  if (!(available > 0)) {
+    throw new HttpError(
+      409,
+      "agent_card_unusable",
+      "That agent card has nothing left. Set up a new budget, or start the checkout without an agent card.",
+      { agentCardId: body.agentCardId },
+    );
+  }
+  const currency = card.amount.currency.toUpperCase();
+  const limit =
+    body.maxCost && body.maxCost.currency.toUpperCase() === currency
+      ? Number.parseFloat(body.maxCost.amount)
+      : Number.POSITIVE_INFINITY;
+  return { amount: Math.min(available, limit).toFixed(2), currency };
 }
 
 /** GET /v1/checkouts/:id */
@@ -748,6 +799,8 @@ function toView(
   const view: CheckoutView = { id: checkout.runId, status: checkout.status };
   const startUrl = checkout.input?.request?.startUrl;
   if (startUrl) view.startUrl = startUrl;
+  const maxCost = checkout.input?.constraints?.maxCost;
+  if (maxCost) view.maxCost = { amount: maxCost.amount, currency: maxCost.currency };
   if (agentCardId) view.agentCardId = agentCardId;
   if (opts.paymentRequest) view.paymentRequest = opts.paymentRequest;
   const action = pendingActionOf(checkout);

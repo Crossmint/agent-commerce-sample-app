@@ -126,7 +126,8 @@ export const TOOL_DOCS = {
       task: "What to buy and how, e.g. medium, black, cheapest shipping, pay by card. The more you say here, the fewer questions the agent stops to ask.",
       agentCardId:
         "Optional. An agent card the user already approved, to pay from it without asking again. Leave it out and the user chooses a payment method when the run reaches its payment step.",
-      maxCost: "Maximum total to pay, including shipping and tax. Enforced.",
+      maxCost:
+        "Maximum total to pay, including shipping and tax. Enforced. Optional: with an agentCardId it is what the card has left, and otherwise the server's default. A store that shows no total before its card form asks for exactly this much.",
       currency: PARAM_DOCS.currency,
       buyerProfileId:
         "Rarely needed. The user's saved buyer details (name, contact, shipping) are attached for you, so the store does not ask for them. Pass this only to name a different profile.",
@@ -202,6 +203,8 @@ export const TOOL_DOCS = {
       amount: "The amount the user named, if they named one: it is picked first.",
       purchase:
         "Only before a checkout: what is being bought, in a few words, e.g. Table for 2 at Nopa, Cubone keychain. Leave it out for a budget on its own.",
+      total:
+        "Only after a run stopped because its total was more than the budget had left: that total. The chat says so, and offers no amount below it.",
     },
     surfaces: ["chat"],
   },
