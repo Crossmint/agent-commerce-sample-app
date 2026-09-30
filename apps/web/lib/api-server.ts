@@ -17,6 +17,17 @@ export function getAgentCommerceHandlers(): Promise<Handlers> {
   return handlersPromise;
 }
 
+/**
+ * The in-memory store, when there is no database, kept on `globalThis`.
+ * Next bundles each route on its own, so /api/chat and /api/agent-commerce
+ * each build their own handlers; a module variable would give each its own
+ * memory, and details saved on the profile page would be missing in the
+ * chat. Only the data is shared: the handlers are rebuilt with new code.
+ */
+const shared = globalThis as typeof globalThis & {
+  __agentCommerceMemoryStore?: ReturnType<typeof memoryRequestStore>;
+};
+
 async function buildHandlers(): Promise<Handlers> {
   const projectId = serverEnv.required("STYTCH_PROJECT_ID");
   const stytchEnv = inferStytchEnvironment(projectId);
@@ -60,7 +71,10 @@ async function buildHandlers(): Promise<Handlers> {
 
 async function buildStore() {
   const databaseUrl = serverEnv.optional("DATABASE_URL");
-  if (!databaseUrl) return memoryRequestStore();
+  if (!databaseUrl) {
+    shared.__agentCommerceMemoryStore ??= memoryRequestStore();
+    return shared.__agentCommerceMemoryStore;
+  }
 
   // Loaded only when a database is configured, so a dev without Postgres
   // never pays for these imports.

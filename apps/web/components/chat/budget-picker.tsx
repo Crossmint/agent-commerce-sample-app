@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
-import { WalletCards } from "lucide-react";
+import { useState, type FormEvent, type ReactNode } from "react";
+import { ChevronRight, Plus, Wallet, WalletCards, type LucideIcon } from "lucide-react";
+import type { AgentCard } from "@agent-commerce/core";
 import {
   ApproveAgentCard,
   Badge,
@@ -11,9 +12,11 @@ import {
   DialogTitle,
   Input,
   Skeleton,
+  agentCardGroup,
   cn,
   errorMessage,
   formatAmount,
+  useAgentCards,
   useAgentCommerce,
   type ApproveOutcome,
   type CreateAgentCardRequestInput,
@@ -78,6 +81,7 @@ export function BudgetPicker({
   error,
   onSubmit,
   onCancel,
+  cancelLabel = "Not now",
   buttonSize = "xl",
 }: {
   category?: string;
@@ -89,6 +93,8 @@ export function BudgetPicker({
   onSubmit: (pick: BudgetPick) => void;
   /** Not now. Left out where the budget is a step the user already chose. */
   onCancel?: () => void;
+  /** What the button under Continue says. */
+  cancelLabel?: string;
   buttonSize?: "lg" | "xl";
 }) {
   const options = budgetAmounts(currency, floor);
@@ -241,7 +247,7 @@ export function BudgetPicker({
             onClick={onCancel}
             disabled={busy}
           >
-            Not now
+            {cancelLabel}
           </Button>
         ) : null}
       </div>
@@ -271,18 +277,60 @@ export function BudgetChosen({
   );
 }
 
-/** Where a budget stands: being picked, being made, then its approval. */
+/**
+ * The general budgets the user has, to pay for a purchase from again:
+ * active, not locked to a store, with money left. The most left first; at
+ * most two.
+ */
+export function generalBudgets(cards: AgentCard[] | undefined): AgentCard[] {
+  return (cards ?? [])
+    .filter(
+      (c) =>
+        agentCardGroup(c) === "active" && !c.merchant && Number.parseFloat(c.amount.available) > 0,
+    )
+    .sort((a, b) => Number.parseFloat(b.amount.available) - Number.parseFloat(a.amount.available))
+    .slice(0, 2);
+}
+
+/** A budget the user has, picked again for this purchase. */
+export function existingBudgetOutcome(card: AgentCard): BudgetOutcome {
+  return {
+    status: "active",
+    existing: true,
+    agentCardId: card.orderIntentId,
+    category: card.description,
+    amount: { value: card.amount.available, currency: card.amount.currency },
+  };
+}
+
+/** What the agent asks over the budget: for a purchase, how to pay for it. */
+export function budgetAsk(purchase: string | undefined, hasBudgets: boolean): string {
+  if (!purchase) return budgetQuestion();
+  return hasBudgets
+    ? `How should I pay for ${purchase}? I can use a budget you have, or set up a new one.`
+    : `To buy ${purchase}, I'll need permission to use your card. What should the budget cover, and how much?`;
+}
+
+/** Where a budget stands: choosing one, being picked, being made, then its approval. */
 type BudgetFlow =
+  | { phase: "choose" }
   | { phase: "pick"; error?: string }
   | { phase: "creating"; pick: BudgetPick }
   | { phase: "approve"; pick: BudgetPick; requestId: string; outcome?: ApprovalOutcome };
 
 /**
- * A budget on its own, in the thread, for the desktop and the phone: the
- * agent asks in its bubble, the form sits under it, and Continue makes the
- * agent card and shows the same approval card the chat shows for any other.
- * The tool answers once the approval ends, or at once with Not now. The
- * answer names the request, so a chat opened again draws the same messages.
+ * A budget, in the thread, for the desktop and the phone: the agent asks in
+ * its bubble, the form sits under it, and Continue makes the agent card and
+ * opens the same approval the chat shows for any other.
+ *
+ * Before a purchase (`input.purchase`), it settles how to pay first: the
+ * general budgets the user has, a new one, or another way to pay, which the
+ * store's payment step offers. With no budget yet, it goes straight to the
+ * form, with the other way under it.
+ *
+ * The tool answers once the approval ends, or at once for a budget they had,
+ * another way, or Not now. The answer names the request, so a chat opened
+ * again draws the same messages.
  */
 export function BudgetInThread({
   input,
@@ -293,7 +341,7 @@ export function BudgetInThread({
   buttonSize = "xl",
   className,
 }: {
-  input: { category: string; amount?: Money };
+  input: { category: string; amount?: Money; purchase?: string };
   output?: BudgetOutcome;
   onOutcome: (outcome: BudgetOutcome) => void;
   /** Open the approval in the frame's own sheet, and call `done` when it ends. Leave it out for a dialog. */
@@ -303,8 +351,13 @@ export function BudgetInThread({
   className?: string;
 }) {
   const { api } = useAgentCommerce();
-  const [flow, setFlow] = useState<BudgetFlow>({ phase: "pick" });
+  const forPurchase = Boolean(input.purchase);
+  const [flow, setFlow] = useState<BudgetFlow>({ phase: forPurchase ? "choose" : "pick" });
   const [dialogOpen, setDialogOpen] = useState(false);
+  // The budgets the user has, read while a purchase waits on this.
+  const cards = useAgentCards({ enabled: forPurchase && !output });
+  const cardsReady = !cards.loading || cards.data !== undefined;
+  const budgets = generalBudgets(cards.data);
   const box = cn(
     "flex w-full max-w-lg flex-col overflow-hidden rounded-2xl bg-card ring-1 ring-foreground/10",
     className,
@@ -343,47 +396,93 @@ export function BudgetInThread({
   // Drawn from the answer once there is one, so a chat opened again shows the same.
   const shown: {
     pick?: { category?: string; amount?: Money; days?: number };
-    requestId?: string; outcome?: ApprovalOutcome } =
-    output
-      ? {
+    requestId?: string;
+    outcome?: ApprovalOutcome;
+  } = output
+    ? output.status === "cancelled" || output.status === "other"
+      ? {}
+      : {
           pick: { category: output.category, amount: output.amount, days: output.days },
           requestId: output.requestId,
-          outcome:
-            output.status === "cancelled"
-              ? undefined
-              : { status: output.status, ...(output.agentCardId ? { agentCardId: output.agentCardId } : {}) },
+          outcome: {
+            status: output.status,
+            ...(output.agentCardId ? { agentCardId: output.agentCardId } : {}),
+          },
         }
-      : flow.phase === "pick"
-        ? {}
-        : {
-            pick: flow.pick,
-            requestId: flow.phase === "approve" ? flow.requestId : undefined,
-            outcome: flow.phase === "approve" ? flow.outcome : undefined,
-          };
+    : flow.phase === "pick" || flow.phase === "choose"
+      ? {}
+      : {
+          pick: flow.pick,
+          requestId: flow.phase === "approve" ? flow.requestId : undefined,
+          outcome: flow.phase === "approve" ? flow.outcome : undefined,
+        };
+
+  const otherWay = () => onOutcome({ status: "other" });
+  const form = (
+    <BudgetPicker
+      category={input.category}
+      currency={input.amount?.currency ?? "USD"}
+      suggested={input.amount}
+      error={flow.phase === "pick" ? flow.error : undefined}
+      onSubmit={(pick) => void create(pick)}
+      onCancel={forPurchase ? otherWay : () => onOutcome({ status: "cancelled" })}
+      cancelLabel={forPurchase ? "Use a different payment method" : undefined}
+      buttonSize={buttonSize}
+    />
+  );
+
+  let body: ReactNode;
+  if (output?.status === "cancelled") {
+    body = <SettledRow label="No budget for now" badge="Skipped" />;
+  } else if (output?.status === "other") {
+    body = <SettledRow label="A different payment method" badge="Chosen" chosen />;
+  } else if (shown.pick) {
+    body = <BudgetChosen pick={shown.pick} />;
+  } else if (flow.phase === "choose" && !cardsReady) {
+    body = (
+      <div className="flex flex-col gap-3 p-3">
+        {[0, 1].map((i) => (
+          <Skeleton key={i} className="h-9 w-full rounded-xl" />
+        ))}
+      </div>
+    );
+  } else if (flow.phase === "choose" && budgets.length) {
+    body = (
+      <ul className="flex flex-col">
+        {budgets.map((c) => (
+          <ChoiceRow
+            key={c.orderIntentId}
+            icon={WalletCards}
+            label={c.description}
+            detail={`${formatAmount(c.amount.available, c.amount.currency)} left. No new approval.`}
+            onPick={() => onOutcome(existingBudgetOutcome(c))}
+          />
+        ))}
+        <ChoiceRow
+          icon={Plus}
+          label="New budget"
+          detail="Set up another budget on a saved card"
+          onPick={() => setFlow({ phase: "pick" })}
+        />
+        <ChoiceRow
+          icon={Wallet}
+          label="Use a different payment method"
+          detail="I check what the store takes at checkout and ask you then"
+          onPick={otherWay}
+        />
+      </ul>
+    );
+  } else {
+    body = form;
+  }
 
   return (
     <>
-      <AgentBubble text={budgetQuestion()} className={bubbleClassName} />
-      <div className={box}>
-        {output?.status === "cancelled" ? (
-          <div className="flex items-center gap-3 p-3">
-            <span className="min-w-0 flex-1 text-sm text-muted-foreground">No budget for now</span>
-            <Badge variant="muted">Skipped</Badge>
-          </div>
-        ) : shown.pick ? (
-          <BudgetChosen pick={shown.pick} />
-        ) : (
-          <BudgetPicker
-            category={input.category}
-            currency={input.amount?.currency ?? "USD"}
-            suggested={input.amount}
-            error={flow.phase === "pick" ? flow.error : undefined}
-            onSubmit={(pick) => void create(pick)}
-            onCancel={() => onOutcome({ status: "cancelled" })}
-            buttonSize={buttonSize}
-          />
-        )}
-      </div>
+      <AgentBubble
+        text={budgetAsk(input.purchase, flow.phase === "choose" && budgets.length > 0)}
+        className={bubbleClassName}
+      />
+      <div className={box}>{body}</div>
 
       {flow.phase === "creating" && !output ? (
         <>
@@ -427,5 +526,52 @@ export function BudgetInThread({
         </Dialog>
       )}
     </>
+  );
+}
+
+/** One way to pay, as a row: its mark, its name and a line under it. */
+function ChoiceRow({
+  icon: Icon,
+  label,
+  detail,
+  onPick,
+}: {
+  icon: LucideIcon;
+  label: string;
+  detail: string;
+  onPick: () => void;
+}) {
+  return (
+    <li className="border-b border-border/60 last:border-b-0">
+      <button
+        type="button"
+        onClick={onPick}
+        className="flex w-full items-center gap-3 p-3 text-left transition-colors hover:bg-muted/60"
+      >
+        <span
+          aria-hidden
+          className="flex size-9 shrink-0 items-center justify-center rounded-full bg-muted text-foreground"
+        >
+          <Icon className="size-4" />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block text-sm font-medium text-foreground">{label}</span>
+          <span className="block text-xs text-muted-foreground">{detail}</span>
+        </span>
+        <ChevronRight aria-hidden className="size-4 shrink-0 text-muted-foreground" />
+      </button>
+    </li>
+  );
+}
+
+/** How it was settled, when no budget came of it. */
+function SettledRow({ label, badge, chosen = false }: { label: string; badge: string; chosen?: boolean }) {
+  return (
+    <div className="flex items-center gap-3 p-3">
+      <span className={cn("min-w-0 flex-1 text-sm", chosen ? "font-medium" : "text-muted-foreground")}>
+        {label}
+      </span>
+      <Badge variant={chosen ? "success" : "muted"}>{badge}</Badge>
+    </div>
   );
 }

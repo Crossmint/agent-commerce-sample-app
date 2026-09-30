@@ -462,7 +462,7 @@ function pageOf(url: string): string {
  */
 export function pendingCall(
   messages: ChatMessage[],
-  type: "tool-await_buyer_details" | "tool-await_payment_choice",
+  type: "tool-await_buyer_details" | "tool-await_payment_choice" | "tool-await_budget",
 ): string | undefined {
   for (let i = messages.length - 1; i >= 0; i--) {
     const m = messages[i]!;

@@ -178,7 +178,7 @@ export const TOOL_DOCS = {
     title: "Ask how to pay",
     summary:
       "Ask the user how to pay for a product on a Shopify store: by card, with Shop Pay, or another way (PayPal, Klarna or one they type). Card has them take an agent card they already have that fits the store, or approve a new one for the budget, before it returns: then it returns agent_card with the agentCardId to start the checkout with. Wait for the answer. " +
-      "Call it after the user picks a product and before anything else, with no text in between; the chat shows the product and the choices. " +
+      "Call it only when the user pressed Buy on a product card from search_products or look_up_products, before anything else, with no text in between; the chat shows the product and the choices. Never for a link the user pasted or typed, even on a Shopify store: start the checkout for those. " +
       "It returns the method, the agentCardId of a card they already have, the name of another way when the user typed one, and a budget: the price with room for shipping and tax, when the price is known.",
     params: {
       url: "The product page URL, as search_products or look_up_products gave it.",
@@ -193,12 +193,15 @@ export const TOOL_DOCS = {
   await_budget: {
     title: "Ask for a budget",
     summary:
-      "Ask the user to set up a budget: an agent card for a kind of purchase, such as Groceries or Clothing, that the agent pays similar purchases from until it runs out or ends. The chat asks in its own words, shows what the budget covers (the user can change it), a few amounts ($20, $50, $100, or one they type) and how long it lasts (1, 7 or 30 days; 7 unless they change it), then has them approve it. Nothing is spent until they approve. It is never locked to one store. " +
-      "Call it with no text in between. It returns active with the agentCardId, what it covers, the amount and the days it lasts; denied, expired or failed when it was not approved; or cancelled when the user said Not now.",
+      "Ask the user to set up a budget: an agent card for a kind of purchase, such as Groceries or Clothing, that the agent pays similar purchases from until it runs out or ends. The chat asks in its own words, shows what the budget covers (the user can change it), how long it lasts (1, 7 or 30 days) and a few amounts ($20, $50, $100, or one they type), then has them approve it. Nothing is spent until they approve. It is never locked to one store. " +
+      "With purchase, it settles how to pay for that purchase before its checkout starts: it also offers the general budgets the user already has, and Use a different payment method. " +
+      "Call it with no text in between. It returns active with the agentCardId, what it covers and the amount (existing when they picked a budget they had); other when they want to pay another way; denied, expired or failed when it was not approved; or cancelled when the user said Not now.",
     params: {
       category:
         "What the budget covers: a broad kind of purchase in one to three words, e.g. Groceries, Clothing, Eating out. What the user said, or your best guess from the chat. Never a store.",
       amount: "The amount the user named, if they named one: it is picked first.",
+      purchase:
+        "Only before a checkout: what is being bought, in a few words, e.g. Table for 2 at Nopa, Cubone keychain. Leave it out for a budget on its own.",
     },
     surfaces: ["chat"],
   },
@@ -227,7 +230,7 @@ export const TOOL_DOCS = {
   look_up_products: {
     title: "Show products",
     summary:
-      "Look products up by their page URLs on Shopify stores, and show them to the user with their pictures, prices and stores. Use it to put a product you are about to suggest in front of the user. Returns the same shape as search_products; URLs it cannot find are left out.",
+      "Look products up by their page URLs on Shopify stores, and show them to the user with their pictures, prices and stores. Use it to put a product you are about to suggest in front of the user. Never use it on a link the user sent to buy: start the checkout for that link instead. Returns the same shape as search_products; URLs it cannot find are left out.",
     params: {
       urls: "Product page URLs, 1 to 5.",
     },

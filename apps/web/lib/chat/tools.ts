@@ -120,11 +120,15 @@ export type BuyerDetailsOutcome = z.infer<typeof buyerDetailsOutcomeSchema>;
 /**
  * What `await_budget` hands back: the budget the user picked and approved,
  * or how it ended when it was not. `cancelled`: they closed it with Not now.
+ * `other`: for a purchase, they want to pay another way, which the store's
+ * payment step offers.
  */
 export const budgetOutcomeSchema = z.object({
-  status: z.enum(["active", "denied", "expired", "failed", "cancelled"]),
+  status: z.enum(["active", "denied", "expired", "failed", "cancelled", "other"]),
   /** When active: the agent card to pay similar purchases from. */
   agentCardId: z.string().optional(),
+  /** When active: a budget the user already had, picked again. */
+  existing: z.boolean().optional(),
   /** The request the picker made: the chat draws its approval from it. */
   requestId: z.string().optional(),
   /** What the budget covers, as the user left it. */
@@ -377,27 +381,35 @@ function skippedDetailsInChat(messages: ModelMessage[]): boolean {
 }
 
 /**
- * What an agent card has left, as a checkout's max cost, so the run stops
- * as blocked before it asks the card for more. Undefined when the card
- * cannot be read: the checkout then keeps its ceiling.
+ * How the user settled paying for the next checkout, from the newest
+ * `await_budget` answer since the last checkout started: the budget to pay
+ * from, or that it goes on with no budget (another way, Not now, or not
+ * approved). Undefined when nothing is settled.
  */
-async function cardLimit(
-  api: AgentCommerceClient,
-  agentCardId: string,
-): Promise<{ amount: string; currency: string } | undefined> {
-  try {
-    const card = await api.getAgentCard(agentCardId);
-    const available = Number.parseFloat(card.amount.available);
-    if (!(available > 0)) return undefined;
-    // Down to the cent, never up past what is left.
-    return {
-      amount: (Math.floor(available * 100) / 100).toFixed(2),
-      currency: card.amount.currency.toUpperCase(),
-    };
-  } catch {
-    return undefined;
+function budgetPlanFor(messages: ModelMessage[]): { agentCardId?: string } | undefined {
+  let plan: { agentCardId?: string } | undefined;
+  for (const m of messages) {
+    if (m.role !== "tool") continue;
+    for (const part of m.content) {
+      if (part.type !== "tool-result" || part.output.type !== "json") continue;
+      const value = part.output.value as Record<string, unknown> | null;
+      if (!value || typeof value !== "object") continue;
+      if (part.toolName === "await_budget") {
+        const outcome = budgetOutcomeSchema.safeParse(value);
+        if (!outcome.success) continue;
+        plan =
+          outcome.data.status === "active" && outcome.data.agentCardId
+            ? { agentCardId: outcome.data.agentCardId }
+            : {};
+      } else if (part.toolName === "create_checkout" && !("error" in value)) {
+        // A checkout that started used the plan up.
+        plan = undefined;
+      }
+    }
   }
+  return plan;
 }
+
 
 /**
  * How the user chose to pay for the store a checkout starts at, as the chat
@@ -609,6 +621,7 @@ export function createChatTools(api: AgentCommerceClient, opts: { userEmail?: st
       inputSchema: z.object({
         category: z.string().min(1).max(60).describe(paramDoc("await_budget", "category")),
         amount: amountSchema.optional().describe(paramDoc("await_budget", "amount")),
+        purchase: z.string().min(1).max(80).optional().describe(paramDoc("await_budget", "purchase")),
       }),
       outputSchema: budgetOutcomeSchema,
     }),
@@ -662,7 +675,7 @@ export function createChatTools(api: AgentCommerceClient, opts: { userEmail?: st
     create_checkout: tool({
       description: describeTool(
         "create_checkout",
-        "In this chat, when the user chose card at await_payment_choice, call it with no agentCardId: it sends you back with a requestId for the new agent card, to pass to await_agent_card_approval; once approved, call it again. An agent card they chose or approved is used by itself. Every checkout is told to buy once, not on a subscription, and to bill the shipping address; say so in the task only to ask for a subscription. Then call watch_checkout with the checkoutId, with no text in between.",
+        "In this chat, every purchase pays from an agent card chosen before it starts. After await_payment_choice, the card they chose is used by itself. Any other purchase settles how to pay with await_budget first: pass its agentCardId, or payWithoutCard when the user chose another way or no budget. Called with neither, it comes back with budget_required. Pass cartOnly for a run that only changes a cart. Every checkout is told to buy once, not on a subscription, and to bill the shipping address; say so in the task only to ask for a subscription. Then call watch_checkout with the checkoutId, with no text in between.",
       ),
       inputSchema: z.object({
         startUrl: z.string().url().describe(paramDoc("create_checkout", "startUrl")),
@@ -688,6 +701,13 @@ export function createChatTools(api: AgentCommerceClient, opts: { userEmail?: st
           .min(1)
           .optional()
           .describe(paramDoc("create_checkout", "agentCardId")),
+        // Chat only, and never sent to the API.
+        payWithoutCard: z
+          .boolean()
+          .optional()
+          .describe(
+            "True only when the user said to pay another way than an agent card for this purchase (PayPal, the card saved in their account at the store). The checkout then starts with no budget, and the store's own payment step is used.",
+          ),
         maxCost: z
           .object({
             amount: z
@@ -712,7 +732,10 @@ export function createChatTools(api: AgentCommerceClient, opts: { userEmail?: st
           .describe(paramDoc("create_checkout", "buyerProfileId")),
         purpose: z.string().min(1).max(80).describe(paramDoc("create_checkout", "purpose")),
       }),
-      execute: async ({ action, cartOnly, currency, maxCost, ...input }, { messages }) => {
+      execute: async (
+        { action, cartOnly, payWithoutCard, currency, maxCost, ...input },
+        { messages },
+      ) => {
         void action; // for the site card only
         if (cartOnly) {
           // Nothing is paid, so no agent card goes with it.
@@ -783,6 +806,20 @@ export function createChatTools(api: AgentCommerceClient, opts: { userEmail?: st
             next: "Call await_agent_card_approval with this requestId now, with no text in between. Once it comes back active, call create_checkout again with the same input. If they deny it, ask in one line whether to pay another way.",
           };
         }
+        // Any other purchase pays from a budget, settled before the checkout
+        // starts: one the user has, or a new one. Or they chose another way,
+        // and the store's payment step asks.
+        if (!agentCardId && !plan && !payWithoutCard) {
+          const settled = budgetPlanFor(messages);
+          if (settled?.agentCardId) agentCardId = settled.agentCardId;
+          else if (!settled) {
+            return {
+              error: "How to pay is not settled yet.",
+              code: "budget_required",
+              next: "Call await_budget now, with no text in between, with purchase (what this is, in a few words) and the broad kind of purchase as its category (Eating out, Travel, Tickets, Shopping). Then call create_checkout again with the same input: with its agentCardId when it returns active, else with payWithoutCard.",
+            };
+          }
+        }
         // The store's agent asks for an email on most checkouts. Give it the
         // user's up front, so nobody is asked for what the app already knows.
         // It is a contact address: an account named in the task is the one to
@@ -792,13 +829,13 @@ export function createChatTools(api: AgentCommerceClient, opts: { userEmail?: st
             ? `The buyer's contact email is ${opts.userEmail}. It is not a store login: to sign in, use the account the task names, if any.`
             : undefined;
         const task = [input.task, PURCHASE_TERMS, email].filter(Boolean).join(" ");
-        // A checkout that pays from an agent card costs at most what the card has left.
-        const limit = maxCost ?? (agentCardId ? await cardLimit(api, agentCardId) : undefined);
+        // Only the user's own limit caps the run. A budget with too little
+        // left does not stop it: the payment step asks for another way.
         return guard(() =>
           api.createCheckout({
             ...input,
             ...(agentCardId ? { agentCardId } : {}),
-            maxCost: limit ?? {
+            maxCost: maxCost ?? {
               amount: CHECKOUT_CEILING,
               currency: (currency ?? "USD").toUpperCase(),
             },

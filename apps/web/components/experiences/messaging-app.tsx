@@ -78,7 +78,13 @@ import {
   paymentOptions,
   type PaymentOption,
 } from "@/components/chat/payment-choice";
-import { budgetLabel, budgetRequest, type BudgetPick } from "@/components/chat/budget-picker";
+import {
+  budgetLabel,
+  budgetRequest,
+  existingBudgetOutcome,
+  generalBudgets,
+  type BudgetPick,
+} from "@/components/chat/budget-picker";
 import {
   DEFAULT_BUDGET_CATEGORY,
   DEFAULT_BUDGET_DAYS,
@@ -94,7 +100,7 @@ import type { MessagingApp as MessagingAppId } from "@/components/frame/views";
 import { LoginForm } from "@/components/login-form";
 import type { FoundProduct } from "@/lib/chat/shopify-catalog";
 import type { AgentCard } from "@agent-commerce/core";
-import type { BuyerDetailsOutcome, PaymentChoiceOutcome } from "@/lib/chat/tools";
+import type { BudgetOutcome, BuyerDetailsOutcome, PaymentChoiceOutcome } from "@/lib/chat/tools";
 import type { ChatMessage } from "@/lib/chat/types";
 import { cn } from "@/lib/cn";
 import {
@@ -256,8 +262,8 @@ function toBubbles(
   newCards: ReadonlyMap<string, NewCardAsk>,
   /** An amount picked for the new budget: make it, and open its approval from the link. */
   onNewBudget: (toolCallId: string, pick: BudgetPick, alone?: boolean) => void,
-  /** Not now, for a budget on its own. */
-  onSkipBudget: (toolCallId: string) => void,
+  /** A budget question answered at once: Not now, a budget they had, or another way. */
+  onBudgetAnswer: (toolCallId: string, outcome: BudgetOutcome) => void,
   /** Open a new card's approval again, from its link. */
   onReviewCard: (toolCallId: string) => void,
   onPick: (message: string) => void,
@@ -529,6 +535,10 @@ function toBubbles(
         const output = part.state === "output-available" ? part.output : undefined;
         const category = part.input.category.trim() || DEFAULT_BUDGET_CATEGORY;
         const amounts = budgetAmounts(part.input.amount?.currency ?? "USD");
+        const purchase = part.input.purchase?.trim();
+        // Before a purchase: the budgets they have, and another way to pay.
+        const budgets = purchase ? generalBudgets(agentCards) : [];
+        if (purchase && !output && !agentCards) return;
         const made: { requestId: string; pick: Partial<BudgetPick> } | undefined =
           newCards.get(part.toolCallId) ??
           (output?.requestId
@@ -541,25 +551,43 @@ function toBubbles(
           key: `${key}-text`,
           kind: "text",
           side: "recv",
-          text: `I'll need permission to use your card. How much for a ${category} budget? I can use it for similar purchases for ${daysLabel(DEFAULT_BUDGET_DAYS)}.`,
+          text: budgets.length
+            ? `How should I pay for ${purchase}? Use a budget you have, or tap an amount for a new ${category} budget for ${daysLabel(DEFAULT_BUDGET_DAYS)}.`
+            : `${purchase ? `To buy ${purchase}, I'll` : "I'll"} need permission to use your card. How much for a ${category} budget? I can use it for similar purchases for ${daysLabel(DEFAULT_BUDGET_DAYS)}.`,
         });
         out.push({
           key,
           kind: "choices",
           choices: [
+            ...budgets.map((c) => ({
+              label: `Use ${c.description}`,
+              message: `card:${c.orderIntentId}`,
+              description: `${formatAmount(c.amount.available, c.amount.currency)} left`,
+            })),
             ...amounts.map((a) => ({ label: formatAmount(a.value, a.currency), message: a.value })),
-            { label: "Not now", message: "skip" },
+            purchase
+              ? { label: "Different payment method", message: "other" }
+              : { label: "Not now", message: "skip" },
           ],
           onPick: (value) => {
-            if (value === "skip") return onSkipBudget(part.toolCallId);
+            if (value === "skip") return onBudgetAnswer(part.toolCallId, { status: "cancelled" });
+            if (value === "other") return onBudgetAnswer(part.toolCallId, { status: "other" });
+            const card = budgets.find((c) => value === `card:${c.orderIntentId}`);
+            if (card) return onBudgetAnswer(part.toolCallId, existingBudgetOutcome(card));
             const amount = amounts.find((a) => a.value === value);
             if (amount) onNewBudget(part.toolCallId, { category, amount }, true);
           },
           used: Boolean(output || made),
         });
-        if (output?.status === "cancelled") {
-          out.push({ key: `${key}-reply`, kind: "text", side: "sent", text: "Not now" });
-        }
+        const settled =
+          output?.status === "cancelled"
+            ? "Not now"
+            : output?.status === "other"
+              ? "Different payment method"
+              : output?.existing
+                ? `Use ${output.category ?? "my budget"}`
+                : undefined;
+        if (settled) out.push({ key: `${key}-reply`, kind: "text", side: "sent", text: settled });
         if (made) {
           out.push({
             key: `${key}-reply`,
@@ -1585,7 +1613,10 @@ function SignedIn({
     setDetailsOpen(true);
   }, []);
   // The user's agent cards, read while a payment choice waits: it offers the ones that fit.
-  const choosing = Boolean(pendingCall(chat.messages, "tool-await_payment_choice"));
+  const choosing = Boolean(
+    pendingCall(chat.messages, "tool-await_payment_choice") ??
+      pendingCall(chat.messages, "tool-await_budget"),
+  );
   const agentCards = useAgentCards({ enabled: choosing });
   const cardsIn = agentCards.data ?? (agentCards.error ? [] : undefined);
   const [choiceSteps, setChoiceSteps] = useState<ReadonlyMap<string, ChoiceStep>>(
@@ -1695,7 +1726,7 @@ function SignedIn({
       onNewCard,
       newCards,
       (toolCallId, pick, alone) => void onNewBudget(toolCallId, pick, alone),
-      (toolCallId) => chat.onBudget(toolCallId, { status: "cancelled" }),
+      chat.onBudget,
       onReviewCard,
       chat.send,
       openProduct,
