@@ -194,7 +194,7 @@ While polling, when the run reaches its **payment step** (a payment input reques
 { "text": "prefer the blue one if the black is out" }                   // a note to the agent, no request
 ```
 
-Optional `messageId` (≤200 chars) makes a retry idempotent. → `CheckoutView`. If the `requestId` names a payment request: `409 payment_handled_by_server`.
+Optional `messageId` (≤200 chars) makes a retry idempotent. → `CheckoutView`. If the `requestId` names a payment request: `409 payment_handled_by_server`. If it names a plain form that asks for card details, a submit fails with `409 card_in_form`: decline it or send an alternative. Only a payment request (`interaction.kind: "payment"`) is answered with an order intent, and only one with a live rail whose `credentialFormats` include `"card"`.
 
 `GET /v1/checkouts/:id/messages?cursor&limit` → Crossmint's message list (progress, activity, input requests, result, and what was sent) as is. Its `streamCursor` is where the stream below picks up.
 

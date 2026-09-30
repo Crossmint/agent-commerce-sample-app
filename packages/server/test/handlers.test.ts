@@ -927,6 +927,138 @@ describe("checkouts", () => {
     vi.restoreAllMocks();
   });
 
+  const maxCost = { amount: "30.00", currency: "USD" };
+
+  it("answers a payment request once, even when another instance sees it again", async () => {
+    vi.spyOn(console, "info").mockImplementation(() => {});
+    const routes = [
+      {
+        method: "POST",
+        path: /\/unstable\/agent-checkouts$/,
+        reply: { status: 202, body: run({ status: "queued" }) },
+      },
+      {
+        method: "GET",
+        path: "/unstable/agent-checkouts/run_1",
+        reply: { body: run({ status: "awaiting_input", requiredAction: paymentRequest }) },
+      },
+      { method: "GET", path: "/unstable/order-intents/oi_1", reply: { body: activeOrderIntent() } },
+      {
+        method: "POST",
+        path: "/unstable/agent-checkouts/run_1/messages",
+        reply: { status: 202, body: { messageId: "m_1", status: "accepted" } },
+      },
+    ];
+    const first = makeServer(routes);
+    const created = await call(first.handlers, "POST", "/v1/checkouts", {
+      body: { startUrl: "https://shop.example/p/1", agentCardId: "oi_1", maxCost },
+    });
+    expect(created.status).toBe(201);
+    await call(first.handlers, "GET", "/v1/checkouts/run_1");
+    const sent = first.calls.filter((c) => c.path.endsWith("/run_1/messages"));
+    expect(sent).toHaveLength(1);
+    expect(sent[0]!.body).toMatchObject(paidWith("oi_1"));
+
+    // A second instance: its own memory, the same store. The request still shows open.
+    const second = makeServer(routes, { store: first.store });
+    const res = await call(second.handlers, "GET", "/v1/checkouts/run_1");
+    expect((await res.json()).status).toBe("running");
+    expect(second.calls.some((c) => c.path.endsWith("/run_1/messages"))).toBe(false);
+    vi.restoreAllMocks();
+  });
+
+  it("does not hand the run an agent card whose live rails make no card", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    const { handlers, calls } = makeServer([
+      {
+        method: "POST",
+        path: /\/unstable\/agent-checkouts$/,
+        reply: { status: 202, body: run({ status: "queued" }) },
+      },
+      {
+        method: "GET",
+        path: "/unstable/agent-checkouts/run_1",
+        reply: { body: run({ status: "awaiting_input", requiredAction: paymentRequest }) },
+      },
+      {
+        method: "GET",
+        path: "/unstable/order-intents/oi_1",
+        reply: {
+          body: activeOrderIntent({
+            rails: [
+              {
+                rail: "agentic-token",
+                provider: "agentpay",
+                status: "active",
+                credentialFormats: ["network-token"],
+              },
+            ],
+          }),
+        },
+      },
+    ]);
+    const created = await call(handlers, "POST", "/v1/checkouts", {
+      body: { startUrl: "https://shop.example/p/1", agentCardId: "oi_1", maxCost },
+    });
+    expect(created.status).toBe(201);
+    const body = await (await call(handlers, "GET", "/v1/checkouts/run_1")).json();
+    // Not answered: the user chooses another card at the payment step.
+    expect(calls.some((c) => c.path.endsWith("/run_1/messages"))).toBe(false);
+    expect(body.status).toBe("awaiting_input");
+    expect(body.paymentRequest).toBeDefined();
+    vi.restoreAllMocks();
+  });
+
+  it("never answers a card form with an agent card, and refuses card fields for it", async () => {
+    const cardForm = {
+      type: "input_response",
+      requestId: "req_form",
+      messageId: "msg_form",
+      request: {
+        question: "Enter your card details.",
+        expiresAt: "2026-09-18T00:00:00.000Z",
+        interaction: {
+          kind: "form",
+          responseSchema: {
+            type: "object",
+            properties: { cardNumber: { type: "string" }, cvc: { type: "string" } },
+          },
+        },
+      },
+    };
+    const { handlers, calls } = makeServer([
+      {
+        method: "POST",
+        path: /\/unstable\/agent-checkouts$/,
+        reply: { status: 202, body: run({ status: "queued" }) },
+      },
+      {
+        method: "GET",
+        path: "/unstable/agent-checkouts/run_1",
+        reply: { body: run({ status: "awaiting_input", requiredAction: cardForm }) },
+      },
+      {
+        method: "POST",
+        path: "/unstable/agent-checkouts/run_1/messages",
+        reply: { status: 202, body: { messageId: "m_1", status: "accepted" } },
+      },
+    ]);
+    const created = await call(handlers, "POST", "/v1/checkouts", {
+      body: { startUrl: "https://shop.example/p/1", agentCardId: "oi_1", maxCost },
+    });
+    expect(created.status).toBe(201);
+    const body = await (await call(handlers, "GET", "/v1/checkouts/run_1")).json();
+    // The agent sees the question, and no order intent was sent to it.
+    expect(body.pendingUserAction.id).toBe("req_form");
+    expect(calls.some((c) => c.path.endsWith("/run_1/messages"))).toBe(false);
+
+    const refused = await call(handlers, "POST", "/v1/checkouts/run_1/messages", {
+      body: { requestId: "req_form", values: { cardNumber: "4111111111111111", cvc: "123" } },
+    });
+    expect(refused.status).toBe(409);
+    expect((await refused.json()).error.code).toBe("card_in_form");
+  });
+
   it("passes the message stream through, resuming from the caller's cursor", async () => {
     const events =
       'id: c1\nevent: message.upsert\ndata: {"id":"m1","role":"assistant","parts":[{"type":"progress","text":"Opened the store"}]}\n\n' +

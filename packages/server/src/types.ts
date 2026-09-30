@@ -77,6 +77,14 @@ export interface CheckoutLink {
   agentCardRequestId?: string;
   /** What the purchase is, in the agent's few words: the agent card's purpose at the payment step. */
   purpose?: string;
+  /**
+   * The payment request the server last answered, and the order intent it
+   * answered with. Kept on the row, not in one instance's memory: every
+   * instance must see it, so none answers the same request twice, and a new
+   * request after an answer means that order intent did not work.
+   */
+  answeredRequestId?: string;
+  answeredOrderIntentId?: string;
   createdAt: string;
 }
 
@@ -85,6 +93,8 @@ export interface CheckoutLinkPatch {
   agentCardId?: string;
   agentCardRequestId?: string;
   purpose?: string;
+  answeredRequestId?: string;
+  answeredOrderIntentId?: string;
 }
 
 /**

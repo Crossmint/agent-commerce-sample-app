@@ -1,4 +1,4 @@
-import { asksPasswordInForm } from "@agent-commerce/core";
+import { asksCardInForm, asksPasswordInForm } from "@agent-commerce/core";
 import type { CheckoutView } from "@agent-commerce/server";
 import type { ApproveOutcome } from "@agent-commerce/ui";
 import type { CheckoutMessage } from "@agent-commerce/core";
@@ -159,7 +159,11 @@ export function stopReason(
         question: action.question || view.rendered?.title || "The store needs an answer.",
         ...(action.expiresAt ? { expiresAt: action.expiresAt } : {}),
         responseSchema: action.responseSchema as Record<string, unknown>,
-        ...(asksPasswordInForm(action) ? { note: PASSWORD_IN_FORM_NOTE } : {}),
+        ...(asksPasswordInForm(action)
+          ? { note: PASSWORD_IN_FORM_NOTE }
+          : asksCardInForm(action)
+            ? { note: CARD_IN_FORM_NOTE }
+            : {}),
       },
     };
   }
@@ -179,6 +183,10 @@ export function watchedHere(message: ChatMessage, part: ChatMessagePart): boolea
 /** What the agent is told when a store asks for a password in a plain form. */
 const PASSWORD_IN_FORM_NOTE =
   "This asks for the user's password in a plain form. Never ask the user for it and never send it: it would pass through the chat, and the store's agent does not use a password sent that way. Tell the user in one line that this store wants them to sign in, which cannot be done safely here, and ask whether to check out as a guest instead (answer_checkout with action alternative) or stop (action decline).";
+
+/** What the agent is told when a store asks for card details in a plain form, not a payment request. */
+const CARD_IN_FORM_NOTE =
+  "This asks for card details in a plain form, not through the payment step. Never ask the user for card details and never send them. Tell the user in one line that the store wants the card typed into a form, which cannot be done safely here, and ask whether to pay another way (answer_checkout with action alternative, such as PayPal or Shop Pay) or stop (action decline).";
 
 /** What the thread's finished watches already did, so the next one does not do it twice. */
 export interface WatchIndex {

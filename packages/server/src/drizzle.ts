@@ -63,6 +63,9 @@ export const checkouts = pgTable("checkouts", {
   agentCardRequestId: text("agent_card_request_id"),
   // What the purchase is, in the agent's few words: the agent card's purpose.
   purpose: text("purpose"),
+  // The payment request last answered, and the order intent it was answered with.
+  answeredRequestId: text("answered_request_id"),
+  answeredOrderIntentId: text("answered_order_intent_id"),
   createdAt: timestamp("created_at", tz).notNull().defaultNow(),
 });
 
@@ -267,6 +270,10 @@ export function drizzleRequestStore(
         ...(patch?.agentCardId ? { agentCardId: patch.agentCardId } : {}),
         ...(patch?.agentCardRequestId ? { agentCardRequestId: patch.agentCardRequestId } : {}),
         ...(patch?.purpose ? { purpose: patch.purpose } : {}),
+        ...(patch?.answeredRequestId ? { answeredRequestId: patch.answeredRequestId } : {}),
+        ...(patch?.answeredOrderIntentId
+          ? { answeredOrderIntentId: patch.answeredOrderIntentId }
+          : {}),
       };
       await db
         .insert(checkouts)
@@ -322,6 +329,8 @@ export function drizzleRequestStore(
         ...(row.agentCardId ? { agentCardId: row.agentCardId } : {}),
         ...(row.agentCardRequestId ? { agentCardRequestId: row.agentCardRequestId } : {}),
         ...(row.purpose ? { purpose: row.purpose } : {}),
+        ...(row.answeredRequestId ? { answeredRequestId: row.answeredRequestId } : {}),
+        ...(row.answeredOrderIntentId ? { answeredOrderIntentId: row.answeredOrderIntentId } : {}),
         createdAt: row.createdAt.toISOString(),
       };
     },

@@ -2,7 +2,7 @@
 
 import { useState, type FormEvent, type ReactNode } from "react";
 import { ChevronRight, Plus, Wallet, WalletCards, type LucideIcon } from "lucide-react";
-import type { AgentCard } from "@agent-commerce/core";
+import { canPayAtCheckout, type AgentCard } from "@agent-commerce/core";
 import {
   ApproveAgentCard,
   Badge,
@@ -279,14 +279,17 @@ export function BudgetChosen({
 
 /**
  * The general budgets the user has, to pay for a purchase from again:
- * active, not locked to a store, with money left. The most left first; at
- * most two.
+ * active, able to pay at a checkout (a live rail that makes a card), not
+ * locked to a store, with money left. The most left first; at most two.
  */
 export function generalBudgets(cards: AgentCard[] | undefined): AgentCard[] {
   return (cards ?? [])
     .filter(
       (c) =>
-        agentCardGroup(c) === "active" && !c.merchant && Number.parseFloat(c.amount.available) > 0,
+        agentCardGroup(c) === "active" &&
+        canPayAtCheckout(c) &&
+        !c.merchant &&
+        Number.parseFloat(c.amount.available) > 0,
     )
     .sort((a, b) => Number.parseFloat(b.amount.available) - Number.parseFloat(a.amount.available))
     .slice(0, 2);

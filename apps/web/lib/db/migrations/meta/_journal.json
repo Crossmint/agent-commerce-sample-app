@@ -43,6 +43,13 @@
       "when": 1790759583544,
       "tag": "0005_yummy_master_chief",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1790775897103,
+      "tag": "0006_first_brother_voodoo",
+      "breakpoints": true
     }
   ]
 }

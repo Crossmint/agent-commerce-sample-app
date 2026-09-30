@@ -14,6 +14,7 @@ export type ErrorCode =
   | "payment_handled_by_server"
   | "protected_input_required"
   | "password_in_form"
+  | "card_in_form"
   | "not_a_protected_request"
   | "checkout_finished"
   | "agent_card_unusable"

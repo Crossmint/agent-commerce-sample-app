@@ -99,6 +99,22 @@ export function hasCardRail(orderIntent: Pick<OrderIntent, "rails">): boolean {
   return orderIntent.rails.some((r) => CARD_RAILS.has(r.rail) && r.status === "active");
 }
 
+/**
+ * Can Agent Checkouts pay with this order intent? It types a card into the
+ * store's form, so it needs a live rail that makes a card, not only a
+ * network token: `credentialFormats` includes `"card"`. A rail that does not
+ * list its formats is taken to make one, as rails did before they listed
+ * them. See docs.crossmint.com/agents/payment-flows/agent-checkouts-payment-method.
+ */
+export function canPayAtCheckout(orderIntent: Pick<OrderIntent, "rails">): boolean {
+  return orderIntent.rails.some(
+    (r) =>
+      CARD_RAILS.has(r.rail) &&
+      r.status === "active" &&
+      (!r.credentialFormats || (r.credentialFormats as readonly string[]).includes("card")),
+  );
+}
+
 /** Is the agent card ready for an agent to pay with? Only a live card rail counts. */
 export function isReadyForAgent(orderIntent: Pick<OrderIntent, "rails">): boolean {
   return hasCardRail(orderIntent);

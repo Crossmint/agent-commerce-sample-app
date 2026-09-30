@@ -145,6 +145,24 @@ export function isProtectedAction(action: Pick<PendingUserAction, "protected">):
   return Boolean(action.protected);
 }
 
+/**
+ * True for the run's payment request (`interaction.kind === "payment"`): the
+ * one answered with an order intent, never with card fields.
+ */
+export function isPaymentRequest(action: Pick<PendingUserAction, "payment">): boolean {
+  return Boolean(action.payment);
+}
+
+/**
+ * True when a plain form, not a payment request, asks for card details. It
+ * is never answered with them, and never with an order intent: that answer
+ * does not fit a form. Decline it, or ask for another way to pay.
+ */
+export function asksCardInForm(action: Pick<PendingUserAction, "responseSchema" | "payment">): boolean {
+  return !action.payment && isPaymentAction(action);
+}
+
+/** True for the payment request, or a form that asks for card details. Card fields never answer either. */
 export function isPaymentAction(action: Pick<PendingUserAction, "responseSchema" | "payment">): boolean {
   if (action.payment) return true;
   const keys = Object.keys(action.responseSchema?.properties ?? {}).map((k) => k.toLowerCase());

@@ -2,7 +2,7 @@
 
 import { useCallback, useState, type FormEvent, type ReactNode } from "react";
 import { ChevronRight, CreditCard, Wallet, WalletCards, type LucideIcon } from "lucide-react";
-import type { AgentCard } from "@agent-commerce/core";
+import { canPayAtCheckout, type AgentCard } from "@agent-commerce/core";
 import {
   ApproveAgentCard,
   Badge,
@@ -129,7 +129,7 @@ export function fittingCards(
     !subject.budget ||
     Number.parseFloat(c.amount.available) >= Number.parseFloat(subject.budget.value);
   return cards
-    .filter((c) => agentCardGroup(c) === "active")
+    .filter((c) => agentCardGroup(c) === "active" && canPayAtCheckout(c))
     .filter((c) => !c.merchant || hostOf(c.merchant.url) === host)
     .filter((c) => {
       const left = Number.parseFloat(c.amount.available);

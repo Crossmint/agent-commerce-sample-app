@@ -112,6 +112,10 @@ export function memoryCheckoutStore(): CheckoutStore {
         ...(patch?.agentCardId ? { agentCardId: patch.agentCardId } : {}),
         ...(patch?.agentCardRequestId ? { agentCardRequestId: patch.agentCardRequestId } : {}),
         ...(patch?.purpose ? { purpose: patch.purpose } : {}),
+        ...(patch?.answeredRequestId ? { answeredRequestId: patch.answeredRequestId } : {}),
+        ...(patch?.answeredOrderIntentId
+          ? { answeredOrderIntentId: patch.answeredOrderIntentId }
+          : {}),
       });
     },
     async getCheckout(checkoutId) {

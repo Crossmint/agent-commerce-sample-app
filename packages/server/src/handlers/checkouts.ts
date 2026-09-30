@@ -1,11 +1,14 @@
 import type { AuthenticatedUser } from "@agent-commerce/auth";
 import {
   alternativeResponse,
+  asksCardInForm,
   asksPasswordInForm,
   buyerProfileProblems,
+  canPayAtCheckout,
+  CrossmintApiError,
   declineResponse,
   expiresInHours,
-  isPaymentAction,
+  isPaymentRequest,
   isProtectedAction,
   isTerminalCheckout,
   newMessageId,
@@ -471,7 +474,7 @@ async function answer(
   let checkout = await ctx.crossmint.checkouts.get(cctx, runId);
   if (requestId) {
     const open = pendingActionOf(checkout);
-    if (open && open.id === requestId && isPaymentAction(open)) {
+    if (open && open.id === requestId && isPaymentRequest(open)) {
       throw new HttpError(
         409,
         "payment_handled_by_server",
@@ -481,6 +484,14 @@ async function answer(
     }
     const submit =
       part.type === "input_response" && part.action === "submit" ? part.response.kind : undefined;
+    if (open && open.id === requestId && asksCardInForm(open) && submit) {
+      throw new HttpError(
+        409,
+        "card_in_form",
+        "The store asks for card details in a plain form. It is never answered with card details or an agent card: card details must not pass through the app or the agent. Send an alternative, such as paying another way, or decline it.",
+        { checkoutId: runId, requestId },
+      );
+    }
     if (open && open.id === requestId && isProtectedAction(open) && submit === "form") {
       throw new HttpError(
         409,
@@ -532,23 +543,6 @@ async function ownedLink(
   return link;
 }
 
-/**
- * The payment request Agent Commerce last answered, by run, and the order
- * intent it answered with. A poll right after an answer can still show the
- * same request open; this stops a second answer. And when the run asks
- * again, with a new request, the order intent that went before did not work
- * (expired, too small, cancelled), so that one is not offered again. Per
- * process; bounded.
- */
-const answeredPayments = new Map<string, { requestId: string; orderIntentId: string }>();
-function rememberAnswered(runId: string, requestId: string, orderIntentId: string): void {
-  if (answeredPayments.size >= 500) {
-    const oldest = answeredPayments.keys().next().value;
-    if (oldest !== undefined) answeredPayments.delete(oldest);
-  }
-  answeredPayments.set(runId, { requestId, orderIntentId });
-}
-
 /** How long an order intent made at the payment step lasts: the rest of the checkout, not an allowance. */
 const PAYMENT_ORDER_INTENT_HOURS = 2;
 
@@ -588,15 +582,26 @@ async function settlePayment(
   link: CheckoutLink | undefined,
 ): Promise<CheckoutView> {
   const action = pendingActionOf(checkout);
-  if (!action || !isPaymentAction(action))
+  // Only the run's payment request takes an order intent. A form that asks
+  // for card details is a question like any other, for the agent to decline.
+  if (!action || !isPaymentRequest(action))
     return toView(ctx.config.webBaseUrl, checkout, link?.agentCardId);
-  const answered = answeredPayments.get(checkout.runId);
-  if (answered?.requestId === action.id)
+  if (link?.answeredRequestId === action.id)
     return toView(ctx.config.webBaseUrl, checkout, link?.agentCardId, { hidePayment: true });
   // Asked again after an answer: that order intent did not work. Not again.
-  const spent = answered?.orderIntentId;
+  let spent = link?.answeredOrderIntentId;
 
   let orderIntentId = link?.agentCardId !== spent ? link?.agentCardId : undefined;
+  // The docs' check before submitting: a live rail that makes a card. One
+  // that makes only network tokens cannot fill the store's card form.
+  if (orderIntentId && !(await payableAtCheckout(ctx, user, orderIntentId))) {
+    console.warn("[agent-commerce] agent card has no active rail that makes a card", {
+      checkoutId: checkout.runId,
+      agentCardId: orderIntentId,
+    });
+    spent = orderIntentId;
+    orderIntentId = undefined;
+  }
   if (!orderIntentId) {
     const request = await paymentStepRequest(ctx, user, checkout, link, action, spent);
     // Until the user has chosen and the card can pay, the payment step is
@@ -615,10 +620,32 @@ async function settlePayment(
     requestId: action.id,
     agentCardId: orderIntentId,
   });
-  await ctx.crossmint.checkouts.payWithOrderIntent(cctx, checkout.runId, action.id, orderIntentId);
-  rememberAnswered(checkout.runId, action.id, orderIntentId);
+  try {
+    await ctx.crossmint.checkouts.payWithOrderIntent(cctx, checkout.runId, action.id, orderIntentId);
+  } catch (e) {
+    // Another instance answered this request a moment ago: the run is no
+    // longer waiting for it. Anything else is a real failure.
+    if (!(e instanceof CrossmintApiError && e.status === 409)) throw e;
+  }
+  await ctx.checkouts.linkCheckout(checkout.runId, user.userId, {
+    answeredRequestId: action.id,
+    answeredOrderIntentId: orderIntentId,
+  });
   const refreshed = await waitForConsumption(ctx, cctx, checkout.runId, action.id);
   return toView(ctx.config.webBaseUrl, refreshed, orderIntentId, { hidePayment: true });
+}
+
+/** True when the order intent has a live rail that makes a card. Unreadable counts as payable: the run says if not. */
+async function payableAtCheckout(
+  ctx: Ctx,
+  user: AuthenticatedUser,
+  orderIntentId: string,
+): Promise<boolean> {
+  try {
+    return canPayAtCheckout(await ctx.crossmint.orderIntents.get({ jwt: user.jwt }, orderIntentId));
+  } catch {
+    return true;
+  }
 }
 
 /**
@@ -725,7 +752,7 @@ function toView(
   if (opts.paymentRequest) view.paymentRequest = opts.paymentRequest;
   const action = pendingActionOf(checkout);
   if (action) {
-    if (isPaymentAction(action)) {
+    if (isPaymentRequest(action)) {
       // Never the raw card form. Either the server is about to answer it, and
       // to the caller the run is still working, or `paymentRequest` carries
       // the step and the run stays `awaiting_input`.

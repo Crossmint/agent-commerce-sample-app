@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { Check, X } from "lucide-react";
-import { isPaymentAction, type CheckoutMessage, type JsonSchema } from "@agent-commerce/core";
+import type { CheckoutMessage, JsonSchema } from "@agent-commerce/core";
 import type { CheckoutView } from "../api/types.js";
 import { cn } from "../lib/utils.js";
 
@@ -71,9 +71,8 @@ export function checkoutSteps(
         const open = part.status === "open";
         const interaction = part.interaction as
           { kind?: string; responseSchema?: JsonSchema } | undefined;
-        const payment =
-          interaction?.kind === "payment" ||
-          isPaymentAction({ responseSchema: interaction?.responseSchema ?? {} });
+        // Only the payment request: a form asking for card details is a question.
+        const payment = interaction?.kind === "payment";
         const step: CheckoutStep = {
           key: part.requestId,
           label: payment
