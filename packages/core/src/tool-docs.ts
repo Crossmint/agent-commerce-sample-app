@@ -203,8 +203,6 @@ export const TOOL_DOCS = {
       amount: "The amount the user named, if they named one: it is picked first.",
       purchase:
         "Only before a checkout: what is being bought, in a few words, e.g. Table for 2 at Nopa, Cubone keychain. Leave it out for a budget on its own.",
-      total:
-        "Only after a run stopped because its total was more than the budget had left: that total. The chat says so, and offers no amount below it.",
     },
     surfaces: ["chat"],
   },

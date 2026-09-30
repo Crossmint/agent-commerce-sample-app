@@ -615,7 +615,6 @@ export function createChatTools(api: AgentCommerceClient, opts: { userEmail?: st
         category: z.string().min(1).max(60).describe(paramDoc("await_budget", "category")),
         amount: amountSchema.optional().describe(paramDoc("await_budget", "amount")),
         purchase: z.string().min(1).max(80).optional().describe(paramDoc("await_budget", "purchase")),
-        total: amountSchema.optional().describe(paramDoc("await_budget", "total")),
       }),
       outputSchema: budgetOutcomeSchema,
     }),

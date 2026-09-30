@@ -534,19 +534,10 @@ function toBubbles(
       ) {
         const output = part.state === "output-available" ? part.output : undefined;
         const category = part.input.category.trim() || DEFAULT_BUDGET_CATEGORY;
-        const total = part.input.total;
-        const amounts = budgetAmounts(part.input.amount?.currency ?? total?.currency ?? "USD", total);
+        const amounts = budgetAmounts(part.input.amount?.currency ?? "USD");
         const purchase = part.input.purchase?.trim();
-        // Before a purchase: the budgets they have (that cover the total, after
-        // a run stopped over it), and another way to pay.
-        const budgets = purchase
-          ? generalBudgets(agentCards).filter(
-              (c) =>
-                !total ||
-                (c.amount.currency.toUpperCase() === total.currency.toUpperCase() &&
-                  Number.parseFloat(c.amount.available) >= Number.parseFloat(total.value)),
-            )
-          : [];
+        // Before a purchase: the budgets they have, and another way to pay.
+        const budgets = purchase ? generalBudgets(agentCards) : [];
         if (purchase && !output && !agentCards) return;
         const made: { requestId: string; pick: Partial<BudgetPick> } | undefined =
           newCards.get(part.toolCallId) ??
@@ -560,22 +551,20 @@ function toBubbles(
           key: `${key}-text`,
           kind: "text",
           side: "recv",
-          text: total
-            ? `The total came to ${formatAmount(total.value, total.currency)}, more than your budget has left. Tap an amount for a bigger ${category} budget, or pay another way.`
-            : budgets.length
-            ? `How should I pay for ${purchase}? Use a budget you have, or tap an amount for a new ${category} budget for ${daysLabel(DEFAULT_BUDGET_DAYS)}.`
+          text: budgets.length
+            ? `Which budget should I use for ${purchase}? Tap an amount for a new ${category} budget for ${daysLabel(DEFAULT_BUDGET_DAYS)}, use one you have, or pay another way than your card.`
             : `${purchase ? `To buy ${purchase}, I'll` : "I'll"} need permission to use your card. How much for a ${category} budget? I can use it for similar purchases for ${daysLabel(DEFAULT_BUDGET_DAYS)}.`,
         });
         out.push({
           key,
           kind: "choices",
           choices: [
+            ...amounts.map((a) => ({ label: formatAmount(a.value, a.currency), message: a.value })),
             ...budgets.map((c) => ({
               label: `Use ${c.description}`,
               message: `card:${c.orderIntentId}`,
               description: `${formatAmount(c.amount.available, c.amount.currency)} left`,
             })),
-            ...amounts.map((a) => ({ label: formatAmount(a.value, a.currency), message: a.value })),
             purchase
               ? { label: "Different payment method", message: "other" }
               : { label: "Not now", message: "skip" },

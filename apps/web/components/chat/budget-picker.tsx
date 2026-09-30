@@ -306,18 +306,14 @@ export function existingBudgetOutcome(card: AgentCard): BudgetOutcome {
   };
 }
 
-/** What the agent asks over the budget: for a purchase, how to pay for it. */
-export function budgetAsk(
-  purchase: string | undefined,
-  hasBudgets: boolean,
-  total?: Money,
-): string {
-  if (total) {
-    return `The total came to ${formatAmount(total.value, total.currency)}, more than your budget has left. Set up a bigger one, or pay another way?`;
-  }
+/**
+ * What the agent asks over the budget. For a purchase it never names a
+ * price: the store states the total only at its payment step.
+ */
+export function budgetAsk(purchase: string | undefined, hasBudgets: boolean): string {
   if (!purchase) return budgetQuestion();
   return hasBudgets
-    ? `How should I pay for ${purchase}? I can use a budget you have, or set up a new one.`
+    ? `Which budget should I use for ${purchase}? I can set up a new one, use one you have, or you can pay another way than your card.`
     : `To buy ${purchase}, I'll need permission to use your card. What should the budget cover, and how much?`;
 }
 
@@ -351,7 +347,7 @@ export function BudgetInThread({
   buttonSize = "xl",
   className,
 }: {
-  input: { category: string; amount?: Money; purchase?: string; total?: Money };
+  input: { category: string; amount?: Money; purchase?: string };
   output?: BudgetOutcome;
   onOutcome: (outcome: BudgetOutcome) => void;
   /** Open the approval in the frame's own sheet, and call `done` when it ends. Leave it out for a dialog. */
@@ -367,13 +363,7 @@ export function BudgetInThread({
   // The budgets the user has, read while a purchase waits on this.
   const cards = useAgentCards({ enabled: forPurchase && !output });
   const cardsReady = !cards.loading || cards.data !== undefined;
-  // After a run stopped over its total, only budgets that cover it.
-  const budgets = generalBudgets(cards.data).filter(
-    (c) =>
-      !input.total ||
-      (c.amount.currency.toUpperCase() === input.total.currency.toUpperCase() &&
-        Number.parseFloat(c.amount.available) >= Number.parseFloat(input.total.value)),
-  );
+  const budgets = generalBudgets(cards.data);
   const box = cn(
     "flex w-full max-w-lg flex-col overflow-hidden rounded-2xl bg-card ring-1 ring-foreground/10",
     className,
@@ -437,9 +427,8 @@ export function BudgetInThread({
   const form = (
     <BudgetPicker
       category={input.category}
-      currency={input.amount?.currency ?? input.total?.currency ?? "USD"}
+      currency={input.amount?.currency ?? "USD"}
       suggested={input.amount}
-      floor={input.total}
       error={flow.phase === "pick" ? flow.error : undefined}
       onSubmit={(pick) => void create(pick)}
       onCancel={forPurchase ? otherWay : () => onOutcome({ status: "cancelled" })}
@@ -466,6 +455,12 @@ export function BudgetInThread({
   } else if (flow.phase === "choose" && budgets.length) {
     body = (
       <ul className="flex flex-col">
+        <ChoiceRow
+          icon={Plus}
+          label="New budget"
+          detail="Set up another budget on a saved card"
+          onPick={() => setFlow({ phase: "pick" })}
+        />
         {budgets.map((c) => (
           <ChoiceRow
             key={c.orderIntentId}
@@ -475,12 +470,6 @@ export function BudgetInThread({
             onPick={() => onOutcome(existingBudgetOutcome(c))}
           />
         ))}
-        <ChoiceRow
-          icon={Plus}
-          label="New budget"
-          detail="Set up another budget on a saved card"
-          onPick={() => setFlow({ phase: "pick" })}
-        />
         <ChoiceRow
           icon={Wallet}
           label="Use a different payment method"
@@ -496,7 +485,7 @@ export function BudgetInThread({
   return (
     <>
       <AgentBubble
-        text={budgetAsk(input.purchase, flow.phase === "choose" && budgets.length > 0, input.total)}
+        text={budgetAsk(input.purchase, flow.phase === "choose" && budgets.length > 0)}
         className={bubbleClassName}
       />
       <div className={box}>{body}</div>

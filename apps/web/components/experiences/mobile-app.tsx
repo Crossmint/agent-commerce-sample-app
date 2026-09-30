@@ -10,7 +10,16 @@ import {
   type KeyboardEvent,
   type ReactNode,
 } from "react";
-import { ArrowLeft, ArrowUp, ChevronRight, CreditCard, LogOut, Plus, Square } from "lucide-react";
+import {
+  ArrowLeft,
+  ArrowUp,
+  ChevronRight,
+  CreditCard,
+  LogOut,
+  Plus,
+  RotateCcw,
+  Square,
+} from "lucide-react";
 import {
   AgentCardDetailBody,
   AgentCardTable,
@@ -148,6 +157,7 @@ function Home({
   chat,
   thread,
   chatEnabled,
+  onNewChat,
   onSignOut,
 }: ExperienceProps & { screen: HTMLDivElement | null }) {
   const [cardsOpen, setCardsOpen] = useState(false);
@@ -206,6 +216,18 @@ function Home({
       {/* A hairline under the header, so the thread does not run into it. */}
       <div className="flex items-center gap-3 border-b border-border px-5 pt-6 pb-3 shadow-[0_1px_3px_rgba(0,0,0,0.04)] md:pt-2">
         <h1 className="flex-1 text-[28px] leading-[1.2] font-medium tracking-[-0.02em]">Chat</h1>
+        {/* Once the chat has started: start over in a new one. The old one stays in the history. */}
+        {chat.messages.length > 0 ? (
+          <RoundButton
+            label="New chat"
+            onClick={() => {
+              chat.stop();
+              onNewChat();
+            }}
+          >
+            <RotateCcw className="size-4.5" />
+          </RoundButton>
+        ) : null}
         <RoundButton label="Cards" onClick={() => setCardsOpen(true)}>
           <CreditCard className="size-4.5" />
         </RoundButton>
