@@ -71,7 +71,6 @@ app, and the agent buys on any website.
 
 Use these sources:
 - Crossmint docs index: https://docs.crossmint.com/llms.txt
-  (or add the docs MCP server: https://docs.crossmint.com/mcp)
 - Agent cards: https://docs.crossmint.com/agents/cards-quickstart
 - Agent Checkouts: https://docs.crossmint.com/agents/agent-checkouts-quickstart
 - A working reference app: https://github.com/Crossmint/agent-commerce-sample-app
