@@ -1,6 +1,7 @@
-import { newMessageId, paymentResponse, protectedResponse, submitResponse } from "./checkout-messages.js";
+import { newMessageId, paymentResponse, submitResponse } from "./checkout-messages.js";
 import { CrossmintApiError } from "./errors.js";
 import type {
+  CheckoutFormAnswer,
   BrowserProfile,
   BrowserProfileInput,
   BrowserProfileList,
@@ -275,17 +276,21 @@ export class CrossmintClient {
         { auth: this.checkoutAuth(ctx), body: input, baseUrl: this.checkoutsBaseUrl },
       ),
 
-    /** Answer an open input request with form values. One message, one part. */
+    /**
+     * Answer an open form with every field in one message, keyed by field
+     * `key`. A protected field's answer is the `{ protectedInputId }` that
+     * Crossmint's protected field returned.
+     */
     respond: (
       ctx: CheckoutContext,
       runId: string,
       requestId: string,
-      values: Record<string, unknown>,
+      answers: Record<string, CheckoutFormAnswer>,
       messageId?: string,
     ): Promise<SendCheckoutMessageResult> =>
       this.checkouts.sendMessage(ctx, runId, {
         id: messageId ?? newMessageId(),
-        parts: [submitResponse(requestId, values)],
+        parts: [submitResponse(requestId, answers)],
       }),
 
     /** Answer the payment step with an order intent the user authorized. */
@@ -299,19 +304,6 @@ export class CrossmintClient {
       this.checkouts.sendMessage(ctx, runId, {
         id: messageId ?? newMessageId(),
         parts: [paymentResponse(requestId, orderIntentId)],
-      }),
-
-    /** Answer a protected input request (a password) with the id Crossmint's field returned. */
-    answerProtected: (
-      ctx: CheckoutContext,
-      runId: string,
-      requestId: string,
-      protectedInputId: string,
-      messageId?: string,
-    ): Promise<SendCheckoutMessageResult> =>
-      this.checkouts.sendMessage(ctx, runId, {
-        id: messageId ?? newMessageId(),
-        parts: [protectedResponse(requestId, protectedInputId)],
       }),
 
     cancel: (ctx: CheckoutContext, runId: string): Promise<CancelCheckoutResult> =>

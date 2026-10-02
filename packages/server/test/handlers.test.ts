@@ -9,6 +9,11 @@ import {
   type FakeCall,
 } from "./helpers.js";
 
+/** A required text field the caller answers with a plain value. */
+function textField(key: string, label: string) {
+  return { key, label, required: true, handling: "standard", input: { kind: "text" } };
+}
+
 describe("auth", () => {
   it("rejects a missing bearer token", async () => {
     const { handlers } = makeServer();
@@ -637,7 +642,7 @@ describe("checkouts", () => {
         purpose: "checkout_payment",
         method: "card",
         amount: { kind: "exact", value: "28.40", currency: "USD" },
-        merchant: { domain: "shop.example" },
+        merchant: { name: "shop.example", url: "https://shop.example", countryCode: "US" },
       },
     },
   };
@@ -1136,10 +1141,7 @@ describe("checkouts", () => {
         expiresAt: "2026-09-18T00:00:00.000Z",
         interaction: {
           kind: "form",
-          responseSchema: {
-            type: "object",
-            properties: { cardNumber: { type: "string" }, cvc: { type: "string" } },
-          },
+          fields: [textField("cardNumber", "Card number"), textField("cvc", "CVC")],
         },
       },
     };
@@ -1315,10 +1317,7 @@ describe("checkouts", () => {
       request: {
         question: "Which size?",
         expiresAt: "2026-09-18T00:00:00.000Z",
-        interaction: {
-          kind: "form",
-          responseSchema: { type: "object", properties: { size: { type: "string" } } },
-        },
+        interaction: { kind: "form", fields: [textField("size", "Size")] },
       },
     };
     const { handlers, calls } = makeServer([
@@ -1353,7 +1352,7 @@ describe("checkouts", () => {
     expect(res.status).toBe(200);
     const sent = calls.filter((c) => c.method === "POST" && c.path.endsWith("/run_note/messages"));
     expect(sent.map((c) => (c.body as { parts: unknown[] }).parts)).toEqual([
-      [{ type: "input_response", requestId: "req_size", action: "submit", response: { kind: "form", values: { size: "M" } } }],
+      [{ type: "input_response", requestId: "req_size", action: "submit", response: { kind: "form", answers: { size: "M" } } }],
       [{ type: "text", text: "Gift wrap it, please" }],
     ]);
   });
@@ -1419,12 +1418,25 @@ describe("checkouts", () => {
         expiresAt: "2026-09-18T00:00:00.000Z",
         interaction: {
           kind: "form",
-          responseSchema: {
-            type: "object",
-            properties: { size: { type: "string", enum: ["s", "m"] } },
-            required: ["size"],
-          },
-          uiSchema: {},
+          fields: [
+            {
+              key: "size",
+              label: "Size",
+              required: true,
+              handling: "standard",
+              input: {
+                kind: "choice",
+                selection: { kind: "one" },
+                options: ["s", "m"].map((value) => ({
+                  value,
+                  label: value.toUpperCase(),
+                  disabled: false,
+                  selected: false,
+                  placeholder: false,
+                })),
+              },
+            },
+          ],
         },
       },
     };
@@ -1468,22 +1480,29 @@ describe("checkouts", () => {
           type: "input_response",
           requestId: "req_size",
           action: "submit",
-          response: { kind: "form", values: { size: "m" } },
+          response: { kind: "form", answers: { size: "m" } },
         },
       ],
     });
   });
 
-  it("answers a password request with the protected input id, and never with values", async () => {
+  it("answers a sign-in form only with protected input ids for its secrets", async () => {
     let answered = false;
-    const passwordRequest = {
+    const password = {
+      key: "password",
+      label: "Password",
+      required: true,
+      handling: "protected",
+      input: { kind: "text", display: "masked", autoComplete: "current-password" },
+    };
+    const signIn = {
       type: "input_response",
       requestId: "req_pw",
       messageId: "msg_pw",
       request: {
-        question: "Enter your password for shop.example to sign in.",
+        question: "Sign in to shop.example to continue.",
         expiresAt: "2026-09-18T00:00:00.000Z",
-        interaction: { kind: "protected", purpose: "password", merchant: { domain: "shop.example" } },
+        interaction: { kind: "form", fields: [textField("email", "Email"), password] },
       },
     };
     const { handlers, calls } = makeServer([
@@ -1494,7 +1513,11 @@ describe("checkouts", () => {
           body: run({
             runId: "run_pw",
             status: answered ? "running" : "awaiting_input",
-            requiredAction: answered ? null : passwordRequest,
+            requiredAction: answered ? null : signIn,
+            input: {
+              request: { startUrl: "https://www.shop.example/p/1" },
+              constraints: { maxCost: { amount: "10.00", currency: "USD" } },
+            },
           }),
         }),
       },
@@ -1507,32 +1530,36 @@ describe("checkouts", () => {
         },
       },
     ]);
-    // The view names the secret and where it is for, and offers no form for it.
+    // The form renders with the protected field's descriptor, for Crossmint's field.
     const view = await (await call(handlers, "GET", "/v1/checkouts/run_pw")).json();
-    expect(view.pendingUserAction).toMatchObject({
-      id: "req_pw",
-      protected: { purpose: "password", merchant: { domain: "shop.example" } },
-    });
-    expect(view.rendered).toBeUndefined();
-    // Where the user types it, for a caller that cannot show the field itself.
-    expect(view.passwordRequest).toEqual({
+    expect(view.rendered.fields.map((f: { kind: string }) => f.kind)).toEqual(["text", "protected"]);
+    expect(view.rendered.fields[1].protectedField).toEqual(password);
+    // Where the user answers it, for a caller that cannot show the field itself.
+    expect(view.protectedRequest).toEqual({
       requestId: "req_pw",
-      question: "Enter your password for shop.example to sign in.",
+      question: "Sign in to shop.example to continue.",
+      fields: [{ key: "password", label: "Password" }],
       merchantDomain: "shop.example",
       expiresAt: "2026-09-18T00:00:00.000Z",
       url: "https://wallet.test/checkouts/run_pw",
     });
 
-    // A password typed as a value is refused, and nothing reaches Crossmint.
-    const typed = await call(handlers, "POST", "/v1/checkouts/run_pw/messages", {
-      body: { requestId: "req_pw", values: { password: "hunter2" } },
-    });
-    expect(typed.status).toBe(409);
-    expect((await typed.json()).error.code).toBe("protected_input_required");
+    // A password typed as a value, or left out, is refused, and nothing reaches Crossmint.
+    for (const values of [{ email: "a@b.co", password: "hunter2" }, { email: "a@b.co" }]) {
+      const refused = await call(handlers, "POST", "/v1/checkouts/run_pw/messages", {
+        body: { requestId: "req_pw", values },
+      });
+      expect(refused.status).toBe(409);
+      expect((await refused.json()).error.code).toBe("protected_input_required");
+    }
     expect(calls.some((c) => c.method === "POST" && c.path.endsWith("/run_pw/messages"))).toBe(false);
 
     const reply = await call(handlers, "POST", "/v1/checkouts/run_pw/messages", {
-      body: { requestId: "req_pw", protectedInputId: "pi_1", messageId: "client-pw" },
+      body: {
+        requestId: "req_pw",
+        values: { email: "a@b.co", password: { protectedInputId: "pi_1" } },
+        messageId: "client-pw",
+      },
     });
     expect((await reply.json()).status).toBe("running");
     const sent = calls.find((c) => c.method === "POST" && c.path.endsWith("/run_pw/messages"))!;
@@ -1543,13 +1570,13 @@ describe("checkouts", () => {
           type: "input_response",
           requestId: "req_pw",
           action: "submit",
-          response: { kind: "protected", protectedInputId: "pi_1" },
+          response: { kind: "form", answers: { email: "a@b.co", password: { protectedInputId: "pi_1" } } },
         },
       ],
     });
   });
 
-  it("refuses a password asked for in a plain form, and renders no form for it", async () => {
+  it("refuses a password asked for in a plain field, and renders no form for it", async () => {
     const passwordForm = {
       type: "input_response",
       requestId: "req_pwf",
@@ -1558,11 +1585,7 @@ describe("checkouts", () => {
         expiresAt: "2026-09-18T00:00:00.000Z",
         interaction: {
           kind: "form",
-          responseSchema: {
-            type: "object",
-            properties: { amazon_password: { type: "string", title: "Amazon account password" } },
-            required: ["amazon_password"],
-          },
+          fields: [textField("amazon_password", "Amazon account password")],
         },
       },
     };
@@ -1576,36 +1599,13 @@ describe("checkouts", () => {
     const view = await (await call(handlers, "GET", "/v1/checkouts/run_pwf")).json();
     expect(view.pendingUserAction).toMatchObject({ id: "req_pwf" });
     expect(view.rendered).toBeUndefined();
+    expect(view.protectedRequest).toBeUndefined();
     const res = await call(handlers, "POST", "/v1/checkouts/run_pwf/messages", {
       body: { requestId: "req_pwf", values: { amazon_password: "hunter2" } },
     });
     expect(res.status).toBe(409);
     expect((await res.json()).error.code).toBe("password_in_form");
     expect(calls.some((c) => c.method === "POST" && c.path.endsWith("/run_pwf/messages"))).toBe(false);
-  });
-
-  it("refuses a protected input id for a request that asks for no secret", async () => {
-    const sizeRequest = {
-      type: "input_response",
-      requestId: "req_size2",
-      request: {
-        question: "Which size?",
-        expiresAt: "2026-09-18T00:00:00.000Z",
-        interaction: { kind: "form", responseSchema: { type: "object", properties: { size: { type: "string" } } } },
-      },
-    };
-    const { handlers } = makeServer([
-      {
-        method: "GET",
-        path: "/unstable/agent-checkouts/run_sz",
-        reply: { body: run({ runId: "run_sz", status: "awaiting_input", requiredAction: sizeRequest }) },
-      },
-    ]);
-    const res = await call(handlers, "POST", "/v1/checkouts/run_sz/messages", {
-      body: { requestId: "req_size2", protectedInputId: "pi_2" },
-    });
-    expect(res.status).toBe(409);
-    expect((await res.json()).error.code).toBe("not_a_protected_request");
   });
 
   it("refuses card fields from callers and maps blocked runs to a failure", async () => {

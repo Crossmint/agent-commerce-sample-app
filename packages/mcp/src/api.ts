@@ -8,6 +8,7 @@ import type {
   AgentCard,
   Amount,
   BuyerProfileInput,
+  CheckoutFormAnswer,
   CheckoutReceipt,
   CheckoutResult,
   CheckoutStatus,
@@ -121,7 +122,8 @@ export interface CreateCheckoutInput {
 export interface CheckoutMessageInput {
   requestId?: string;
   action?: "submit" | "decline" | "alternative";
-  values?: Record<string, unknown>;
+  /** One answer per field, keyed by field key. */
+  values?: Record<string, CheckoutFormAnswer>;
   text?: string;
   messageId?: string;
 }
@@ -141,12 +143,19 @@ export interface CheckoutPaymentRequest {
   failureReason?: string;
 }
 
-export interface CheckoutPasswordRequest {
+/**
+ * The open form has protected fields, such as the password of the user's
+ * account at the store. Only the app answers it, at `url`.
+ */
+export interface CheckoutProtectedRequest {
   requestId: string;
   question: string;
+  /** The protected fields, by key and label: "Password". Never their values. */
+  fields: Array<{ key: string; label: string }>;
+  /** The store the checkout runs on: "shop.example.com". */
   merchantDomain?: string;
   expiresAt?: string;
-  /** The checkout's page in the app, with Crossmint's protected field. */
+  /** The checkout's page in the app, with Crossmint's protected fields. */
   url: string;
 }
 
@@ -155,8 +164,8 @@ export interface CheckoutView {
   status: CheckoutStatus;
   agentCardId?: string;
   paymentRequest?: CheckoutPaymentRequest;
-  /** The store asks for the user's password there: show them `url`, where they type it into a secure field. */
-  passwordRequest?: CheckoutPasswordRequest;
+  /** The store asks for secrets: show the user `url`, where they type each into a secure field. */
+  protectedRequest?: CheckoutProtectedRequest;
   pendingUserAction?: PendingUserAction;
   rendered?: RenderedAction;
   embedUrl?: string;

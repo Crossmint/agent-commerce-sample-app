@@ -11,7 +11,7 @@ import {
   type ReactNode,
 } from "react";
 import {
-  AnswerPasswordRequest,
+  AnswerProtectedRequest,
   ApproveAgentCard,
   SaveCard,
   errorMessage,
@@ -21,7 +21,7 @@ import {
   PAYMENT_STEP_ASK,
   type CheckoutStep,
   type ApproveOutcome,
-  type PasswordRequestOutcome,
+  type ProtectedRequestOutcome,
   type SaveCardResult,
 } from "@agent-commerce/ui";
 import {
@@ -36,7 +36,8 @@ import {
   checkoutSiteOf,
   findPaymentStep,
   findRequest,
-  passwordRequestOf,
+  protectedRequestOf,
+  type ProtectedRequestSummary,
   pendingCall,
   pendingWatches,
   productFor,
@@ -219,8 +220,8 @@ interface ChoicesBubble {
   used: boolean;
 }
 
-/** A store's password request, open in the browser sheet. */
-type PasswordAsk = { toolCallId: string; checkoutId: string; requestId: string; domain: string };
+/** A store's question with secrets, open in the browser sheet. */
+type ProtectedAsk = ProtectedRequestSummary & { toolCallId: string };
 
 type Approval = {
   requestId: string;
@@ -244,7 +245,7 @@ function toBubbles(
   watches: WatchIndex,
   live: ReadonlyMap<string, LiveWatch>,
   onReview: (a: Approval) => void,
-  onEnterPassword: (ask: PasswordAsk) => void,
+  onEnterProtected: (ask: ProtectedAsk) => void,
   onAddCard: (toolCallId: string) => void,
   onAddDetails: (toolCallId: string) => void,
   onBuyerDetails: (toolCallId: string, outcome: BuyerDetailsOutcome) => void,
@@ -609,10 +610,10 @@ function toBubbles(
         }
         return;
       }
-      // A password: a link to the checkout's page, where Crossmint's field takes it.
-      const password = passwordRequestOf(part, watches);
+      // Secrets: a link to the checkout's page, where Crossmint's fields take them.
+      const protectedAsk = protectedRequestOf(part, watches);
       if (
-        password &&
+        protectedAsk &&
         part.type === "tool-await_protected_input" &&
         (part.state === "input-available" || part.state === "output-available")
       ) {
@@ -626,12 +627,12 @@ function toBubbles(
           key,
           kind: "link",
           side: "recv",
-          title: `Sign in to ${password.domain}`,
-          path: `/checkouts/${password.checkoutId}`,
+          title: protectedAsk.question,
+          path: `/checkouts/${protectedAsk.checkoutId}`,
           done,
           onOpen: done
             ? undefined
-            : () => onEnterPassword({ toolCallId: part.toolCallId, ...password }),
+            : () => onEnterProtected({ toolCallId: part.toolCallId, ...protectedAsk }),
         });
         return;
       }
@@ -1533,8 +1534,8 @@ function SignedIn({
 }: ExperienceProps & { Chrome: Chrome }) {
   const [approval, setApproval] = useState<Approval | null>(null);
   const [approvalOpen, setApprovalOpen] = useState(false);
-  const [password, setPassword] = useState<PasswordAsk | null>(null);
-  const [passwordOpen, setPasswordOpen] = useState(false);
+  const [protectedAsk, setProtectedAsk] = useState<ProtectedAsk | null>(null);
+  const [protectedOpen, setProtectedOpen] = useState(false);
   // The add_card call whose form is open in the browser sheet.
   const [addCard, setAddCard] = useState<string | null>(null);
   const [addCardOpen, setAddCardOpen] = useState(false);
@@ -1575,13 +1576,13 @@ function SignedIn({
     [approval, chat, closeApproval],
   );
 
-  const onEnterPassword = useCallback((ask: PasswordAsk) => {
-    setPassword(ask);
-    setPasswordOpen(true);
+  const onEnterProtected = useCallback((ask: ProtectedAsk) => {
+    setProtectedAsk(ask);
+    setProtectedOpen(true);
   }, []);
-  const closePassword = useCallback(() => {
-    setPasswordOpen(false);
-    setTimeout(() => setPassword(null), PAGE_SHEET_TRANSITION_MS);
+  const closeProtected = useCallback(() => {
+    setProtectedOpen(false);
+    setTimeout(() => setProtectedAsk(null), PAGE_SHEET_TRANSITION_MS);
   }, []);
   const onAddCard = useCallback((toolCallId: string) => {
     setAddCard(toolCallId);
@@ -1598,12 +1599,12 @@ function SignedIn({
     },
     [addCard, chat, closeAddCard],
   );
-  const onPasswordDone = useCallback(
-    (status: PasswordRequestOutcome) => {
-      if (password) chat.onPasswordOutcome(password.toolCallId, { status });
-      setTimeout(closePassword, DONE_LINGER_MS);
+  const onProtectedDone = useCallback(
+    (status: ProtectedRequestOutcome) => {
+      if (protectedAsk) chat.onProtectedInputOutcome(protectedAsk.toolCallId, { status });
+      setTimeout(closeProtected, DONE_LINGER_MS);
     },
-    [password, chat, closePassword],
+    [protectedAsk, chat, closeProtected],
   );
   // The await_buyer_details call whose form is open, from its link.
   const [details, setDetails] = useState<string | null>(null);
@@ -1714,7 +1715,7 @@ function SignedIn({
       watches,
       live,
       onReview,
-      onEnterPassword,
+      onEnterProtected,
       onAddCard,
       onAddDetails,
       chat.onBuyerDetails,
@@ -1782,20 +1783,20 @@ function SignedIn({
       </BrowserSheet>
 
       <BrowserSheet
-        open={passwordOpen}
-        path={`/checkouts/${password?.checkoutId ?? ""}`}
+        open={protectedOpen}
+        path={`/checkouts/${protectedAsk?.checkoutId ?? ""}`}
         brand={brand}
-        onDone={closePassword}
+        onDone={closeProtected}
         ariaLabel="Sign in"
       >
-        {password ? (
-          <AnswerPasswordRequest
-            key={password.requestId}
-            checkoutId={password.checkoutId}
-            requestId={password.requestId}
-            merchantDomain={password.domain}
+        {protectedAsk ? (
+          <AnswerProtectedRequest
+            key={protectedAsk.requestId}
+            checkoutId={protectedAsk.checkoutId}
+            requestId={protectedAsk.requestId}
+            merchantDomain={protectedAsk.domain}
             platformName={AGENT_COMPANY}
-            onDone={onPasswordDone}
+            onDone={onProtectedDone}
           />
         ) : null}
       </BrowserSheet>

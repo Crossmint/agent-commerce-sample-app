@@ -119,13 +119,16 @@ export interface CheckoutPaymentRequest {
 }
 
 /**
- * The store asks for the password of the user's account there. The user
- * types it at `url`, the checkout's page, into a secure field; nothing here
- * ever carries the password.
+ * The open form has protected fields, such as the password of the user's
+ * account at the store or a one-time code. The user types each at `url`, the
+ * checkout's page, into a secure field; nothing here ever carries a secret.
  */
-export interface CheckoutPasswordRequest {
+export interface CheckoutProtectedRequest {
   requestId: string;
   question: string;
+  /** The protected fields, by key and label: "Password". Never their values. */
+  fields: Array<{ key: string; label: string }>;
+  /** The store the checkout runs on: "shop.example.com". */
   merchantDomain?: string;
   expiresAt?: string;
   url: string;
@@ -136,7 +139,7 @@ export interface CheckoutView {
   status: CheckoutStatus;
   agentCardId?: string;
   paymentRequest?: CheckoutPaymentRequest;
-  passwordRequest?: CheckoutPasswordRequest;
+  protectedRequest?: CheckoutProtectedRequest;
   pendingUserAction?: PendingUserAction;
   rendered?: RenderedAction;
   embedUrl?: string;

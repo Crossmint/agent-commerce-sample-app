@@ -23,7 +23,7 @@ import {
 import {
   AgentCardDetailBody,
   AgentCardTable,
-  AnswerPasswordRequest,
+  AnswerProtectedRequest,
   ApproveAgentCard,
   Button,
   CardMark,
@@ -38,7 +38,7 @@ import {
   usePaymentMethods,
   type AgentCardGroup,
   type ApproveOutcome,
-  type PasswordRequestOutcome,
+  type ProtectedRequestOutcome,
   type SaveCardResult,
 } from "@agent-commerce/ui";
 import { AGENT_COMPANY, AGENT_NAME, AgentAvatar, PLATFORM_NAME } from "@/components/brand";
@@ -60,7 +60,8 @@ import {
   messageText,
   toolBusy,
   toolTitle,
-  passwordRequestOf,
+  protectedRequestOf,
+  type ProtectedRequestSummary,
   productFor,
   sentBackFirst,
   toApprovalOutcome,
@@ -69,7 +70,7 @@ import {
   type WatchIndex,
 } from "@/components/chat/parts";
 import { APPROVAL_DONE_LINGER_MS, ApprovalInThread } from "@/components/chat/agent-card-approval";
-import { PasswordInThread } from "@/components/chat/password-request";
+import { ProtectedRequestInThread } from "@/components/chat/protected-request";
 import { AddCardInThread, savedCardOutcome } from "@/components/chat/add-card";
 import {
   BUYER_DETAILS_NOTE,
@@ -134,8 +135,8 @@ export function MobileApp(props: ExperienceProps) {
 // Signed in
 // ---------------------------------------------------------------------------
 
-/** A store's password request, open in the sheet. */
-type PasswordAsk = { toolCallId: string; checkoutId: string; requestId: string; domain: string };
+/** A store's question with secrets, open in the sheet. */
+type ProtectedAsk = ProtectedRequestSummary & { toolCallId: string };
 
 /** The details sheet: answering the agent's question, or changing the details from the account. */
 type DetailsSheet =
@@ -163,7 +164,7 @@ function Home({
   const [cardsOpen, setCardsOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
   const [approval, setApproval] = useState<Approval | null>(null);
-  const [password, setPassword] = useState<PasswordAsk | null>(null);
+  const [protectedAsk, setProtectedAsk] = useState<ProtectedAsk | null>(null);
   // The add_card call whose form is open in the sheet.
   const [addCard, setAddCard] = useState<string | null>(null);
   // The product whose details are open, over the chat.
@@ -193,13 +194,13 @@ function Home({
     },
     [addCard, chat],
   );
-  const onPasswordDone = useCallback(
-    (status: PasswordRequestOutcome) => {
-      if (!password) return;
-      chat.onPasswordOutcome(password.toolCallId, { status });
-      setTimeout(() => setPassword(null), APPROVAL_DONE_LINGER_MS);
+  const onProtectedDone = useCallback(
+    (status: ProtectedRequestOutcome) => {
+      if (!protectedAsk) return;
+      chat.onProtectedInputOutcome(protectedAsk.toolCallId, { status });
+      setTimeout(() => setProtectedAsk(null), APPROVAL_DONE_LINGER_MS);
     },
-    [password, chat],
+    [protectedAsk, chat],
   );
   const onDetailsDone = useCallback(
     (outcome: BuyerDetailsOutcome) => {
@@ -241,7 +242,7 @@ function Home({
         loading={thread.loading}
         chatEnabled={chatEnabled}
         onReview={setApproval}
-        onEnterPassword={setPassword}
+        onEnterProtected={setProtectedAsk}
         onAddCard={setAddCard}
         onAddDetails={askDetails}
         onOpenProduct={setProduct}
@@ -299,20 +300,20 @@ function Home({
       </PhoneSheet>
 
       <PhoneSheet
-        open={password !== null}
-        onOpenChange={(open) => !open && setPassword(null)}
+        open={protectedAsk !== null}
+        onOpenChange={(open) => !open && setProtectedAsk(null)}
         container={screen}
-        title={password ? `Sign in to ${password.domain}` : "Sign in"}
+        title={protectedAsk ? protectedAsk.question : "Sign in"}
         hideTitle
       >
-        {password ? (
-          <AnswerPasswordRequest
-            key={password.requestId}
-            checkoutId={password.checkoutId}
-            requestId={password.requestId}
-            merchantDomain={password.domain}
+        {protectedAsk ? (
+          <AnswerProtectedRequest
+            key={protectedAsk.requestId}
+            checkoutId={protectedAsk.checkoutId}
+            requestId={protectedAsk.requestId}
+            merchantDomain={protectedAsk.domain}
             platformName={AGENT_COMPANY}
-            onDone={onPasswordDone}
+            onDone={onProtectedDone}
           />
         ) : null}
       </PhoneSheet>
@@ -379,7 +380,7 @@ function Thread({
   loading,
   chatEnabled,
   onReview,
-  onEnterPassword,
+  onEnterProtected,
   onAddCard,
   onAddDetails,
   onOpenProduct,
@@ -388,7 +389,7 @@ function Thread({
   loading: boolean;
   chatEnabled: boolean;
   onReview: (approval: Approval) => void;
-  onEnterPassword: (ask: PasswordAsk) => void;
+  onEnterProtected: (ask: ProtectedAsk) => void;
   onAddCard: (toolCallId: string) => void;
   onAddDetails: (toolCallId: string) => void;
   onOpenProduct: (product: FoundProduct) => void;
@@ -442,7 +443,7 @@ function Thread({
               message={m}
               streaming={chat.status === "streaming" && i === chat.messages.length - 1}
               onReview={onReview}
-              onEnterPassword={onEnterPassword}
+              onEnterProtected={onEnterProtected}
               onAddCard={onAddCard}
               onAddDetails={onAddDetails}
               onPaymentChoice={chat.onPaymentChoice}
@@ -470,7 +471,7 @@ function CompactMessage({
   message,
   streaming,
   onReview,
-  onEnterPassword,
+  onEnterProtected,
   onAddCard,
   onAddDetails,
   onPaymentChoice,
@@ -484,7 +485,7 @@ function CompactMessage({
   message: ChatMessage;
   streaming: boolean;
   onReview: (a: Approval) => void;
-  onEnterPassword: (ask: PasswordAsk) => void;
+  onEnterProtected: (ask: ProtectedAsk) => void;
   onAddCard: (toolCallId: string) => void;
   onAddDetails: (toolCallId: string) => void;
   onPaymentChoice: (toolCallId: string, outcome: PaymentChoiceOutcome) => void;
@@ -516,7 +517,7 @@ function CompactMessage({
         part={part}
         message={message}
         onReview={onReview}
-        onEnterPassword={onEnterPassword}
+        onEnterProtected={onEnterProtected}
         onAddCard={onAddCard}
         onAddDetails={onAddDetails}
         onPaymentChoice={onPaymentChoice}
@@ -542,7 +543,7 @@ function CompactPart({
   part,
   message,
   onReview,
-  onEnterPassword,
+  onEnterProtected,
   onAddCard,
   onAddDetails,
   onPaymentChoice,
@@ -556,7 +557,7 @@ function CompactPart({
   part: ChatMessagePart;
   message: ChatMessage;
   onReview: (a: Approval) => void;
-  onEnterPassword: (ask: PasswordAsk) => void;
+  onEnterProtected: (ask: ProtectedAsk) => void;
   onAddCard: (toolCallId: string) => void;
   onAddDetails: (toolCallId: string) => void;
   onPaymentChoice: (toolCallId: string, outcome: PaymentChoiceOutcome) => void;
@@ -681,15 +682,15 @@ function CompactPart({
         </ActivityLine>
       );
 
-    // The store asks for a password: Crossmint's field in a sheet, never words.
+    // The store asks for secrets: Crossmint's fields in a sheet, never words.
     case "tool-await_protected_input": {
-      const request = passwordRequestOf(part, watches);
+      const request = protectedRequestOf(part, watches);
       if (request && (part.state === "input-available" || part.state === "output-available")) {
         return (
-          <PasswordInThread
-            domain={request.domain}
+          <ProtectedRequestInThread
+            request={request}
             output={part.state === "output-available" ? part.output : undefined}
-            onEnter={() => onEnterPassword({ toolCallId: part.toolCallId, ...request })}
+            onEnter={() => onEnterProtected({ toolCallId: part.toolCallId, ...request })}
             bubbleClassName="max-w-[85%] px-3.5 py-2 text-[15px] leading-snug"
             className="max-w-none"
           />

@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { Check, X } from "lucide-react";
-import type { CheckoutMessage, JsonSchema } from "@agent-commerce/core";
+import type { CheckoutMessage } from "@agent-commerce/core";
 import type { CheckoutView } from "../api/types.js";
 import { cn } from "../lib/utils.js";
 
@@ -16,7 +16,11 @@ export interface CheckoutStep {
 
 const RUNNING = new Set(["queued", "running"]);
 
-/** What the user sent for each question, in a few words: "US 10", or "Skipped". */
+/**
+ * What the user sent for each question, in a few words: their alternative,
+ * or "Skipped". The transcript keeps which fields a submit answered, never
+ * their values, so a submit adds nothing.
+ */
 function answersOf(messages: CheckoutMessage[]): Map<string, string> {
   const out = new Map<string, string>();
   for (const message of messages) {
@@ -26,16 +30,6 @@ function answersOf(messages: CheckoutMessage[]): Map<string, string> {
       if (part.action === "decline") out.set(part.requestId, "Skipped");
       else if (part.action === "alternative" && typeof part.text === "string")
         out.set(part.requestId, part.text);
-      else {
-        const values =
-          "response" in part
-            ? ((part.response as { values?: Record<string, unknown> })?.values ?? {})
-            : {};
-        const words = Object.values(values)
-          .filter((v) => typeof v === "string" || typeof v === "number" || typeof v === "boolean")
-          .map(String);
-        if (words.length) out.set(part.requestId, words.join(", "));
-      }
     }
   }
   return out;
@@ -69,8 +63,7 @@ export function checkoutSteps(
       }
       if (part.type === "input_request" && typeof part.requestId === "string") {
         const open = part.status === "open";
-        const interaction = part.interaction as
-          { kind?: string; responseSchema?: JsonSchema } | undefined;
+        const interaction = part.interaction as { kind?: string } | undefined;
         // Only the payment request: a form asking for card details is a question.
         const payment = interaction?.kind === "payment";
         const step: CheckoutStep = {

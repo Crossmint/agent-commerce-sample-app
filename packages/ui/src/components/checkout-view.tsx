@@ -19,7 +19,7 @@ import { Skeleton } from "./primitives/skeleton.js";
 import { Spinner } from "./primitives/spinner.js";
 import { ApproveAgentCard, PAYMENT_STEP_ASK } from "./approve-agent-card.js";
 import { CheckoutSteps, checkoutSteps } from "./checkout-steps.js";
-import { AnswerPasswordRequest } from "./protected-input.js";
+import { AnswerProtectedRequest } from "./answer-protected-request.js";
 import { PendingActionForm } from "./pending-action-form.js";
 
 export interface CheckoutViewProps {
@@ -210,14 +210,14 @@ export function CheckoutView({
         </div>
       ) : null}
 
-      {/* A password request: Crossmint's protected field, never a form. */}
-      {!terminal && data.pendingUserAction?.protected ? (
+      {/* A form with secrets: each one in Crossmint's protected field, the rest as usual. */}
+      {!terminal && data.protectedRequest && data.rendered ? (
         <div className={PANEL}>
-          <AnswerPasswordRequest
-            key={data.pendingUserAction.id}
+          <AnswerProtectedRequest
+            key={data.rendered.id}
             checkoutId={checkoutId}
-            requestId={data.pendingUserAction.id}
-            merchantDomain={data.pendingUserAction.protected.merchant?.domain ?? "the store"}
+            requestId={data.rendered.id}
+            merchantDomain={data.protectedRequest.merchantDomain}
             platformName={platformName}
             onDone={() => {
               void refetch();
@@ -227,7 +227,7 @@ export function CheckoutView({
         </div>
       ) : null}
 
-      {/* A password in a plain form: never filled in here, only skipped. */}
+      {/* A password in a plain field: never filled in here, only skipped. */}
       {!terminal && data.pendingUserAction && asksPasswordInForm(data.pendingUserAction) ? (
         <div className={PANEL}>
           <Problem
@@ -255,7 +255,7 @@ export function CheckoutView({
         </div>
       ) : null}
 
-      {!terminal && data.rendered ? (
+      {!terminal && data.rendered && !data.protectedRequest ? (
         <div className={PANEL}>
           {actionError ? (
             <Problem

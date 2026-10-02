@@ -240,7 +240,7 @@ async function waitForCheckout(
     isTerminalCheckout(v) ||
     pendingAction(v) !== undefined ||
     v.paymentRequest !== undefined ||
-    v.passwordRequest !== undefined ||
+    v.protectedRequest !== undefined ||
     passwordInForm(v) !== undefined;
   if (done(initial)) return initial;
   let last = initial;
@@ -276,7 +276,7 @@ function passwordInForm(view: CheckoutView): PendingUserAction | undefined {
 function report(ctx: CliContext, view: CheckoutView, json: boolean | undefined): void {
   const action = pendingAction(view);
   const payment = view.paymentRequest;
-  const password = view.passwordRequest;
+  const secure = view.protectedRequest;
   const formPassword = passwordInForm(view);
   if (json) {
     ctx.out(toJson(view));
@@ -293,15 +293,16 @@ function report(ctx: CliContext, view: CheckoutView, json: boolean | undefined):
         `  ${pc.dim(`It mints an agent card for up to ${payment.amount.value} ${payment.amount.currency}. Then run: agent-commerce checkout get ${view.id} --wait`)}`,
       );
     }
-    if (password) {
+    if (secure) {
       // A secret never goes through the CLI: the user types it in a browser.
+      const labels = secure.fields.map((f) => f.label).join(", ");
       ctx.out("");
       ctx.out(
-        `  ${pc.bold("Password needed.")} ${password.merchantDomain ?? "The store"} asks for the password of your account there. Open this to type it into a secure field:`,
+        `  ${pc.bold("Secure input needed.")} ${secure.merchantDomain ?? "The store"} asks for ${labels}. Open this to type each into a secure field:`,
       );
-      ctx.out(`  ${password.url}`);
+      ctx.out(`  ${secure.url}`);
       ctx.out(
-        `  ${pc.dim(`Never pass the password to this CLI. Then run: agent-commerce checkout get ${view.id} --wait`)}`,
+        `  ${pc.dim(`Never pass a secret to this CLI. Then run: agent-commerce checkout get ${view.id} --wait`)}`,
       );
     }
     if (formPassword) {
@@ -327,11 +328,14 @@ function report(ctx: CliContext, view: CheckoutView, json: boolean | undefined):
       "password_in_form",
     );
   }
-  if (password && !action) {
+  if (secure && !action) {
+    const labels = secure.fields.map((f) => f.label).join(", ");
     throw new CliExit(
       EXIT.NEEDS_USER_ACTION,
-      json ? `Checkout ${view.id} is waiting for the user's password at ${password.url}.` : "",
-      "password_needed",
+      json
+        ? `Checkout ${view.id} is waiting for secure input (${labels}): the user types it at ${secure.url}. Never ask for it.`
+        : "",
+      "protected_input_needed",
     );
   }
   if (payment && !action) {

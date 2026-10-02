@@ -88,8 +88,9 @@ Build these parts:
    a merchant and an expiry. Show an approval screen in my app where the user picks
    a card and approves. Run OrderIntentVerification when the card rail needs it.
 3. Agent Checkouts. Start a run at a product URL with a max cost and stream its
-   messages. Answer its form requests. Pay its payment step with an agent card for
-   the exact amount. Collect store passwords with CrossmintProtectedInput.
+   messages. Answer each form request with all its fields in one answer. Pay its
+   payment step with an agent card for the exact amount. Collect each protected
+   field, such as a store password, with CrossmintProtectedInput.
 4. Buyer details. Save the user's name, contact and shipping address as a buyer
    profile, so checkouts do not stop to ask for them.
 5. Agent tools. Give my agent tools to list saved cards, request an agent card,

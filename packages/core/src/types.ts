@@ -322,27 +322,6 @@ export interface CreateCheckoutInput {
   merchantGuidance?: string;
 }
 
-/** A JSON Schema object. Kept loose on purpose; Agent Commerce walks `.properties`. */
-export interface JsonSchema {
-  type?: string | string[];
-  title?: string;
-  description?: string;
-  properties?: Record<string, JsonSchema>;
-  required?: string[];
-  enum?: unknown[];
-  oneOf?: JsonSchema[];
-  anyOf?: JsonSchema[];
-  items?: JsonSchema;
-  format?: string;
-  default?: unknown;
-  minimum?: number;
-  maximum?: number;
-  minLength?: number;
-  maxLength?: number;
-  pattern?: string;
-  [key: string]: unknown;
-}
-
 /** What a payment input request asks the caller to authorize. */
 export interface CheckoutPaymentAmount {
   /** `exact` is the verified payable total; `maximum` is the run's cost ceiling. */
@@ -352,27 +331,105 @@ export interface CheckoutPaymentAmount {
   currency: string;
 }
 
-export interface CheckoutInteraction {
-  /**
-   * `form`: answer with values that fit `responseSchema`. `payment`: the
-   * payment step; answer with an order intent (`paymentResponse`), never
-   * with card details. `protected`: a secret such as a password; the buyer
-   * types it into Crossmint's own field, and the answer is only the id of
-   * what they typed (`protectedResponse`). The request carries no secret.
-   */
-  kind: "form" | "payment" | "protected" | (string & {});
-  /** On a form. */
-  responseSchema?: JsonSchema;
-  uiSchema?: Record<string, unknown>;
-  /** On a payment request, e.g. "checkout_payment". On a protected one, what the secret is: "password". */
-  purpose?: string;
-  /** On a payment request: what the checkout accepts. Today always "card". */
-  method?: "card" | (string & {});
-  /** On a payment request: the total to authorize, which the order intent must match. */
-  amount?: CheckoutPaymentAmount;
-  /** On a payment or protected request: the merchant the credential or secret is bound to. */
-  merchant?: { domain: string };
+/** A free-text field. `display: "masked"` hides what is typed. */
+export type CheckoutTextInput = {
+  kind: "text";
+  multiline?: boolean;
+  placeholder?: string;
+  display?: "masked";
+  /** An HTML autocomplete token. */
+  autoComplete?:
+    | "on"
+    | "off"
+    | "name"
+    | "given-name"
+    | "family-name"
+    | "email"
+    | "username"
+    | "tel"
+    | "current-password"
+    | "new-password"
+    | "one-time-code"
+    | "street-address"
+    | "postal-code";
+  /** An HTML inputmode. */
+  inputMode?: "none" | "text" | "decimal" | "numeric" | "tel" | "search" | "email" | "url";
+};
+
+/** One option of a choice. A `placeholder` option ("Select a size") is never an answer. */
+export type CheckoutChoiceOption = {
+  value: string;
+  label: string;
+  disabled: boolean;
+  selected: boolean;
+  placeholder: boolean;
+};
+
+export type CheckoutChoiceInput = {
+  kind: "choice";
+  /** `one`: answer with one option value. `many`: answer with a list of them. */
+  selection: { kind: "one" } | { kind: "many"; min: number; max?: number };
+  options: CheckoutChoiceOption[];
+};
+
+export type CheckoutFieldInput =
+  | CheckoutTextInput
+  | { kind: "boolean" }
+  | { kind: "number" }
+  | { kind: "integer" }
+  | CheckoutChoiceInput;
+
+/** A field the caller answers with a plain value. */
+export interface CheckoutStandardField {
+  /** The answer's key. */
+  key: string;
+  label: string;
+  required: boolean;
+  handling: "standard";
+  input: CheckoutFieldInput;
 }
+
+/**
+ * A field holding a secret, such as a password or a one-time code. Never
+ * answered with a value: the buyer types it into Crossmint's protected field
+ * (`CrossmintProtectedInput`), and the answer is only the id it returns,
+ * `{ protectedInputId }`. The request carries no secret.
+ */
+export interface CheckoutProtectedField {
+  key: string;
+  label: string;
+  required: boolean;
+  handling: "protected";
+  input: (CheckoutTextInput & { multiline?: false }) | { kind: "number" } | { kind: "integer" };
+}
+
+export type CheckoutField = CheckoutStandardField | CheckoutProtectedField;
+
+/**
+ * `form`: answer each field by its `key` (`submitResponse`). `payment`: the
+ * payment step; answer with an order intent (`paymentResponse`), never with
+ * card details.
+ */
+export type CheckoutInteraction =
+  | { kind: "form"; fields: CheckoutField[] }
+  | {
+      kind: "payment";
+      /** "checkout_payment". */
+      purpose: string;
+      /** What the checkout accepts. Today always "card". */
+      method: "card" | (string & {});
+      /** The total to authorize, which the order intent must match. */
+      amount: CheckoutPaymentAmount;
+      /** The store the credential is bound to. */
+      merchant: { name: string; url: string; countryCode: string };
+    };
+
+/**
+ * One form answer. A standard field takes a string, number, boolean or, for a
+ * choice of many, a list of option values. A protected field takes only the
+ * id Crossmint's protected field returned.
+ */
+export type CheckoutFormAnswer = string | number | boolean | string[] | { protectedInputId: string };
 
 /** What the agent is asking, as it appears in `requiredAction.request` and in `input_request` message parts. */
 export interface CheckoutInputRequest {
@@ -399,22 +456,13 @@ export interface PendingUserAction {
   messageId?: string;
   question: string;
   expiresAt?: string;
-  responseSchema: JsonSchema;
-  uiSchema?: Record<string, unknown>;
+  /** The form's fields, in order. Empty on the payment step. */
+  fields: CheckoutField[];
   /** Set when this is the payment step: what to authorize, and where. */
   payment?: {
     method: string;
-    amount?: CheckoutPaymentAmount;
-    merchant?: { domain: string };
-  };
-  /**
-   * Set when the store asks for a secret, such as the password of the
-   * buyer's account there. Never answer it with values: the buyer types it
-   * into Crossmint's protected field, which returns an id to answer with.
-   */
-  protected?: {
-    purpose: "password" | (string & {});
-    merchant?: { domain: string };
+    amount: CheckoutPaymentAmount;
+    merchant: { name: string; url: string; countryCode: string };
   };
 }
 
@@ -462,9 +510,8 @@ export interface CheckoutList {
 // result; the caller writes input responses and free text.
 
 export type InputResponsePart =
-  | { type: "input_response"; requestId: string; action: "submit"; response: { kind: "form"; values: Record<string, unknown> } }
+  | { type: "input_response"; requestId: string; action: "submit"; response: { kind: "form"; answers: Record<string, CheckoutFormAnswer> } }
   | { type: "input_response"; requestId: string; action: "submit"; response: { kind: "payment"; orderIntentId: string } }
-  | { type: "input_response"; requestId: string; action: "submit"; response: { kind: "protected"; protectedInputId: string } }
   | { type: "input_response"; requestId: string; action: "decline" }
   | { type: "input_response"; requestId: string; action: "alternative"; text: string };
 
