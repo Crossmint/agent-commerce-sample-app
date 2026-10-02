@@ -67,9 +67,17 @@ export function renderField(field: CheckoutField): RenderedField {
     case "integer":
       return { ...base, kind: "number", ...(input.kind === "integer" ? { integer: true } : {}) };
     case "choice": {
+      const many = input.selection.kind === "many";
+      // A disabled option the store preselected is locked in, not unavailable: still a
+      // valid answer to a choice of one, and one a choice of many must keep (so it stays
+      // disabled there, checked and fixed).
       const options = input.options
         .filter((o) => !o.placeholder)
-        .map((o) => ({ value: o.value, label: o.label, ...(o.disabled ? { disabled: true } : {}) }));
+        .map((o) => ({
+          value: o.value,
+          label: o.label,
+          ...(o.disabled && (many || !o.selected) ? { disabled: true } : {}),
+        }));
       const selected = input.options.filter((o) => o.selected && !o.placeholder).map((o) => o.value);
       if (input.selection.kind === "many") {
         return {

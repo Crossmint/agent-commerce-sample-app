@@ -88,6 +88,18 @@ describe("renderPendingAction", () => {
     expect(r.fields[0]).toMatchObject({ kind: "multiselect", min: 1, max: 2 });
     expect(r.fields[0]?.options?.[2]).toEqual({ value: "c", label: "C", disabled: true });
   });
+  it("keeps a locked option: the answer to a choice of one, fixed in a choice of many", () => {
+    const locked = [option("std", { selected: true, disabled: true }), option("express"), option("gone", { disabled: true })];
+    const r = renderPendingAction(
+      action([
+        { key: "ship", label: "Shipping", required: true, handling: "standard", input: { kind: "choice", selection: { kind: "one" }, options: locked } },
+        { key: "extras", label: "Extras", required: true, handling: "standard", input: { kind: "choice", selection: { kind: "many", min: 1 }, options: locked } },
+      ]),
+    );
+    expect(r.fields[0]).toMatchObject({ default: "std", options: [{ value: "std", label: "STD" }, { value: "express", label: "EXPRESS" }, { value: "gone", label: "GONE", disabled: true }] });
+    expect(r.fields[0]?.options?.[0]?.disabled).toBeUndefined();
+    expect(r.fields[1]).toMatchObject({ default: ["std"], options: [{ value: "std", disabled: true }, { value: "express" }, { value: "gone", disabled: true }] });
+  });
   it("keeps a protected field's descriptor for Crossmint's protected field, unchanged", () => {
     const r = renderPendingAction(action([text("email", "Email"), password]));
     expect(r.fields[1]).toEqual({ name: "password", label: "Password", required: true, kind: "protected", protectedField: password });

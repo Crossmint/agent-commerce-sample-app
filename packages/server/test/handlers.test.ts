@@ -1554,6 +1554,17 @@ describe("checkouts", () => {
     }
     expect(calls.some((c) => c.method === "POST" && c.path.endsWith("/run_pw/messages"))).toBe(false);
 
+    // A protected input id on a standard field is refused too.
+    const misplaced = await call(handlers, "POST", "/v1/checkouts/run_pw/messages", {
+      body: {
+        requestId: "req_pw",
+        values: { email: { protectedInputId: "pi_0" }, password: { protectedInputId: "pi_1" } },
+      },
+    });
+    expect(misplaced.status).toBe(409);
+    expect((await misplaced.json()).error.code).toBe("not_a_protected_field");
+    expect(calls.some((c) => c.method === "POST" && c.path.endsWith("/run_pw/messages"))).toBe(false);
+
     const reply = await call(handlers, "POST", "/v1/checkouts/run_pw/messages", {
       body: {
         requestId: "req_pw",

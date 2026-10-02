@@ -365,6 +365,7 @@ export function runSteps(opts: {
   switch (out.status) {
     case "awaiting_input":
     case "awaiting_payment":
+    case "awaiting_protected_input":
       break;
     case "succeeded":
       steps.push({

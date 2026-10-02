@@ -557,6 +557,14 @@ async function answer(
         { checkoutId: runId, requestId },
       );
     }
+    if (open && open.id === requestId && answers && !answersStandardFields(open, answers)) {
+      throw new HttpError(
+        409,
+        "not_a_protected_field",
+        "A protected input id answers only a protected field. Answer this field with a plain value.",
+        { checkoutId: runId, requestId },
+      );
+    }
     if (open && open.id === requestId && asksPasswordInForm(open) && answers) {
       throw new HttpError(
         409,
@@ -594,6 +602,17 @@ function answersProtectedFields(
     if (answer === undefined) return !field.required;
     return typeof answer === "object" && !Array.isArray(answer) && typeof answer.protectedInputId === "string";
   });
+}
+
+/** True when no field but a protected one is answered with a protected input id. */
+function answersStandardFields(
+  action: PendingUserAction,
+  answers: Record<string, CheckoutFormAnswer>,
+): boolean {
+  const secure = new Set(protectedFields(action).map((field) => field.key));
+  return Object.entries(answers).every(
+    ([key, answer]) => secure.has(key) || typeof answer !== "object" || Array.isArray(answer),
+  );
 }
 
 /** Look up what Agent Commerce knows about a checkout. 403 when another user owns it. */
