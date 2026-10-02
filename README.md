@@ -95,14 +95,6 @@ Build these parts:
 5. Agent tools. Give my agent tools to list saved cards, request an agent card,
    start a checkout and answer it. Show each approval as a component in my UI, or
    as a link when the agent has no UI.
-
-Rules:
-- The model never sees a full card number, a CVC or a password.
-- Nothing is paid until the user approves the budget.
-- The Crossmint server key stays on my server. Card and order-intent calls use the
-  client key with the signed-in user's JWT.
-- Agent Checkouts need a production server key with the agent-checkouts scopes,
-  and the x-crossmint-user-id header on every call.
 ```
 
 </details>
