@@ -44,7 +44,7 @@ describe("CrossmintClient", () => {
     expect(url).toBe("https://www.crossmint.com/api/unstable/agent-checkouts/run_1/messages");
     expect(JSON.parse((init as RequestInit).body as string)).toEqual({
       id: "my-id",
-      parts: [{ type: "input_response", requestId: "req_1", action: "submit", response: { kind: "form", values: { size: "m" } } }],
+      parts: [{ type: "input_response", requestId: "req_1", action: "submit", response: { kind: "form", answers: { size: "m" } } }],
     });
   });
   it("throws CrossmintApiError on non-2xx", async () => {

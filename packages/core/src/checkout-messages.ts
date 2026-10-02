@@ -1,5 +1,6 @@
 import type {
   Checkout,
+  CheckoutFormAnswer,
   CheckoutMessage,
   CheckoutResult,
   InputResponsePart,
@@ -20,8 +21,12 @@ export function newMessageId(): string {
   return `msg_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
 }
 
-export function submitResponse(requestId: string, values: Record<string, unknown>): InputResponsePart {
-  return { type: "input_response", requestId, action: "submit", response: { kind: "form", values } };
+/**
+ * The answer to a form: every field in one message, keyed by field `key`.
+ * A protected field's answer is `{ protectedInputId }`, never the secret.
+ */
+export function submitResponse(requestId: string, answers: Record<string, CheckoutFormAnswer>): InputResponsePart {
+  return { type: "input_response", requestId, action: "submit", response: { kind: "form", answers } };
 }
 
 /**
@@ -31,16 +36,6 @@ export function submitResponse(requestId: string, values: Record<string, unknown
  */
 export function paymentResponse(requestId: string, orderIntentId: string): InputResponsePart {
   return { type: "input_response", requestId, action: "submit", response: { kind: "payment", orderIntentId } };
-}
-
-/**
- * The answer to a protected input request, such as a password: the id of
- * what the buyer typed into Crossmint's own field. The secret never passes
- * through here; Agent Checkouts reads it from Crossmint's vault on the
- * merchant's sign-in page alone.
- */
-export function protectedResponse(requestId: string, protectedInputId: string): InputResponsePart {
-  return { type: "input_response", requestId, action: "submit", response: { kind: "protected", protectedInputId } };
 }
 
 export function declineResponse(requestId: string): InputResponsePart {
@@ -58,33 +53,12 @@ export function alternativeResponse(requestId: string, text: string): InputRespo
 export function pendingActionOf(checkout: Pick<Checkout, "status" | "requiredAction">): PendingUserAction | undefined {
   const ra = checkout.requiredAction;
   if (!ra || checkout.status !== "awaiting_input") return undefined;
-  const req = ra.request;
-  const interaction = req.interaction;
-  return {
-    id: ra.requestId,
-    messageId: ra.messageId,
-    question: req.question,
-    expiresAt: req.expiresAt,
-    responseSchema: interaction?.responseSchema ?? {},
-    uiSchema: interaction?.uiSchema,
-    ...(interaction?.kind === "payment"
-      ? {
-          payment: {
-            method: interaction.method ?? "card",
-            ...(interaction.amount ? { amount: interaction.amount } : {}),
-            ...(interaction.merchant ? { merchant: interaction.merchant } : {}),
-          },
-        }
-      : {}),
-    ...(interaction?.kind === "protected"
-      ? {
-          protected: {
-            purpose: interaction.purpose ?? "password",
-            ...(interaction.merchant ? { merchant: interaction.merchant } : {}),
-          },
-        }
-      : {}),
-  };
+  const { question, expiresAt, interaction } = ra.request;
+  const action: PendingUserAction = { id: ra.requestId, messageId: ra.messageId, question, expiresAt, fields: [] };
+  if (interaction.kind === "form") action.fields = interaction.fields;
+  else if (interaction.kind === "payment")
+    action.payment = { method: interaction.method, amount: interaction.amount, merchant: interaction.merchant };
+  return action;
 }
 
 /** The receipt of a succeeded run, when the agent could read one. */

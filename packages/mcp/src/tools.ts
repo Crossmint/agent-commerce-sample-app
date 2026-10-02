@@ -6,6 +6,7 @@ import {
   PARAM_DOCS,
   paramDoc,
   asksPasswordInForm,
+  isProtectedAction,
   renderPendingAction,
   TOOL_DOCS,
   toDecimalString,
@@ -292,7 +293,9 @@ export function registerAgentCommerceTools(
         freshBrowser: args.freshBrowser,
         merchantGuidance: args.merchantGuidance,
       });
-      return ok(`Checkout ${checkout.id} created.\n${describeCheckout(checkout)}`, { checkout });
+      return ok(`Checkout ${checkout.id} created.\n${describeCheckout(checkout)}`, {
+        checkout: forAgent(checkout),
+      });
     }),
   );
 
@@ -302,17 +305,14 @@ export function registerAgentCommerceTools(
       title: title("get_checkout"),
       description: describeTool(
         "get_checkout",
-        "Here paymentRequest carries an approvalUrl: show it to the user, then keep polling until they have chosen. passwordRequest carries a url the same way: the store asks for the user's password there, which they type on that page; never ask for it yourself.",
+        "Here paymentRequest carries an approvalUrl: show it to the user, then keep polling until they have chosen. protectedRequest carries a url the same way: the store asks for secrets, such as the user's password there, which they type on that page; never ask for them yourself.",
       ),
       inputSchema: { checkoutId: z.string().describe(paramDoc("get_checkout", "checkoutId")) },
       annotations: { readOnlyHint: true, openWorldHint: true },
     },
     guard(async ({ checkoutId }) => {
       const checkout = await api.getCheckout(checkoutId);
-      const rendered = renderedAction(checkout);
-      return ok(describeCheckout(checkout), {
-        checkout: rendered ? { ...checkout, rendered } : checkout,
-      });
+      return ok(describeCheckout(checkout), { checkout: forAgent(checkout) });
     }),
   );
 
@@ -328,8 +328,9 @@ export function registerAgentCommerceTools(
           .enum(["submit", "decline", "alternative"])
           .optional()
           .describe(paramDoc("answer_checkout", "action")),
+        // Plain answers only: a protected field is answered on the app's page, never by the agent.
         values: z
-          .record(z.string(), z.unknown())
+          .record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.array(z.string())]))
           .optional()
           .describe(paramDoc("answer_checkout", "values")),
         text: z.string().max(20000).optional().describe(paramDoc("answer_checkout", "text")),
@@ -338,7 +339,7 @@ export function registerAgentCommerceTools(
     },
     guard(async ({ checkoutId, ...input }) => {
       const checkout = await api.answerCheckout(checkoutId, input);
-      return ok(describeCheckout(checkout), { checkout });
+      return ok(describeCheckout(checkout), { checkout: forAgent(checkout) });
     }),
   );
 
@@ -352,7 +353,7 @@ export function registerAgentCommerceTools(
     },
     guard(async ({ checkoutId }) => {
       const checkout = await api.cancelCheckout(checkoutId);
-      return ok(describeCheckout(checkout), { checkout });
+      return ok(describeCheckout(checkout), { checkout: forAgent(checkout) });
     }),
   );
 }
@@ -475,9 +476,11 @@ function describeCredential(
 }
 
 function renderedAction(checkout: CheckoutView): RenderedAction | undefined {
+  // A form with secrets is not the agent's to answer, even though the server
+  // renders it for the app: the user types them on the page protectedRequest links to.
+  const pending = checkout.pendingUserAction;
+  if (checkout.protectedRequest || (pending && isProtectedAction(pending))) return undefined;
   if (checkout.rendered) return checkout.rendered;
-  // A password has no form: the user types it on the page passwordRequest links to.
-  if (checkout.passwordRequest || checkout.pendingUserAction?.protected) return undefined;
   // Nor does a password asked for in a plain form: it is declined, never filled in.
   if (checkout.pendingUserAction && asksPasswordInForm(checkout.pendingUserAction))
     return undefined;
@@ -491,30 +494,45 @@ function renderedAction(checkout: CheckoutView): RenderedAction | undefined {
   return undefined;
 }
 
-function describeField(f: RenderedField, indent = "  "): string {
-  const opts = f.options
-    ? ` one of: ${f.options.map((o) => JSON.stringify(o.value)).join(", ")}`
-    : "";
-  const desc = f.description ? ` — ${f.description}` : "";
-  const line = `${indent}- ${f.name} (${f.kind}${f.required ? ", required" : ""})${opts}${desc}`;
-  const children = f.children?.map((c) => describeField(c, indent + "  ")) ?? [];
-  return [line, ...children].join("\n");
+/** The checkout as the agent gets it: `rendered` only when the form is the agent's to answer. */
+function forAgent(checkout: CheckoutView): CheckoutView {
+  const { rendered: _serverRendered, ...rest } = checkout;
+  const rendered = renderedAction(checkout);
+  return rendered ? { ...rest, rendered } : rest;
+}
+
+/** One field as a line the agent can answer from: its key, its kind, and what it accepts. */
+function describeField(f: RenderedField): string {
+  const traits: string[] = [f.kind === "number" && f.integer ? "whole number" : f.kind];
+  if (f.multiline) traits.push("several lines");
+  if (f.required) traits.push("required");
+  const options = (f.options ?? [])
+    .filter((o) => !o.disabled)
+    .map((o) => `${JSON.stringify(o.value)} (${o.label})`)
+    .join(", ");
+  let accepts = "";
+  if (f.kind === "select") accepts = ` one of: ${options}`;
+  if (f.kind === "multiselect") {
+    const count =
+      f.max !== undefined ? `${f.min ?? 0} to ${f.max}` : f.min ? `at least ${f.min}` : "any";
+    accepts = ` a list of ${count} of: ${options}`;
+  }
+  const preset = f.default !== undefined ? `; preselected ${JSON.stringify(f.default)}` : "";
+  return `  - ${f.name} "${f.label}" (${traits.join(", ")})${accepts}${preset}`;
 }
 
 function describeCheckout(checkout: CheckoutView): string {
   const lines = [`Checkout ${checkout.id}: status ${checkout.status}.`];
   const action = renderedAction(checkout);
   if (action) {
-    lines.push(
-      `Question (requestId "${action.id}"): ${action.title}${action.description ? ` — ${action.description}` : ""}`,
-    );
+    lines.push(`Question (requestId "${action.id}"): ${action.title}`);
     if (action.fields.length) {
       lines.push("Fields:", ...action.fields.map((f) => describeField(f)));
     }
     if (action.expiresAt) lines.push(`Answer before ${action.expiresAt}, or the checkout fails.`);
     lines.push(
       `Ask the user if you do not know a value. Then call answer_checkout with checkoutId "${checkout.id}" and requestId "${action.id}" ` +
-        `(values to submit, or action "decline" / "alternative").`,
+        `(values with every field to submit, or action "decline" / "alternative").`,
     );
   }
   if (checkout.paymentRequest) {
@@ -531,14 +549,16 @@ function describeCheckout(checkout: CheckoutView): string {
       `The store asks for the user's password in a plain form. Never ask for it and never send it: it would pass through you, and the store's agent does not use a password sent that way. Tell the user this store wants them to sign in, which cannot be done safely here, and offer to check out as a guest (answer_checkout with action "alternative") or stop (action "decline").`,
     );
   }
-  if (checkout.passwordRequest) {
-    const pw = checkout.passwordRequest;
-    const store = pw.merchantDomain ?? "the store";
+  if (checkout.protectedRequest) {
+    const pr = checkout.protectedRequest;
+    const store = pr.merchantDomain ?? "the store";
+    const labels = pr.fields.map((f) => f.label).join(", ");
     lines.push(
-      `Password request (requestId "${pw.requestId}"): ${store} asks for the password of the user's account there. Show the user this link, where they type it into a secure field and the app answers the checkout: ${pw.url}`,
-      `Never ask for the password and never send it, not in answer_checkout or anywhere else. Then keep polling get_checkout. If the user would rather not sign in, call answer_checkout with action "decline", or "alternative" with text such as checking out as a guest.`,
+      `Secure input request (requestId "${pr.requestId}"): ${pr.question}`,
+      `${store} asks for secrets: ${labels}. Show the user this link, where they type each into a secure field and the app answers the checkout: ${pr.url}`,
+      `Never ask the user for them and never send them, not in answer_checkout or anywhere else. Then keep polling get_checkout. If the user would rather not, call answer_checkout with action "decline", or "alternative" with text such as checking out as a guest.`,
     );
-    if (pw.expiresAt) lines.push(`The user has until ${pw.expiresAt}, or the checkout fails.`);
+    if (pr.expiresAt) lines.push(`The user has until ${pr.expiresAt}, or the checkout fails.`);
   }
   if (checkout.embedUrl)
     lines.push(`The user can watch the agent's browser at: ${checkout.embedUrl}`);
@@ -562,7 +582,7 @@ function describeCheckout(checkout: CheckoutView): string {
     );
   }
   if (checkout.spentUsd) lines.push(`Spent so far: ${checkout.spentUsd} USD.`);
-  const waitingOnUser = checkout.passwordRequest || (pending && asksPasswordInForm(pending));
+  const waitingOnUser = checkout.protectedRequest || (pending && asksPasswordInForm(pending));
   if (!action && !waitingOnUser && !checkout.failure && checkout.status !== "succeeded") {
     lines.push("Still running. Poll get_checkout again in a few seconds.");
   }

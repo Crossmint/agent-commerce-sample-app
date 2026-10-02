@@ -24,7 +24,7 @@ export interface MessagesProps {
   messages: ChatMessage[];
   status: ChatStatus;
   onApprovalOutcome: (toolCallId: string, outcome: ApprovalOutcome) => void;
-  onPasswordOutcome: (toolCallId: string, outcome: ProtectedInputOutcome) => void;
+  onProtectedInputOutcome: (toolCallId: string, outcome: ProtectedInputOutcome) => void;
   onCardSaved: (toolCallId: string, outcome: SavedCardOutcome) => void;
   onBuyerDetails: (toolCallId: string, outcome: BuyerDetailsOutcome) => void;
   onPaymentChoice: (toolCallId: string, outcome: PaymentChoiceOutcome) => void;
@@ -42,7 +42,7 @@ export function Messages({
   messages,
   status,
   onApprovalOutcome,
-  onPasswordOutcome,
+  onProtectedInputOutcome,
   onCardSaved,
   onBuyerDetails,
   onPaymentChoice,
@@ -71,7 +71,7 @@ export function Messages({
                 message={m}
                 streaming={status === "streaming" && i === messages.length - 1}
                 onApprovalOutcome={onApprovalOutcome}
-                onPasswordOutcome={onPasswordOutcome}
+                onProtectedInputOutcome={onProtectedInputOutcome}
                 onCardSaved={onCardSaved}
                 onBuyerDetails={onBuyerDetails}
                 onPaymentChoice={onPaymentChoice}

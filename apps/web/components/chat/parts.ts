@@ -136,15 +136,17 @@ export function stopReason(
     };
   }
   const action = view.pendingUserAction;
-  // A password: the chat shows Crossmint's protected field, never a question in words.
-  if (view.status === "awaiting_input" && action?.protected && !asked.has(action.id)) {
+  // Secrets: the chat shows Crossmint's protected fields, never a question in words.
+  const secure = view.protectedRequest;
+  if (view.status === "awaiting_input" && secure && !asked.has(secure.requestId)) {
     return {
       checkoutId: view.id,
-      status: "awaiting_password",
-      password: {
-        requestId: action.id,
-        question: action.question || "The store asks for your password.",
-        ...(action.protected.merchant ? { domain: action.protected.merchant.domain } : {}),
+      status: "awaiting_protected_input",
+      protectedInput: {
+        requestId: secure.requestId,
+        question: secure.question || "The store asks for a secret.",
+        secrets: secure.fields.map((f) => f.label),
+        ...(secure.merchantDomain ? { domain: secure.merchantDomain } : {}),
       },
     };
   }
@@ -158,7 +160,8 @@ export function stopReason(
         requestId: action.id,
         question: action.question || view.rendered?.title || "The store needs an answer.",
         ...(action.expiresAt ? { expiresAt: action.expiresAt } : {}),
-        responseSchema: action.responseSchema as Record<string, unknown>,
+        // The model answers by key; the handling is always standard here.
+        fields: action.fields.map(({ key, label, required, input }) => ({ key, label, required, input })),
         ...(asksPasswordInForm(action)
           ? { note: PASSWORD_IN_FORM_NOTE }
           : asksCardInForm(action)
@@ -180,9 +183,9 @@ export function watchedHere(message: ChatMessage, part: ChatMessagePart): boolea
   return message.parts.some((p) => p.type === "tool-watch_checkout" && p.input?.checkoutId === id);
 }
 
-/** What the agent is told when a store asks for a password in a plain form. */
+/** What the agent is told when a store asks for a password in a plain field. */
 const PASSWORD_IN_FORM_NOTE =
-  "This asks for the user's password in a plain form. Never ask the user for it and never send it: it would pass through the chat, and the store's agent does not use a password sent that way. Tell the user in one line that this store wants them to sign in, which cannot be done safely here, and ask whether to check out as a guest instead (answer_checkout with action alternative) or stop (action decline).";
+  "This asks for the user's password in a plain field. Never ask the user for it and never send it: it would pass through the chat, and the store's agent does not use a password sent that way. Tell the user in one line that this store wants them to sign in, which cannot be done safely here, and ask whether to check out as a guest instead (answer_checkout with action alternative) or stop (action decline).";
 
 /** What the agent is told when a store asks for card details in a plain form, not a payment request. */
 const CARD_IN_FORM_NOTE =
@@ -200,8 +203,8 @@ export interface WatchIndex {
   sites: Map<string, CheckoutSite>;
   /** Each checkout's first `watch_checkout`, by tool call id. */
   firstWatch: Map<string, string>;
-  /** Password requests a watch handed back, by requestId: the store the password is for, from the checkout itself. */
-  passwords: Map<string, { checkoutId: string; domain?: string }>;
+  /** Protected requests a watch handed back, by requestId: the store the secrets are for, from the checkout itself. */
+  protectedInputs: Map<string, { checkoutId: string; question: string; secrets: string[]; domain?: string }>;
   /**
    * Watches whose card the next watch takes over: the stretch stopped on a
    * question the agent answered itself, with nothing shown in between, so the
@@ -229,7 +232,7 @@ export function watchIndex(messages: ChatMessage[]): WatchIndex {
     paymentRequests: new Set(),
     sites: new Map(),
     firstWatch: new Map(),
-    passwords: new Map(),
+    protectedInputs: new Map(),
     absorbed: new Set(),
     carried: new Map(),
     products: new Map(),
@@ -274,11 +277,13 @@ export function watchIndex(messages: ChatMessage[]): WatchIndex {
       if (!shown) index.shown.set(out.checkoutId, (shown = new Set()));
       for (const u of out.updates ?? []) shown.add(u.id);
       if (out.question) index.asked.add(out.question.requestId);
-      if (out.password) {
-        index.asked.add(out.password.requestId);
-        index.passwords.set(out.password.requestId, {
+      if (out.protectedInput) {
+        index.asked.add(out.protectedInput.requestId);
+        index.protectedInputs.set(out.protectedInput.requestId, {
           checkoutId: out.checkoutId,
-          ...(out.password.domain ? { domain: out.password.domain } : {}),
+          question: out.protectedInput.question,
+          secrets: out.protectedInput.secrets,
+          ...(out.protectedInput.domain ? { domain: out.protectedInput.domain } : {}),
         });
       }
       if (out.payment) index.paymentRequests.add(out.payment.requestId);
@@ -287,23 +292,36 @@ export function watchIndex(messages: ChatMessage[]): WatchIndex {
   return index;
 }
 
+/** An `await_protected_input` call, as its card shows it. */
+export interface ProtectedRequestSummary {
+  checkoutId: string;
+  requestId: string;
+  /** The store's question: "Sign in to shop.example to continue." */
+  question: string;
+  /** The secrets it asks for, by label: "Password". */
+  secrets: string[];
+  domain: string;
+}
+
 /**
  * An `await_protected_input` call, with what its card needs: the checkout,
- * the request, and the store the password is for. The store comes from the
+ * the request, what it asks for, and the store. All of it comes from the
  * watch that handed the request back, else the checkout's own site, never
- * from the model's arguments: the password is bound to it.
+ * from the model's arguments.
  */
-export function passwordRequestOf(
+export function protectedRequestOf(
   part: ChatMessagePart,
   watches: WatchIndex,
-): { checkoutId: string; requestId: string; domain: string } | undefined {
+): ProtectedRequestSummary | undefined {
   if (part.type !== "tool-await_protected_input" || part.state === "input-streaming")
     return undefined;
   const requestId = part.input?.requestId;
-  const known = requestId ? watches.passwords.get(requestId) : undefined;
+  const known = requestId ? watches.protectedInputs.get(requestId) : undefined;
   if (!requestId || !known) return undefined;
   const domain = known.domain ?? watches.sites.get(known.checkoutId)?.host;
-  return domain ? { checkoutId: known.checkoutId, requestId, domain } : undefined;
+  return domain
+    ? { checkoutId: known.checkoutId, requestId, question: known.question, secrets: known.secrets, domain }
+    : undefined;
 }
 
 /**
@@ -317,7 +335,7 @@ export function stoppedForUser(outcome: CheckoutOutcome | undefined): boolean {
   return (
     outcome?.status === "awaiting_input" ||
     outcome?.status === "awaiting_payment" ||
-    outcome?.status === "awaiting_password"
+    outcome?.status === "awaiting_protected_input"
   );
 }
 
@@ -347,6 +365,7 @@ export function runSteps(opts: {
   switch (out.status) {
     case "awaiting_input":
     case "awaiting_payment":
+    case "awaiting_protected_input":
       break;
     case "succeeded":
       steps.push({
@@ -552,7 +571,7 @@ export function toolTitle(type: string): string {
     "tool-get_agent_card": "Checking an agent card",
     "tool-request_agent_card": "Requesting an agent card",
     "tool-await_agent_card_approval": "Waiting for your approval",
-    "tool-await_protected_input": "Waiting for your password",
+    "tool-await_protected_input": "Waiting for your answer",
     "tool-await_saved_card": "Waiting for your card",
     "tool-await_buyer_details": "Waiting for your details",
     "tool-await_payment_choice": "Waiting for how you want to pay",

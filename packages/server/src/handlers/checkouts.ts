@@ -14,13 +14,14 @@ import {
   newMessageId,
   normalizeBuyerProfile,
   pendingActionOf,
-  protectedResponse,
+  protectedFields,
   receiptOf,
   renderPendingAction,
   submitResponse,
   type Amount,
   type Checkout,
   type CheckoutContext,
+  type CheckoutFormAnswer,
   type CheckoutMessageList,
   type CheckoutReceipt,
   type CheckoutResult,
@@ -106,12 +107,12 @@ export interface CheckoutView {
   /** The receipt of a `succeeded` run, when the agent captured one. */
   receipt?: CheckoutReceipt;
   /**
-   * The store asks for the password of the user's account there. It is
-   * never answered with values: show the user `url`, the checkout's page in
-   * the app, where they type it into Crossmint's protected field and the app
-   * answers the run.
+   * The open form has a protected field, such as the password of the user's
+   * account at the store. Only the app answers it: show the user `url`, the
+   * checkout's page, where they type each secret into Crossmint's protected
+   * field and the app sends the whole form.
    */
-  passwordRequest?: CheckoutPasswordRequest;
+  protectedRequest?: CheckoutProtectedRequest;
   /** On `failed` (Crossmint's `reason`), `blocked` (the `code`) and `cancelled`. */
   failure?: { reason: string; message?: string };
   /** What the run has spent so far, in USD. */
@@ -119,14 +120,16 @@ export interface CheckoutView {
   createdAt?: string;
 }
 
-/** A password request, as a caller shows it: where the user types it, and for which store. */
-export interface CheckoutPasswordRequest {
+/** A form with protected fields, as a caller shows it: where the user answers it, and for which store. */
+export interface CheckoutProtectedRequest {
   requestId: string;
   question: string;
-  /** The store the password is for: "shop.example.com". */
+  /** The protected fields, by key and label: "Password". Never their values. */
+  fields: Array<{ key: string; label: string }>;
+  /** The store the checkout runs on: "shop.example.com". */
   merchantDomain?: string;
   expiresAt?: string;
-  /** `${webBaseUrl}/checkouts/${id}`: the checkout's page, with the secure field. */
+  /** `${webBaseUrl}/checkouts/${id}`: the checkout's page, with the secure fields. */
   url: string;
 }
 
@@ -295,8 +298,8 @@ export async function streamCheckoutMessages(
  * POST /v1/checkouts/:id/messages
  * Answer the open input request, or send the agent a note. Card fields are
  * refused: the server answers payment requests itself from the agent card.
- * A password request is answered with the id from Crossmint's protected
- * field, which the app's own UI sends here; the secret never passes through.
+ * A form with protected fields is answered by the app's own UI, with the
+ * ids Crossmint's protected fields returned; the secrets never pass through.
  */
 export async function sendCheckoutMessage(
   req: Request,
@@ -310,8 +313,7 @@ export async function sendCheckoutMessage(
   let note: string | undefined;
   if (body.requestId) {
     const action = body.action ?? "submit";
-    if (body.protectedInputId) part = protectedResponse(body.requestId, body.protectedInputId);
-    else if (action === "submit") part = submitResponse(body.requestId, body.values ?? {});
+    if (action === "submit") part = submitResponse(body.requestId, body.values ?? {});
     else if (action === "decline") part = declineResponse(body.requestId);
     else part = alternativeResponse(body.requestId, body.text!);
     if (body.text && action !== "alternative") note = body.text;
@@ -395,7 +397,7 @@ export async function setCheckoutAgentCard(
       { agentCardId: body.agentCardId, available: card.amount.available, needed: asked.value },
     );
   }
-  const storeHost = action?.payment?.merchant?.domain ?? merchantFromCheckout(checkout)?.url;
+  const storeHost = action?.payment?.merchant.url ?? merchantFromCheckout(checkout)?.url;
   if (card.merchant && storeHost && hostOf(card.merchant.url) !== hostOf(storeHost)) {
     throw new HttpError(
       409,
@@ -543,7 +545,11 @@ async function answer(
         { checkoutId: runId, requestId },
       );
     }
-    if (open && open.id === requestId && isProtectedAction(open) && submit === "form") {
+    const answers =
+      part.type === "input_response" && part.action === "submit" && part.response.kind === "form"
+        ? part.response.answers
+        : undefined;
+    if (open && open.id === requestId && answers && !answersProtectedFields(open, answers)) {
       throw new HttpError(
         409,
         "protected_input_required",
@@ -551,19 +557,19 @@ async function answer(
         { checkoutId: runId, requestId },
       );
     }
-    if (open && open.id === requestId && asksPasswordInForm(open) && submit === "form") {
+    if (open && open.id === requestId && answers && !answersStandardFields(open, answers)) {
       throw new HttpError(
         409,
-        "password_in_form",
-        "The store asks for a password in a plain form. It is never answered with values: Agent Checkouts does not fill a password from them, and it would pass through the app and the agent. Decline it, or send an alternative such as checking out as a guest. Asking for a password with a secure field needs protected inputs enabled on the Crossmint project.",
+        "not_a_protected_field",
+        "A protected input id answers only a protected field. Answer this field with a plain value.",
         { checkoutId: runId, requestId },
       );
     }
-    if (submit === "protected" && !(open && open.id === requestId && isProtectedAction(open))) {
+    if (open && open.id === requestId && asksPasswordInForm(open) && answers) {
       throw new HttpError(
         409,
-        "not_a_protected_request",
-        "The open request does not ask for a protected input, or it is no longer open.",
+        "password_in_form",
+        "The store asks for a password in a plain field, not a protected one. It is never answered with values: it would pass through the app and the agent. Decline it, or send an alternative such as checking out as a guest.",
         { checkoutId: runId, requestId },
       );
     }
@@ -580,6 +586,33 @@ async function answer(
   }
   checkout = await waitForConsumption(ctx, cctx, runId, requestId);
   return settlePayment(ctx, user, cctx, checkout, link);
+}
+
+/**
+ * True when every protected field is answered only with the id Crossmint's
+ * protected field returned, or left out when optional. A plain value there
+ * would be the secret itself, typed somewhere other than the secure field.
+ */
+function answersProtectedFields(
+  action: PendingUserAction,
+  answers: Record<string, CheckoutFormAnswer>,
+): boolean {
+  return protectedFields(action).every((field) => {
+    const answer = answers[field.key];
+    if (answer === undefined) return !field.required;
+    return typeof answer === "object" && !Array.isArray(answer) && typeof answer.protectedInputId === "string";
+  });
+}
+
+/** True when no field but a protected one is answered with a protected input id. */
+function answersStandardFields(
+  action: PendingUserAction,
+  answers: Record<string, CheckoutFormAnswer>,
+): boolean {
+  const secure = new Set(protectedFields(action).map((field) => field.key));
+  return Object.entries(answers).every(
+    ([key, answer]) => secure.has(key) || typeof answer !== "object" || Array.isArray(answer),
+  );
 }
 
 /** Look up what Agent Commerce knows about a checkout. 403 when another user owns it. */
@@ -733,7 +766,7 @@ async function paymentStepRequest(
 
   const now = ctx.now();
   const id = agentCardRequestId();
-  const domain = action.payment?.merchant?.domain ?? merchantFromCheckout(checkout)?.name;
+  const domain = action.payment?.merchant.name ?? merchantFromCheckout(checkout)?.name;
   // As Agent Checkouts wants it: the exact amount the run asks for, for the
   // rest of the checkout only, and no merchant, because the checkout binds
   // the credential to the store itself when it mints it.
@@ -812,20 +845,19 @@ function toView(
       if (opts.hidePayment) view.status = "running";
     } else {
       view.pendingUserAction = action;
-      // A secret has no form: the app shows Crossmint's protected field instead.
+      // A password in a plain field gets no form: it is declined, never filled in.
+      if (!asksPasswordInForm(action)) view.rendered = renderPendingAction(action);
+      // Secrets: only the app's page answers, with Crossmint's protected fields.
       if (isProtectedAction(action)) {
-        view.passwordRequest = {
+        const domain = merchantFromCheckout(checkout)?.name;
+        view.protectedRequest = {
           requestId: action.id,
           question: action.question,
-          ...(action.protected?.merchant
-            ? { merchantDomain: action.protected.merchant.domain }
-            : {}),
+          fields: protectedFields(action).map(({ key, label }) => ({ key, label })),
+          ...(domain ? { merchantDomain: domain } : {}),
           ...(action.expiresAt ? { expiresAt: action.expiresAt } : {}),
           url: `${webBaseUrl.replace(/\/$/, "")}/checkouts/${encodeURIComponent(checkout.runId)}`,
         };
-      } else if (!asksPasswordInForm(action)) {
-        // A password in a plain form gets no form either: it is declined, never filled in.
-        view.rendered = renderPendingAction(action);
       }
     }
   }

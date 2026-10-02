@@ -92,26 +92,58 @@ describe("Agent Commerce tools", () => {
     expect(result.structuredContent).toMatchObject({ enforced: false, card: { number: "4111111111111111" } });
   });
 
-  it("get_checkout hands a password request over as a link, never as a question", async () => {
+  it("get_checkout hands a protected request over as a link, never as a form", async () => {
+    const passwordField = {
+      key: "password",
+      label: "Password",
+      required: true,
+      handling: "protected",
+      input: { kind: "text", display: "masked", autoComplete: "current-password" },
+    };
     const { client } = await connect(
       mockAgentCommerceFetch({
         "GET /v1/checkouts/run_pw": {
           status: 200,
           body: {
-          id: "run_pw",
-          status: "awaiting_input",
-          pendingUserAction: {
-            id: "req_pw",
-            question: "Enter your password for shop.example to sign in.",
-            responseSchema: {},
-            protected: { purpose: "password", merchant: { domain: "shop.example" } },
-          },
-          passwordRequest: {
-            requestId: "req_pw",
-            question: "Enter your password for shop.example to sign in.",
-            merchantDomain: "shop.example",
-            url: "https://wallet.example.com/checkouts/run_pw",
-          },
+            id: "run_pw",
+            status: "awaiting_input",
+            pendingUserAction: {
+              id: "req_pw",
+              question: "Sign in to shop.example to continue.",
+              fields: [
+                {
+                  key: "email",
+                  label: "Email",
+                  required: true,
+                  handling: "standard",
+                  input: { kind: "text", autoComplete: "email" },
+                },
+                passwordField,
+              ],
+            },
+            // The server renders the form for the app's own page, protected field included.
+            rendered: {
+              id: "req_pw",
+              type: "input_response",
+              title: "Sign in to shop.example to continue.",
+              fields: [
+                { name: "email", label: "Email", kind: "text", required: true },
+                {
+                  name: "password",
+                  label: "Password",
+                  kind: "protected",
+                  required: true,
+                  protectedField: passwordField,
+                },
+              ],
+            },
+            protectedRequest: {
+              requestId: "req_pw",
+              question: "Sign in to shop.example to continue.",
+              fields: [{ key: "password", label: "Password" }],
+              merchantDomain: "shop.example",
+              url: "https://wallet.example.com/checkouts/run_pw",
+            },
           },
         },
       }),
@@ -120,10 +152,94 @@ describe("Agent Commerce tools", () => {
     expect(result.isError).toBeFalsy();
     const text = (result.content as Array<{ type: string; text: string }>)[0]!.text;
     expect(text).toContain("https://wallet.example.com/checkouts/run_pw");
-    expect(text).toContain("Never ask for the password");
+    expect(text).toContain("shop.example asks for secrets: Password.");
+    expect(text).toContain("Never ask the user for them");
     expect(text).not.toContain("Question (requestId");
+    expect(text).not.toContain("Fields:");
     expect(text).not.toContain("Still running");
     expect((result.structuredContent as { checkout: Record<string, unknown> }).checkout.rendered).toBeUndefined();
+  });
+
+  it("get_checkout lists each field with the answers it accepts", async () => {
+    const { client } = await connect(
+      mockAgentCommerceFetch({
+        "GET /v1/checkouts/run_1": {
+          status: 200,
+          body: {
+            id: "run_1",
+            status: "awaiting_input",
+            pendingUserAction: {
+              id: "req_1",
+              question: "Pick your options.",
+              fields: [
+                {
+                  key: "size",
+                  label: "Size",
+                  required: true,
+                  handling: "standard",
+                  input: {
+                    kind: "choice",
+                    selection: { kind: "one" },
+                    options: [
+                      { value: "", label: "Select a size", disabled: false, selected: false, placeholder: true },
+                      { value: "m", label: "Medium", disabled: false, selected: true, placeholder: false },
+                      { value: "l", label: "Large", disabled: true, selected: false, placeholder: false },
+                    ],
+                  },
+                },
+                {
+                  key: "extras",
+                  label: "Extras",
+                  required: false,
+                  handling: "standard",
+                  input: {
+                    kind: "choice",
+                    selection: { kind: "many", min: 0, max: 2 },
+                    options: [
+                      { value: "wrap", label: "Gift wrap", disabled: false, selected: false, placeholder: false },
+                      { value: "note", label: "Card", disabled: false, selected: false, placeholder: false },
+                    ],
+                  },
+                },
+                { key: "quantity", label: "Quantity", required: true, handling: "standard", input: { kind: "integer" } },
+                { key: "notes", label: "Notes", required: false, handling: "standard", input: { kind: "text", multiline: true } },
+              ],
+            },
+          },
+        },
+      }),
+    );
+    const result = await client.callTool({ name: "get_checkout", arguments: { checkoutId: "run_1" } });
+    const text = (result.content as Array<{ type: string; text: string }>)[0]!.text;
+    expect(text).toContain('Question (requestId "req_1"): Pick your options.');
+    expect(text).toContain('- size "Size" (select, required) one of: "m" (Medium); preselected "m"');
+    expect(text).toContain('- extras "Extras" (multiselect) a list of 0 to 2 of: "wrap" (Gift wrap), "note" (Card)');
+    expect(text).toContain('- quantity "Quantity" (whole number, required)');
+    expect(text).toContain('- notes "Notes" (text, several lines)');
+    const checkout = (result.structuredContent as { checkout: { rendered?: { fields: unknown[] } } }).checkout;
+    expect(checkout.rendered?.fields).toHaveLength(4);
+  });
+
+  it("answer_checkout sends plain answers and refuses a protectedInputId from the agent", async () => {
+    const fetchMock = mockAgentCommerceFetch({
+      "POST /v1/checkouts/run_1/messages": { body: { id: "run_1", status: "running" } },
+    });
+    const { client } = await connect(fetchMock);
+    const values = { size: "m", extras: ["wrap"], quantity: 2, gift: true };
+    const sent = await client.callTool({
+      name: "answer_checkout",
+      arguments: { checkoutId: "run_1", requestId: "req_1", values },
+    });
+    expect(sent.isError).toBeFalsy();
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(JSON.parse(String(init.body))).toEqual({ requestId: "req_1", values });
+
+    const refused = await client.callTool({
+      name: "answer_checkout",
+      arguments: { checkoutId: "run_1", requestId: "req_1", values: { password: { protectedInputId: "pi_1" } } },
+    });
+    expect(refused.isError).toBe(true);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
   it("turns Agent Commerce API errors into isError results", async () => {

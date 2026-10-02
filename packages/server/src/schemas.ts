@@ -84,35 +84,40 @@ export const createCheckoutSchema = z
   });
 
 /**
+ * One form answer: text, a number, true or false, an option value, a list of
+ * option values, or for a protected field the `{ protectedInputId }` that
+ * Crossmint's protected field returned.
+ */
+const formAnswerSchema = z.union([
+  z.string(),
+  z.number(),
+  z.boolean(),
+  z.array(z.string()),
+  z.object({ protectedInputId: z.string().min(1).max(200) }).strict(),
+]);
+
+/**
  * Body of POST /v1/checkouts/:id/messages. With `requestId`: answer the open
- * input request (`submit` with `values`, `decline`, or `alternative` with
- * `text`). A protected request, such as a password, is submitted with the
- * `protectedInputId` Crossmint's protected field returned, never with values.
- * Without `requestId`: a free-text note to the agent.
+ * input request (`submit` with `values`, every field keyed by its key;
+ * `decline`; or `alternative` with `text`). Without `requestId`: a free-text
+ * note to the agent.
  */
 export const checkoutMessageSchema = z
   .object({
     requestId: z.string().min(1).optional(),
     action: z.enum(["submit", "decline", "alternative"]).optional(),
-    values: z.record(z.string(), z.unknown()).optional(),
-    protectedInputId: z.string().min(1).max(200).optional(),
+    values: z.record(z.string(), formAnswerSchema).optional(),
     text: z.string().min(1).max(20000).optional(),
     messageId: z.string().min(1).max(200).optional(),
   })
   .superRefine((b, ctx) => {
     if (b.requestId) {
       const action = b.action ?? "submit";
-      if (action === "submit" && !b.values && !b.protectedInputId)
+      if (action === "submit" && !b.values)
         ctx.addIssue({
           code: "custom",
           path: ["values"],
           message: "values are required to submit",
-        });
-      if (b.protectedInputId && (action !== "submit" || b.values))
-        ctx.addIssue({
-          code: "custom",
-          path: ["protectedInputId"],
-          message: "protectedInputId is a submit of its own, with no values",
         });
       if (action === "alternative" && !b.text)
         ctx.addIssue({
@@ -120,12 +125,6 @@ export const checkoutMessageSchema = z
           path: ["text"],
           message: "text is required for an alternative",
         });
-    } else if (b.protectedInputId) {
-      ctx.addIssue({
-        code: "custom",
-        path: ["requestId"],
-        message: "requestId is required with protectedInputId",
-      });
     } else if (!b.text) {
       ctx.addIssue({ code: "custom", path: ["text"], message: "text or requestId is required" });
     }
@@ -138,7 +137,7 @@ export const checkoutAgentCardSchema = z.object({
 });
 
 export const submitActionSchema = z.object({
-  values: z.record(z.string(), z.unknown()),
+  values: z.record(z.string(), formAnswerSchema),
 });
 
 export const buyerProfileSchema = z.object({

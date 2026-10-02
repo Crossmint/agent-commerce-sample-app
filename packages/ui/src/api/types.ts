@@ -18,6 +18,7 @@ import type {
   RegisterCardInput,
   RegisterCardResult,
   RenderedAction,
+  CheckoutFormAnswer,
 } from "@agent-commerce/core";
 
 export interface AgentCommerceErrorEnvelope {
@@ -164,9 +165,8 @@ export interface CreateCheckoutInput {
 export interface CheckoutMessageInput {
   requestId?: string;
   action?: "submit" | "decline" | "alternative";
-  values?: Record<string, unknown>;
-  /** A password request's answer: the id Crossmint's protected field returned, never the password. */
-  protectedInputId?: string;
+  /** Every field's answer, keyed by field name. A protected field's is `{ protectedInputId }`, never the secret. */
+  values?: Record<string, CheckoutFormAnswer>;
   text?: string;
   messageId?: string;
 }
@@ -193,10 +193,11 @@ export interface CheckoutView {
   startUrl?: string;
   agentCardId?: string;
   paymentRequest?: CheckoutPaymentRequest;
-  /** The store asks for the user's password there; `url` is the checkout's page with the secure field. */
-  passwordRequest?: {
+  /** The open form has protected fields, such as a password; `url` is the checkout's page with the secure fields. */
+  protectedRequest?: {
     requestId: string;
     question: string;
+    fields: Array<{ key: string; label: string }>;
     merchantDomain?: string;
     expiresAt?: string;
     url: string;

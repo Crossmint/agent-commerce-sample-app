@@ -36,14 +36,16 @@ export type {
   VerificationAppearance,
 } from "./components/verify-agent-card.js";
 export { RecollectCvc } from "./components/recollect-cvc.js";
-export { AnswerPasswordRequest, ProtectedInput } from "./components/protected-input.js";
+export { ProtectedField } from "./components/protected-input.js";
 export type {
-  AnswerPasswordRequestProps,
-  PasswordRequestOutcome,
+  ProtectedFieldProps,
   ProtectedInputAppearance,
-  ProtectedInputError,
-  ProtectedInputProps,
 } from "./components/protected-input.js";
+export { AnswerProtectedRequest } from "./components/answer-protected-request.js";
+export type {
+  AnswerProtectedRequestProps,
+  ProtectedRequestOutcome,
+} from "./components/answer-protected-request.js";
 export type { RecollectCvcProps, CvcAppearance, CvcError } from "./components/recollect-cvc.js";
 export {
   AgentCardList,
@@ -63,7 +65,7 @@ export type {
   AgentCardDetailBodyProps,
 } from "./components/agent-card-detail.js";
 export { PendingActionForm } from "./components/pending-action-form.js";
-export type { PendingActionFormProps } from "./components/pending-action-form.js";
+export type { FormAnswers, PendingActionFormProps } from "./components/pending-action-form.js";
 export { CheckoutView } from "./components/checkout-view.js";
 export { CheckoutSteps, checkoutSteps } from "./components/checkout-steps.js";
 export type {

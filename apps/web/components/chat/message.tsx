@@ -15,7 +15,7 @@ import type {
 } from "@/lib/chat/tools";
 import type { ChatMessage, ChatMessagePart } from "@/lib/chat/types";
 import { AgentCardApproval } from "./agent-card-approval";
-import { PasswordRequest } from "./password-request";
+import { ProtectedRequest } from "./protected-request";
 import { AddCard } from "./add-card";
 import { BuyerDetailsRequest } from "./buyer-details-request";
 import { PaymentChoiceInThread } from "./payment-choice";
@@ -38,7 +38,7 @@ import {
   isToolError,
   isCheckoutPart,
   messageText,
-  passwordRequestOf,
+  protectedRequestOf,
   productFor,
   sentBackFirst,
   toolBusy,
@@ -54,7 +54,7 @@ export interface MessageProps {
   /** True while this message is still streaming in. */
   streaming: boolean;
   onApprovalOutcome: (toolCallId: string, outcome: ApprovalOutcome) => void;
-  onPasswordOutcome: (toolCallId: string, outcome: ProtectedInputOutcome) => void;
+  onProtectedInputOutcome: (toolCallId: string, outcome: ProtectedInputOutcome) => void;
   onCardSaved: (toolCallId: string, outcome: SavedCardOutcome) => void;
   onBuyerDetails: (toolCallId: string, outcome: BuyerDetailsOutcome) => void;
   onPaymentChoice: (toolCallId: string, outcome: PaymentChoiceOutcome) => void;
@@ -76,7 +76,7 @@ export function Message({
   message,
   streaming,
   onApprovalOutcome,
-  onPasswordOutcome,
+  onProtectedInputOutcome,
   onCardSaved,
   onBuyerDetails,
   onPaymentChoice,
@@ -106,7 +106,7 @@ export function Message({
               part={part}
               streaming={streaming}
               onApprovalOutcome={onApprovalOutcome}
-              onPasswordOutcome={onPasswordOutcome}
+              onProtectedInputOutcome={onProtectedInputOutcome}
               onCardSaved={onCardSaved}
               onBuyerDetails={onBuyerDetails}
               onPaymentChoice={onPaymentChoice}
@@ -198,7 +198,7 @@ function Part({
   part,
   streaming,
   onApprovalOutcome,
-  onPasswordOutcome,
+  onProtectedInputOutcome,
   onCardSaved,
   onBuyerDetails,
   onPaymentChoice,
@@ -212,7 +212,7 @@ function Part({
   part: ChatMessagePart;
   streaming: boolean;
   onApprovalOutcome: MessageProps["onApprovalOutcome"];
-  onPasswordOutcome: MessageProps["onPasswordOutcome"];
+  onProtectedInputOutcome: MessageProps["onProtectedInputOutcome"];
   onCardSaved: MessageProps["onCardSaved"];
   onBuyerDetails: MessageProps["onBuyerDetails"];
   onPaymentChoice: MessageProps["onPaymentChoice"];
@@ -329,18 +329,16 @@ function Part({
         </ActivityLine>
       );
 
-    // The store asks for a password: Crossmint's field in a dialog, never words.
+    // The store asks for secrets: Crossmint's fields in a dialog, never words.
     case "tool-await_protected_input": {
-      const request = passwordRequestOf(part, watches);
+      const request = protectedRequestOf(part, watches);
       if (request && (part.state === "input-available" || part.state === "output-available")) {
         return (
-          <PasswordRequest
+          <ProtectedRequest
             toolCallId={part.toolCallId}
-            checkoutId={request.checkoutId}
-            requestId={request.requestId}
-            domain={request.domain}
+            request={request}
             output={part.state === "output-available" ? part.output : undefined}
-            onOutcome={onPasswordOutcome}
+            onOutcome={onProtectedInputOutcome}
           />
         );
       }

@@ -154,7 +154,7 @@ export const TOOL_DOCS = {
       "Follow a running checkout for the user. While it runs, the chat shows the user each update the store's agent writes, as its own message; you do not repeat them. " +
       "Call it straight after create_checkout, and again after each answer you send; never poll get_checkout meanwhile. It returns with the updates it showed and one of four reasons. " +
       "awaiting_input with a question: the store asks something, and you put it to the user. awaiting_payment with a payment: the run reached its payment step, and the user chooses how to pay. " +
-      "awaiting_password with a password: the store asks for the password of the user's account there; call await_protected_input, and never ask for the password in words. " +
+      "awaiting_protected_input with a protectedInput: the store asks for a secret, such as the password of the user's account there or a one-time code; call await_protected_input, and never ask for the secret in words. " +
       "A final status (succeeded, blocked, failed, cancelled): the run ended, with the total and the order number, or why it stopped.",
     params: { checkoutId: PARAM_DOCS.checkoutId },
     surfaces: ["chat"],
@@ -207,13 +207,13 @@ export const TOOL_DOCS = {
     surfaces: ["chat"],
   },
   await_protected_input: {
-    title: "Wait for a password",
+    title: "Wait for a secret",
     summary:
-      "When a checkout asks for the password of the user's account at the store, show the user a secure field for it and wait. The password goes straight to Crossmint's vault: neither you nor the chat ever sees it, and the app answers the checkout itself. " +
-      "Call it straight after watch_checkout returns awaiting_password, with no text in between; the chat asks the user. It returns submitted, then call watch_checkout again, or declined, when the user would rather not sign in: ask whether to check out as a guest (answer_checkout with action alternative) or stop.",
+      "When a checkout asks for a secret, such as the password of the user's account at the store or a one-time code, show the user the question with a secure field for each secret, and wait. Each secret goes straight to Crossmint's vault: neither you nor the chat ever sees it, and the app answers the checkout itself, with the other fields of the same question. " +
+      "Call it straight after watch_checkout returns awaiting_protected_input, with no text in between; the chat asks the user. It returns submitted, then call watch_checkout again, or declined, when the user would rather not: ask whether to check out as a guest (answer_checkout with action alternative) or stop.",
     params: {
       checkoutId: PARAM_DOCS.checkoutId,
-      requestId: "The password request's requestId, from watch_checkout's password.",
+      requestId: "The request's requestId, from watch_checkout's protectedInput.",
     },
     surfaces: ["chat"],
   },
@@ -292,14 +292,14 @@ export const TOOL_DOCS = {
   answer_checkout: {
     title: "Answer a checkout question",
     summary:
-      "Answer the open question on a checkout. Pass requestId with values keyed by field name (as listed by get_checkout) to submit, action decline to refuse it, or action alternative with text to suggest another way (e.g. use the cheapest shipping). " +
+      "Answer the open question on a checkout. Pass requestId with values keyed by field key (as listed by get_checkout), with every field in one answer, to submit; action decline to refuse it; or action alternative with text to suggest another way (e.g. use the cheapest shipping). " +
       "Without requestId, text is a note to the agent mid-run. Never send card fields: the payment step is answered from the agent card the user picks. " +
-      "Never send a password, and never ask the user for one: a request for the password of their account at the store (pendingUserAction.protected) is answered by the user in a secure field, on the checkout's page in the app. You may decline it, or send an alternative such as checking out as a guest.",
+      "Never send a password or another secret, and never ask the user for one: a question with a protected field (handling protected, such as the password of their account at the store) is answered by the user in a secure field, on the checkout's page in the app. You may decline it, or send an alternative such as checking out as a guest.",
     params: {
       checkoutId: PARAM_DOCS.checkoutId,
       requestId: "The pending request id from get_checkout.",
       action: "submit (default), decline, or alternative.",
-      values: "Field values keyed by field name, for submit.",
+      values: "For submit: an answer for each field, keyed by field key. Text as a string, a number, true or false, a choice's option value, or a list of option values for a choice of many.",
       text: "Free text: the alternative, or a note for the agent.",
     },
     surfaces: ["mcp", "chat"],

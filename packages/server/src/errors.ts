@@ -15,7 +15,7 @@ export type ErrorCode =
   | "protected_input_required"
   | "password_in_form"
   | "card_in_form"
-  | "not_a_protected_request"
+  | "not_a_protected_field"
   | "checkout_finished"
   | "agent_card_unusable"
   | "agent_card_wrong_merchant"

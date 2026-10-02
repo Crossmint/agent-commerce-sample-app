@@ -1,7 +1,8 @@
 "use client";
 
 import * as React from "react";
-import type { RenderedAction, RenderedField } from "@agent-commerce/core";
+import type { CrossmintProtectedInputRef } from "@crossmint/client-sdk-react-ui";
+import type { CheckoutFormAnswer, RenderedAction, RenderedField } from "@agent-commerce/core";
 import { cn } from "../lib/utils.js";
 import { formatDateTime } from "../lib/format.js";
 import { Button } from "./primitives/button.js";
@@ -9,50 +10,56 @@ import { Input } from "./primitives/input.js";
 import { Label } from "./primitives/label.js";
 import { NativeSelect } from "./primitives/native-select.js";
 import { Spinner } from "./primitives/spinner.js";
+import { ProtectedField } from "./protected-input.js";
+
+export type FormAnswers = Record<string, CheckoutFormAnswer>;
 
 export interface PendingActionFormProps {
   action: RenderedAction;
-  onSubmit: (values: Record<string, unknown>) => void | Promise<void>;
+  /**
+   * Fires with every field's answer, keyed by field name. A protected field's
+   * answer is the `{ protectedInputId }` Crossmint's field returned, collected
+   * on submit; the secret never reaches this app.
+   */
+  onSubmit: (answers: FormAnswers) => void | Promise<void>;
   submitting?: boolean;
   submitLabel?: string;
   className?: string;
 }
 
-type Values = Record<string, unknown>;
+type Value = string | number | boolean | string[] | undefined;
+type Values = Record<string, Value>;
 
 /** The phone-screen field: tall, 12px corners, on the grey fill, no border. */
 const FIELD = "h-12 rounded-xl border-0 bg-muted px-4 shadow-none";
 
-function getAt(values: Values, path: string[]): unknown {
-  let cur: unknown = values;
-  for (const key of path) {
-    if (typeof cur !== "object" || cur === null) return undefined;
-    cur = (cur as Record<string, unknown>)[key];
-  }
-  return cur;
-}
-
-function setAt(values: Values, path: string[], value: unknown): Values {
-  if (path.length === 0) return values;
-  const [head, ...rest] = path as [string, ...string[]];
-  const next = { ...values };
-  if (rest.length === 0) {
-    next[head] = value;
-  } else {
-    const child = next[head];
-    next[head] = setAt(typeof child === "object" && child !== null ? (child as Values) : {}, rest, value);
-  }
-  return next;
-}
-
-function defaultsFor(fields: RenderedField[], acc: Values = {}): Values {
-  let out = acc;
+function defaultsFor(fields: RenderedField[]): Values {
+  const out: Values = {};
   for (const f of fields) {
-    if (f.kind === "object" && f.children) out = defaultsFor(f.children, out);
-    else if (f.default !== undefined) out = setAt(out, f.path, f.default);
-    else if (f.kind === "boolean") out = setAt(out, f.path, false);
+    if (f.default !== undefined) out[f.name] = f.default;
+    else if (f.kind === "boolean") out[f.name] = false;
+    else if (f.kind === "multiselect") out[f.name] = [];
   }
   return out;
+}
+
+/** The fields still missing an answer, by label. Protected ones are checked by Crossmint's field on submit. */
+function missingOf(fields: RenderedField[], values: Values): string[] {
+  return fields
+    .filter((f) => {
+      const value = values[f.name];
+      if (f.kind === "protected" || f.kind === "boolean") return false;
+      if (f.kind === "multiselect") {
+        const n = Array.isArray(value) ? value.length : 0;
+        if (n === 0 && !f.required) return false;
+        return n < (f.min ?? 0) || (f.max !== undefined && n > f.max);
+      }
+      if (f.kind === "number" && value !== undefined) {
+        return typeof value !== "number" || !Number.isFinite(value) || (f.integer === true && !Number.isSafeInteger(value));
+      }
+      return f.required && (value === undefined || value === "");
+    })
+    .map((f) => f.label);
 }
 
 /** Most options a question may have and still show as buttons. */
@@ -67,15 +74,22 @@ function singleChoice(fields: RenderedField[]): RenderedField | undefined {
 }
 
 /**
- * Renders a checkout's pending user action (shipping, size, a question) from
- * its JSON Schema, walked into fields by `renderPendingAction` in core.
+ * Renders a checkout's pending user action (shipping, size, a sign-in) from
+ * its fields, as `renderPendingAction` in core lists them.
  *
  * A question that is one choice shows its options as buttons, and a tap
- * answers it. Everything else is a form with a submit button.
+ * answers it. Everything else is a form with a submit button. A protected
+ * field, such as a password, is Crossmint's own field: on submit, each one
+ * is collected into Crossmint's vault, and the form sends only the ids.
  */
 export function PendingActionForm({ action, onSubmit, submitting = false, submitLabel = "Continue", className }: PendingActionFormProps) {
   const [values, setValues] = React.useState<Values>(() => defaultsFor(action.fields));
-  const [picked, setPicked] = React.useState<unknown>(undefined);
+  const [picked, setPicked] = React.useState<string | undefined>(undefined);
+  // Optional secrets are left out until the user chooses to add them.
+  const [included, setIncluded] = React.useState<ReadonlySet<string>>(() => requiredSecrets(action.fields));
+  const [errors, setErrors] = React.useState<Record<string, string>>({});
+  const [collecting, setCollecting] = React.useState(false);
+  const refs = React.useRef(new Map<string, CrossmintProtectedInputRef | null>());
 
   // Start over for a new question, and only then. A poll hands back the same
   // question as a fresh object every few seconds; keying on the object would
@@ -86,15 +100,62 @@ export function PendingActionForm({ action, onSubmit, submitting = false, submit
     setShownId(action.id);
     setValues(defaultsFor(action.fields));
     setPicked(undefined);
+    setIncluded(requiredSecrets(action.fields));
+    setErrors({});
   }
 
-  const update = (path: string[], value: unknown) => setValues((prev) => setAt(prev, path, value));
+  const busy = submitting || collecting;
+  const update = (name: string, value: Value) => setValues((prev) => ({ ...prev, [name]: value }));
   const choice = singleChoice(action.fields);
+  const missing = missingOf(action.fields, values);
+
+  const submit = async () => {
+    if (busy || missing.length > 0) return;
+    const answers: FormAnswers = {};
+    for (const f of action.fields) {
+      const value = values[f.name];
+      if (f.kind === "protected" || value === undefined || value === "") continue;
+      if (Array.isArray(value) && value.length === 0 && !f.required) continue;
+      answers[f.name] = value;
+    }
+    const secrets = action.fields.filter((f) => f.kind === "protected" && included.has(f.name));
+    if (secrets.length > 0) {
+      setCollecting(true);
+      setErrors({});
+      try {
+        // Every field reports at once, so the user sees each problem together.
+        const results = await Promise.all(
+          secrets.map(async (f) => {
+            const field = refs.current.get(f.name);
+            if (!field) {
+              return [f.name, { status: "unavailable", message: "The secure field is still loading. Try again." }] as const;
+            }
+            return [f.name, await field.collect()] as const;
+          }),
+        );
+        const failed: Record<string, string> = {};
+        for (const [name, result] of results) {
+          if (result.status === "collected") answers[name] = result.input;
+          else failed[name] = result.message;
+        }
+        if (Object.keys(failed).length > 0) {
+          setErrors(failed);
+          return;
+        }
+      } catch {
+        // An unexpected SDK fault: say so, never the provider's payload.
+        setErrors(Object.fromEntries(secrets.map((f) => [f.name, "The secure field is unavailable. Try again."])));
+        return;
+      } finally {
+        setCollecting(false);
+      }
+    }
+    await onSubmit(answers);
+  };
 
   const heading = (
     <div className="flex flex-col gap-1">
-      <h3 className="text-xl font-medium">{action.title}</h3>
-      {action.description ? <p className="text-sm text-muted-foreground">{action.description}</p> : null}
+      {action.title ? <h3 className="text-xl font-medium">{action.title}</h3> : null}
       {action.expiresAt ? (
         <p className="text-xs text-muted-foreground">Answer before {formatDateTime(action.expiresAt)}.</p>
       ) : null}
@@ -107,21 +168,21 @@ export function PendingActionForm({ action, onSubmit, submitting = false, submit
         {heading}
         <div role="group" aria-label={choice.label} className="flex flex-col gap-2">
           {choice.options!.map((o) => {
-            const busy = submitting && picked === o.value;
+            const sending = submitting && picked === o.value;
             return (
               <Button
-                key={String(o.value)}
+                key={o.value}
                 type="button"
                 size="xl"
                 variant="secondary"
                 className="w-full justify-start"
-                disabled={submitting}
+                disabled={submitting || o.disabled}
                 onClick={() => {
                   setPicked(o.value);
-                  void onSubmit(setAt({}, choice.path, o.value));
+                  void onSubmit({ [choice.name]: o.value });
                 }}
               >
-                {busy ? <Spinner /> : null}
+                {sending ? <Spinner /> : null}
                 {o.label}
               </Button>
             );
@@ -136,69 +197,116 @@ export function PendingActionForm({ action, onSubmit, submitting = false, submit
       className={cn("flex flex-col gap-5", className)}
       onSubmit={(e) => {
         e.preventDefault();
-        void onSubmit(values);
+        void submit();
       }}
     >
       {heading}
-      <FieldList fields={action.fields} values={values} update={update} disabled={submitting} />
-      <Button type="submit" size="xl" className="w-full" disabled={submitting}>
-        {submitting ? <Spinner /> : null}
-        {submitLabel}
+      <div className="flex flex-col gap-4">
+        {action.fields.map((f) =>
+          f.kind === "protected" && f.protectedField ? (
+            <SecretField
+              key={f.name}
+              field={f}
+              included={included.has(f.name)}
+              onInclude={(include) =>
+                setIncluded((prev) => {
+                  const next = new Set(prev);
+                  if (include) next.add(f.name);
+                  else next.delete(f.name);
+                  return next;
+                })
+              }
+              collectorRef={(el) => {
+                if (el) refs.current.set(f.name, el);
+                else refs.current.delete(f.name);
+              }}
+              error={errors[f.name]}
+              disabled={busy}
+            />
+          ) : (
+            <Field key={f.name} field={f} value={values[f.name]} update={update} disabled={busy} />
+          ),
+        )}
+      </div>
+      {missing.length > 0 ? (
+        <p className="text-xs text-muted-foreground">Still needed: {missing.join(", ")}</p>
+      ) : null}
+      <Button type="submit" size="xl" className="w-full" disabled={busy || missing.length > 0}>
+        {busy ? <Spinner /> : null}
+        {collecting ? "Securing…" : submitLabel}
       </Button>
     </form>
   );
 }
 
-function FieldList({
-  fields,
-  values,
-  update,
+function requiredSecrets(fields: RenderedField[]): ReadonlySet<string> {
+  return new Set(fields.filter((f) => f.kind === "protected" && f.required).map((f) => f.name));
+}
+
+/** A protected field, or for an optional one, the choice to add it. */
+function SecretField({
+  field,
+  included,
+  onInclude,
+  collectorRef,
+  error,
   disabled,
 }: {
-  fields: RenderedField[];
-  values: Values;
-  update: (path: string[], value: unknown) => void;
+  field: RenderedField;
+  included: boolean;
+  onInclude: (include: boolean) => void;
+  collectorRef: React.Ref<CrossmintProtectedInputRef>;
+  error?: string;
   disabled: boolean;
 }) {
+  const id = `paf-${field.name}`;
   return (
-    <div className="flex flex-col gap-4">
-      {fields.map((f) => (
-        <Field key={f.path.join(".")} field={f} values={values} update={update} disabled={disabled} />
-      ))}
+    <div className="flex flex-col gap-2">
+      {field.required ? null : (
+        <div className="flex items-center gap-3">
+          <input
+            id={`${id}-include`}
+            type="checkbox"
+            className="size-4 rounded border-input accent-primary"
+            checked={included}
+            disabled={disabled}
+            onChange={(e) => onInclude(e.target.checked)}
+          />
+          <Label htmlFor={`${id}-include`}>Add {field.label.toLowerCase()}</Label>
+        </div>
+      )}
+      {included ? (
+        <ProtectedField
+          ref={collectorRef}
+          field={field.protectedField!}
+          error={error}
+          disabled={disabled}
+        />
+      ) : null}
     </div>
   );
 }
 
 function Field({
   field,
-  values,
+  value,
   update,
   disabled,
 }: {
   field: RenderedField;
-  values: Values;
-  update: (path: string[], value: unknown) => void;
+  value: Value;
+  update: (name: string, value: Value) => void;
   disabled: boolean;
 }) {
-  const id = `paf-${field.path.join("-")}`;
-  const value = getAt(values, field.path);
+  const id = `paf-${field.name}`;
   const label = (
     <Label htmlFor={id}>
       {field.label}
       {field.required ? <span className="text-destructive">*</span> : null}
     </Label>
   );
-  const help = field.description ? <p className="text-xs text-muted-foreground">{field.description}</p> : null;
 
   switch (field.kind) {
-    case "object":
-      return (
-        <fieldset className="flex flex-col gap-3 rounded-2xl border border-border p-4">
-          <legend className="px-1 text-sm font-medium">{field.label}</legend>
-          {help}
-          <FieldList fields={field.children ?? []} values={values} update={update} disabled={disabled} />
-        </fieldset>
-      );
     case "boolean":
       return (
         <div className="flex items-center gap-3">
@@ -206,13 +314,11 @@ function Field({
             id={id}
             type="checkbox"
             className="size-4 rounded border-input accent-primary"
-            checked={Boolean(value)}
-            required={field.required}
+            checked={value === true}
             disabled={disabled}
-            onChange={(e) => update(field.path, e.target.checked)}
+            onChange={(e) => update(field.name, e.target.checked)}
           />
           {label}
-          {help}
         </div>
       );
     case "select":
@@ -224,49 +330,46 @@ function Field({
             className={FIELD}
             required={field.required}
             disabled={disabled}
-            value={value === undefined || value === null ? "" : String(value)}
-            onChange={(e) => {
-              const raw = e.target.value;
-              const match = field.options?.find((o) => String(o.value) === raw);
-              update(field.path, match ? match.value : raw);
-            }}
+            value={typeof value === "string" ? value : ""}
+            onChange={(e) => update(field.name, e.target.value === "" ? undefined : e.target.value)}
           >
-            <option value="" disabled>
+            <option value="" disabled={field.required}>
               Choose…
             </option>
             {field.options?.map((o) => (
-              <option key={String(o.value)} value={String(o.value)}>
+              <option key={o.value} value={o.value} disabled={o.disabled}>
                 {o.label}
               </option>
             ))}
           </NativeSelect>
-          {help}
         </div>
       );
-    case "array":
+    case "multiselect": {
+      const picked = Array.isArray(value) ? value : [];
       return (
-        <div className="flex flex-col gap-2">
-          {label}
-          <Input
-            id={id}
-            className={FIELD}
-            required={field.required}
-            disabled={disabled}
-            placeholder="Separate items with commas"
-            value={Array.isArray(value) ? value.join(", ") : typeof value === "string" ? value : ""}
-            onChange={(e) =>
-              update(
-                field.path,
-                e.target.value
-                  .split(",")
-                  .map((s) => s.trim())
-                  .filter(Boolean),
-              )
-            }
-          />
-          {help}
-        </div>
+        <fieldset className="flex flex-col gap-2">
+          <legend className="mb-2 text-sm font-medium">
+            {field.label}
+            {field.required ? <span className="text-destructive">*</span> : null}
+          </legend>
+          {field.options?.map((o) => (
+            <div key={o.value} className="flex items-center gap-3">
+              <input
+                id={`${id}-${o.value}`}
+                type="checkbox"
+                className="size-4 rounded border-input accent-primary"
+                checked={picked.includes(o.value)}
+                disabled={disabled || o.disabled}
+                onChange={(e) =>
+                  update(field.name, e.target.checked ? [...picked, o.value] : picked.filter((v) => v !== o.value))
+                }
+              />
+              <Label htmlFor={`${id}-${o.value}`}>{o.label}</Label>
+            </div>
+          ))}
+        </fieldset>
       );
+    }
     case "number":
       return (
         <div className="flex flex-col gap-2">
@@ -275,32 +378,43 @@ function Field({
             id={id}
             className={FIELD}
             type="number"
-            inputMode="decimal"
+            inputMode={field.integer ? "numeric" : "decimal"}
+            step={field.integer ? 1 : "any"}
             required={field.required}
             disabled={disabled}
-            value={value === undefined || value === null ? "" : String(value)}
-            onChange={(e) => update(field.path, e.target.value === "" ? undefined : Number(e.target.value))}
+            value={typeof value === "number" ? String(value) : ""}
+            onChange={(e) => update(field.name, e.target.value === "" ? undefined : Number(e.target.value))}
           />
-          {help}
         </div>
       );
     default: {
-      const type =
-        field.kind === "email" ? "email" : field.kind === "url" ? "url" : field.kind === "date" ? (field.format === "date-time" ? "datetime-local" : "date") : "text";
+      const shared = {
+        id,
+        required: field.required,
+        disabled,
+        placeholder: field.placeholder,
+        autoComplete: field.autoComplete,
+        value: typeof value === "string" ? value : "",
+      };
       return (
         <div className="flex flex-col gap-2">
           {label}
-          <Input
-            id={id}
-            className={FIELD}
-            type={type}
-            required={field.required}
-            disabled={disabled}
-            pattern={field.pattern}
-            value={typeof value === "string" ? value : value === undefined || value === null ? "" : String(value)}
-            onChange={(e) => update(field.path, e.target.value)}
-          />
-          {help}
+          {field.multiline ? (
+            <textarea
+              {...shared}
+              rows={3}
+              className="min-h-24 rounded-xl border-0 bg-muted px-4 py-3 text-base shadow-none outline-none focus-visible:ring-2 focus-visible:ring-ring md:text-sm"
+              onChange={(e) => update(field.name, e.target.value)}
+            />
+          ) : (
+            <Input
+              {...shared}
+              className={FIELD}
+              type={field.masked ? "password" : "text"}
+              inputMode={field.inputMode}
+              onChange={(e) => update(field.name, e.target.value)}
+            />
+          )}
         </div>
       );
     }

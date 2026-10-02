@@ -38,8 +38,8 @@ export interface AgentChat {
   onApprovalOutcome: (toolCallId: string, outcome: ApprovalOutcome) => void;
   /** Hand the card form's result (saved or cancelled) back to the `await_saved_card` tool call. */
   onCardSaved: (toolCallId: string, outcome: SavedCardOutcome) => void;
-  /** Hand the password field's answer (submitted or declined) back to the `await_protected_input` tool call. */
-  onPasswordOutcome: (toolCallId: string, outcome: ProtectedInputOutcome) => void;
+  /** Hand the protected fields' answer (submitted or declined) back to the `await_protected_input` tool call. */
+  onProtectedInputOutcome: (toolCallId: string, outcome: ProtectedInputOutcome) => void;
   /** Hand the details form's result (saved or skipped) back to the `await_buyer_details` tool call. */
   onBuyerDetails: (toolCallId: string, outcome: BuyerDetailsOutcome) => void;
   /** Hand the way the user chose to pay back to the `await_payment_choice` tool call. */
@@ -192,7 +192,7 @@ export function useAgentChat({ id, initialMessages, persist }: UseAgentChatOptio
     [hand],
   );
 
-  const onPasswordOutcome = useCallback(
+  const onProtectedInputOutcome = useCallback(
     (toolCallId: string, output: ProtectedInputOutcome) => {
       hand({ tool: "await_protected_input", toolCallId, output });
     },
@@ -247,7 +247,7 @@ export function useAgentChat({ id, initialMessages, persist }: UseAgentChatOptio
     send,
     stop: () => void stop(),
     onApprovalOutcome,
-    onPasswordOutcome,
+    onProtectedInputOutcome,
     onCardSaved,
     onBuyerDetails,
     onPaymentChoice,

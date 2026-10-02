@@ -95,7 +95,7 @@ export const savedCardOutcomeSchema = z.object({
 });
 export type SavedCardOutcome = z.infer<typeof savedCardOutcomeSchema>;
 
-/** What `await_protected_input` hands back: whether the user gave the password. Never the password, never its id. */
+/** What `await_protected_input` hands back: whether the user answered. Never a secret, never its id. */
 export const protectedInputOutcomeSchema = z.object({
   status: z.enum(["submitted", "declined"]),
 });
@@ -176,20 +176,30 @@ export const checkoutOutcomeSchema = z.object({
     "cancelled",
     "awaiting_input",
     "awaiting_payment",
-    "awaiting_password",
+    "awaiting_protected_input",
   ]),
   updates: z.array(checkoutUpdateSchema),
   /** When the chat started and stopped following this stretch, ISO 8601: its card shows how long it took. */
   startedAt: z.string().optional(),
   endedAt: z.string().optional(),
-  /** On `awaiting_input`: what the store asks, and the JSON Schema the answer must fit. */
+  /**
+   * On `awaiting_input`: what the store asks, and the fields to answer, each
+   * by its key: text, a number, true or false, or a choice's option values.
+   */
   question: z
     .object({
       requestId: z.string(),
       question: z.string(),
       expiresAt: z.string().optional(),
-      responseSchema: z.record(z.string(), z.unknown()),
-      /** Set when the question asks for a password in a plain form, which is never answered with values. */
+      fields: z.array(
+        z.object({
+          key: z.string(),
+          label: z.string(),
+          required: z.boolean(),
+          input: z.record(z.string(), z.unknown()),
+        }),
+      ),
+      /** Set when the question asks for a password in a plain field, or card details in a form: never answered with values. */
       note: z.string().optional(),
     })
     .optional(),
@@ -208,14 +218,16 @@ export const checkoutOutcomeSchema = z.object({
     })
     .optional(),
   /**
-   * On `awaiting_password`: the store asks for the password of the user's
-   * account there. `requestId` is what await_protected_input takes. The
-   * password itself never reaches the chat.
+   * On `awaiting_protected_input`: the store asks for secrets, such as the
+   * password of the user's account there, named by label in `secrets`.
+   * `requestId` is what await_protected_input takes. The secrets never reach
+   * the chat.
    */
-  password: z
+  protectedInput: z
     .object({
       requestId: z.string(),
       question: z.string(),
+      secrets: z.array(z.string()),
       domain: z.string().optional(),
     })
     .optional(),
@@ -553,9 +565,9 @@ export function createChatTools(api: AgentCommerceClient, opts: { userEmail?: st
       outputSchema: savedCardOutcomeSchema,
     }),
 
-    // Client-side tool: no `execute`. The chat shows Crossmint's password
-    // field; the app answers the run with what it returns, and the model
-    // only hears whether the user did.
+    // Client-side tool: no `execute`. The chat shows the question with
+    // Crossmint's protected fields; the app answers the run with what they
+    // return, and the model only hears whether the user did.
     await_protected_input: tool({
       description: describeTool("await_protected_input"),
       inputSchema: z.object({
@@ -1088,8 +1100,9 @@ export function createChatTools(api: AgentCommerceClient, opts: { userEmail?: st
           .enum(["submit", "decline", "alternative"])
           .optional()
           .describe(paramDoc("answer_checkout", "action")),
+        // Plain answers only: a protected field is answered in the app, never by the model.
         values: z
-          .record(z.string(), z.unknown())
+          .record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.array(z.string())]))
           .optional()
           .describe(paramDoc("answer_checkout", "values")),
         text: z.string().max(20000).optional().describe(paramDoc("answer_checkout", "text")),

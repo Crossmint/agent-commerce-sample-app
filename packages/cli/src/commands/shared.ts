@@ -1,6 +1,6 @@
 import type { Command } from "commander";
 import type { Merchant, PendingUserAction, RenderedAction, RenderedField } from "@agent-commerce/core";
-import { asksPasswordInForm, renderPendingAction } from "@agent-commerce/core";
+import { asksPasswordInForm, isProtectedAction, renderPendingAction } from "@agent-commerce/core";
 import pc from "picocolors";
 import { AgentCommerceApi } from "../api.js";
 import { resolveConfig } from "../config.js";
@@ -78,10 +78,11 @@ export function parseJsonValues(raw: string): Record<string, unknown> {
 
 /** The action a checkout is waiting on, rendered. Prefers the server's `rendered`. */
 export function pendingAction(view: CheckoutView): RenderedAction | undefined {
-  if (view.rendered) return view.rendered;
-  // A password has no form: the user types it on the page passwordRequest links to.
+  // A form with secrets is never answered here, even though the server renders
+  // it for the app: the user types them on the page protectedRequest links to.
   const pending = view.pendingUserAction as PendingUserAction | undefined;
-  if (view.passwordRequest || pending?.protected) return undefined;
+  if (view.protectedRequest || (pending && isProtectedAction(pending))) return undefined;
+  if (view.rendered) return view.rendered;
   // Nor does a password asked for in a plain form: it is declined, never filled in.
   if (pending && asksPasswordInForm(pending)) return undefined;
   if (view.pendingUserAction)
@@ -93,10 +94,9 @@ export function pendingAction(view: CheckoutView): RenderedAction | undefined {
 export function describeAction(checkoutId: string, action: RenderedAction): string[] {
   const lines: string[] = [];
   lines.push(`${pc.yellow("Action needed:")} ${pc.bold(action.title)} ${pc.dim(`(${action.id})`)}`);
-  if (action.description) lines.push(`  ${action.description}`);
   if (action.expiresAt) lines.push(`  ${pc.dim("Expires:")} ${action.expiresAt}`);
   lines.push("");
-  for (const line of fieldLines(action.fields, "  ")) lines.push(line);
+  for (const line of fieldLines(action.fields)) lines.push(line);
   lines.push("");
   lines.push("Answer with:");
   lines.push(
@@ -106,30 +106,31 @@ export function describeAction(checkoutId: string, action: RenderedAction): stri
   return lines;
 }
 
-function fieldLines(fields: RenderedField[], indent: string): string[] {
-  const out: string[] = [];
-  for (const f of fields) {
+function fieldLines(fields: RenderedField[]): string[] {
+  return fields.map((f) => {
     const req = f.required ? pc.red("*") : " ";
-    let kind: string = f.kind;
-    if (f.kind === "select" && f.options)
-      kind = `one of: ${f.options.map((o) => JSON.stringify(o.value)).join(", ")}`;
-    const desc = f.description ? ` ${pc.dim(f.description)}` : "";
-    out.push(`${indent}${f.name}${req} ${pc.dim(`(${kind})`)} ${f.label}${desc}`);
-    if (f.children?.length) out.push(...fieldLines(f.children, `${indent}  `));
-  }
-  return out;
+    const options = f.options?.filter((o) => !o.disabled).map((o) => JSON.stringify(o.value));
+    let kind: string = f.kind === "number" && f.integer ? "whole number" : f.kind;
+    if (f.kind === "select" && options) kind = `one of: ${options.join(", ")}`;
+    if (f.kind === "multiselect" && options) {
+      const count =
+        f.max !== undefined ? `${f.min ?? 0} to ${f.max}` : f.min ? `at least ${f.min}` : "any";
+      kind = `list of ${count} of: ${options.join(", ")}`;
+    }
+    return `  ${f.name}${req} ${pc.dim(`(${kind})`)} ${f.label}`;
+  });
 }
 
 /** A `values` object with one placeholder per field. */
 export function valuesTemplate(fields: RenderedField[]): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   for (const f of fields) {
+    const firstOption = f.options?.find((o) => !o.disabled)?.value;
     if (f.default !== undefined) out[f.name] = f.default;
-    else if (f.kind === "object" && f.children) out[f.name] = valuesTemplate(f.children);
-    else if (f.kind === "select" && f.options?.[0]) out[f.name] = f.options[0].value;
+    else if (f.kind === "select" && firstOption !== undefined) out[f.name] = firstOption;
+    else if (f.kind === "multiselect") out[f.name] = [];
     else if (f.kind === "boolean") out[f.name] = false;
     else if (f.kind === "number") out[f.name] = 0;
-    else if (f.kind === "array") out[f.name] = [];
     else out[f.name] = "";
   }
   return out;

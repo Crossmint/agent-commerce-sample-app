@@ -168,10 +168,17 @@ interface CheckoutView {
     messageId?: string;
     question: string;
     expiresAt?: string;                  // answer before this or the run fails with input_expired
-    responseSchema: JsonSchema;
-    uiSchema?: object;
+    fields: CheckoutField[];             // core: { key, label, required, handling: "standard" | "protected", input }
   };
   rendered?: RenderedAction;             // from renderPendingAction, for UIs
+  protectedRequest?: {                   // the open form has protected fields; only the app answers it
+    requestId: string;
+    question: string;
+    fields: Array<{ key: string; label: string }>;  // the protected ones: "Password"
+    merchantDomain?: string;             // the checkout's store, from its start URL
+    expiresAt?: string;
+    url: string;                         // the checkout's page in the app, with the secure fields
+  };
   embedUrl?: string;                     // absolute URL for a view-only iframe of the agent's browser
   result?: { outcome; summary; code?; purchase? }; // on succeeded, blocked, cancelled
   receipt?: { total: { amount; currency }; merchantOrderId? }; // on succeeded, when captured
@@ -183,21 +190,24 @@ interface CheckoutView {
 
 `GET /v1/checkouts/:id` → `CheckoutView`. Poll it about every 1.5s; there are no webhooks.
 
-While polling, when the run reaches its **payment step** (a payment input request, `interaction.kind: "payment"`, stating the amount and the merchant's domain) the server never passes it on. It answers it with the id of an order intent (an agent card), as Agent Checkouts requires: `input_response` with `response: { kind: "payment", orderIntentId }`. No card number is ever sent; the checkout mints the credential itself. Which order intent depends on the checkout:
+While polling, when the run reaches its **payment step** (a payment input request, `interaction.kind: "payment"`, stating the amount and the merchant) the server never passes it on. It answers it with the id of an order intent (an agent card), as Agent Checkouts requires: `input_response` with `response: { kind: "payment", orderIntentId }`. No card number is ever sent; the checkout mints the credential itself. Which order intent depends on the checkout:
 
 - **With an `agentCardId`** (passed to `POST /v1/checkouts`, set with `POST /v1/checkouts/:id/agent-card`, or made earlier in this run): the server answers with it before returning. The view reports `running` while that is in flight.
 - **Without one**: the server creates an agent card request for the run as Agent Checkouts wants the order intent: the **exact amount** the payment request states, **no merchant** (the checkout binds the credential to the store itself), and an expiry of **two hours**. It returns it as `paymentRequest`, and the status stays `awaiting_input`. The user answers it through the ordinary `POST /v1/agent-card-requests/:id/approve`, or at `approvalUrl`; once the card is active, the next read answers the run with it. The request is reused on every read while it fits; when the run asks again after an answer (the card expired, was too small, or was cancelled), the server raises a fresh one and does not offer the card that failed.
+
+A form's fields are typed. Each has a `key`, a `label`, `required`, an `input` (`text`, `number`, `integer`, `boolean`, or `choice` of one or many options) and a `handling`. A `standard` field is answered with a plain value. A `protected` field holds a secret, such as the password of the user's account at the store or a one-time code. When a form has one, the view carries `protectedRequest`: show the user its `url`. On that page each secret is typed into Crossmint's protected field (`CrossmintProtectedInput` in `@crossmint/client-sdk-react-ui`). Crossmint stores it and returns `{ protectedInputId }`, and the page sends the whole form at once. An agent never answers such a form, and never asks for a secret; it may decline it or send an alternative.
 
 `POST /v1/checkouts/:id/messages` body, one of:
 
 ```json
 { "requestId": "…", "values": { "fullName": "Ada Lovelace" } }          // submit the form (action defaults to "submit")
+{ "requestId": "…", "values": { "email": "ada@example.com", "password": { "protectedInputId": "…" } } } // a form with a protected field
 { "requestId": "…", "action": "decline" }                               // refuse the request
 { "requestId": "…", "action": "alternative", "text": "cheapest shipping" }
 { "text": "prefer the blue one if the black is out" }                   // a note to the agent, no request
 ```
 
-Optional `messageId` (≤200 chars) makes a retry idempotent. → `CheckoutView`. If the `requestId` names a payment request: `409 payment_handled_by_server`. If it names a plain form that asks for card details, a submit fails with `409 card_in_form`: decline it or send an alternative. Only a payment request (`interaction.kind: "payment"`) is answered with an order intent, and only one with a live rail whose `credentialFormats` include `"card"`.
+`values` holds every field's answer, keyed by its `key`: a string, a number, `true` or `false`, a choice's option value, or a list of option values for a choice of many. A protected field takes only `{ "protectedInputId": "…" }`. Optional `messageId` (≤200 chars) makes a retry idempotent: when no reply came back, send the same answer with the same `messageId`. → `CheckoutView`. If a protected field is answered with a plain value, or a required one is missing: `409 protected_input_required`. If a standard field is answered with a protected input id: `409 not_a_protected_field`. If a standard text field looks like a password (masked, a password autocomplete, or a password name): `409 password_in_form`, and the view has no `rendered`; decline it or send an alternative. If the `requestId` names a payment request: `409 payment_handled_by_server`. If it names a plain form that asks for card details, a submit fails with `409 card_in_form`: decline it or send an alternative. Only a payment request (`interaction.kind: "payment"`) is answered with an order intent, and only one with a live rail whose `credentialFormats` include `"card"`.
 
 `GET /v1/checkouts/:id/messages?cursor&limit` → Crossmint's message list (progress, activity, input requests, result, and what was sent) as is. Its `streamCursor` is where the stream below picks up.
 

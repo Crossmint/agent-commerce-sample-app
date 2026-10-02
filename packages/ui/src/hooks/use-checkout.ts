@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import type { CheckoutFormAnswer } from "@agent-commerce/core";
 import type { CheckoutView } from "../api/types.js";
 import { useAgentCommerce } from "../provider.js";
 import { useResource, type Resource } from "./use-resource.js";
@@ -19,8 +20,8 @@ export interface UseCheckoutOptions {
 }
 
 export interface UseCheckoutResult extends Resource<CheckoutView> {
-  /** Submit form values for the open request. Replaces the local view with the server's response. */
-  submitAction: (requestId: string, values: Record<string, unknown>) => Promise<CheckoutView>;
+  /** Submit every field's answer for the open request. Replaces the local view with the server's response. */
+  submitAction: (requestId: string, values: Record<string, CheckoutFormAnswer>) => Promise<CheckoutView>;
   /** Refuse the open request. */
   decline: (requestId: string) => Promise<CheckoutView>;
   /** Stop the checkout. It reaches `cancelled` on a later poll. */
@@ -54,7 +55,7 @@ export function useCheckout(checkoutId: string | undefined, { poll = true, pollM
   );
 
   const submitAction = React.useCallback(
-    (requestId: string, values: Record<string, unknown>) => send(() => api.answerCheckout(checkoutId as string, { requestId, action: "submit", values })),
+    (requestId: string, values: Record<string, CheckoutFormAnswer>) => send(() => api.answerCheckout(checkoutId as string, { requestId, action: "submit", values })),
     [api, checkoutId, send],
   );
   const decline = React.useCallback(

@@ -19,14 +19,44 @@ describe("agent-commerce checkout", () => {
             id: "req_1",
             question: "Where should we ship this?",
             expiresAt: "2026-09-18T00:00:00.000Z",
-            responseSchema: {
-              type: "object",
-              required: ["fullName"],
-              properties: {
-                fullName: { type: "string" },
-                country: { type: "string", enum: ["US", "GB"] },
+            fields: [
+              {
+                key: "fullName",
+                label: "Full name",
+                required: true,
+                handling: "standard",
+                input: { kind: "text", autoComplete: "name" },
               },
-            },
+              {
+                key: "country",
+                label: "Country",
+                required: false,
+                handling: "standard",
+                input: {
+                  kind: "choice",
+                  selection: { kind: "one" },
+                  options: [
+                    { value: "US", label: "United States", disabled: false, selected: false, placeholder: false },
+                    { value: "GB", label: "United Kingdom", disabled: false, selected: false, placeholder: false },
+                  ],
+                },
+              },
+              {
+                key: "addOns",
+                label: "Add-ons",
+                required: false,
+                handling: "standard",
+                input: {
+                  kind: "choice",
+                  selection: { kind: "many", min: 0 },
+                  options: [
+                    { value: "wrap", label: "Gift wrap", disabled: false, selected: false, placeholder: false },
+                  ],
+                },
+              },
+              { key: "quantity", label: "Quantity", required: true, handling: "standard", input: { kind: "integer" } },
+              { key: "gift", label: "Gift", required: false, handling: "standard", input: { kind: "boolean" } },
+            ],
           },
         });
       },
@@ -61,8 +91,11 @@ describe("agent-commerce checkout", () => {
     const out = t.stdout.join("\n");
     expect(out).toContain("Action needed: Where should we ship this?");
     expect(out).toContain("fullName*");
+    expect(out).toContain('(one of: "US", "GB") Country');
+    expect(out).toContain('(list of any of: "wrap") Add-ons');
+    expect(out).toContain("(whole number) Quantity");
     expect(out).toContain(
-      `agent-commerce checkout answer run_1 req_1 --values '{"fullName":"","country":"US"}'`,
+      `agent-commerce checkout answer run_1 req_1 --values '{"fullName":"","country":"US","addOns":[],"quantity":0,"gift":false}'`,
     );
   });
 
@@ -128,7 +161,14 @@ describe("agent-commerce checkout", () => {
     expect(t2.stderr.join("\n")).toContain("input_expired");
   });
 
-  it("get stops at a password request with the page to open, never a question to answer", async () => {
+  it("get stops at a protected request with the page to open, never a form to answer", async () => {
+    const passwordField = {
+      key: "password",
+      label: "Password",
+      required: true,
+      handling: "protected",
+      input: { kind: "text", display: "masked", autoComplete: "current-password" },
+    };
     const { fetch } = fakeFetch({
       "GET /v1/checkouts/run_pw": () =>
         json({
@@ -136,13 +176,28 @@ describe("agent-commerce checkout", () => {
           status: "awaiting_input",
           pendingUserAction: {
             id: "req_pw",
-            question: "Enter your password for shop.example to sign in.",
-            responseSchema: {},
-            protected: { purpose: "password", merchant: { domain: "shop.example" } },
+            question: "Sign in to shop.example to continue.",
+            fields: [passwordField],
           },
-          passwordRequest: {
+          // The server renders the form for the app's own page, protected field included.
+          rendered: {
+            id: "req_pw",
+            type: "input_response",
+            title: "Sign in to shop.example to continue.",
+            fields: [
+              {
+                name: "password",
+                label: "Password",
+                kind: "protected",
+                required: true,
+                protectedField: passwordField,
+              },
+            ],
+          },
+          protectedRequest: {
             requestId: "req_pw",
-            question: "Enter your password for shop.example to sign in.",
+            question: "Sign in to shop.example to continue.",
+            fields: [{ key: "password", label: "Password" }],
             merchantDomain: "shop.example",
             url: "https://wallet.test/checkouts/run_pw",
           },
@@ -153,14 +208,18 @@ describe("agent-commerce checkout", () => {
       EXIT.NEEDS_USER_ACTION,
     );
     const out = t.stdout.join("\n");
-    expect(out).toContain("Password needed.");
+    expect(out).toContain("Secure input needed.");
+    expect(out).toContain("shop.example asks for Password.");
     expect(out).toContain("https://wallet.test/checkouts/run_pw");
     expect(out).not.toContain("Action needed");
+    expect(out).not.toContain("--values");
     const t2 = testContext({ fetch });
     expect(await runCli(["checkout", "get", "run_pw", "--json"], t2.overrides)).toBe(
       EXIT.NEEDS_USER_ACTION,
     );
-    expect(JSON.parse(t2.stderr.join("\n"))).toMatchObject({ error: { code: "password_needed" } });
+    const error = JSON.parse(t2.stderr.join("\n")) as { error: { code: string; message: string } };
+    expect(error.error.code).toBe("protected_input_needed");
+    expect(error.error.message).toContain("https://wallet.test/checkouts/run_pw");
   });
 
   it("cancel posts to the cancel route", async () => {
