@@ -5,6 +5,7 @@ import {
   isReadyForAgent,
   needsCvcRecollection,
   pendingVerificationRails,
+  toDecimalString,
   withAgentRails,
 } from "@agent-commerce/core";
 import { parseBody, requireUser, type Ctx, resolveEmail } from "../context.js";
@@ -117,7 +118,12 @@ export async function approveRequest(req: Request, ctx: Ctx, params: Params): Pr
   try {
     agentCard = await ctx.crossmint.orderIntents.create(jwt, {
       paymentMethodId: body.paymentMethodId,
-      amount: request.amount,
+      // Stored amounts from before per-currency validation may still carry
+      // extra decimals; the order intent wants the currency's own precision.
+      amount: {
+        value: toDecimalString(request.amount.value, request.amount.currency),
+        currency: request.amount.currency.toUpperCase(),
+      },
       description: request.description,
       expiresAt: request.expiresAt,
       ...(request.merchant ? { merchant: request.merchant } : {}),

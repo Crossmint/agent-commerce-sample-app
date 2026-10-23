@@ -59,7 +59,7 @@ interface AnswerOptions extends WaitOptions {
 export function buildCheckoutBody(opts: CreateOptions): CreateCheckoutBody {
   const body: CreateCheckoutBody = {
     startUrl: opts.url,
-    maxCost: { amount: toDecimalString(opts.maxCost), currency: opts.currency.toUpperCase() },
+    maxCost: { amount: toDecimalString(opts.maxCost, opts.currency), currency: opts.currency.toUpperCase() },
   };
   if (opts.agentCard) body.agentCardId = opts.agentCard;
   const task = opts.task ?? opts.request;

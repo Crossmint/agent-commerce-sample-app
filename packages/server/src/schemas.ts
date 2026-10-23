@@ -1,9 +1,43 @@
 import { z } from "zod";
+import { currencyFractionDigits } from "@agent-commerce/core";
 
-export const amountSchema = z.object({
-  value: z.string().regex(/^\d+(\.\d{1,2})?$/, 'Use a decimal string like "50.00"'),
-  currency: z.string().length(3),
-});
+/**
+ * The decimals in an amount's `value` must not exceed what its `currency`
+ * allows — Crossmint rejects "10000.00" CLP outright, so a bad amount is a
+ * 400 here rather than a 502 there. An unknown currency is rejected too.
+ */
+function checkCurrencyDecimals(
+  amount: { value: string; currency: string },
+  ctx: z.RefinementCtx,
+  valueKey = "value",
+): void {
+  let allowed: number;
+  try {
+    allowed = currencyFractionDigits(amount.currency);
+  } catch {
+    ctx.addIssue({
+      code: "custom",
+      path: ["currency"],
+      message: `Unknown currency: ${amount.currency}`,
+    });
+    return;
+  }
+  const used = (amount.value.split(".")[1] ?? "").length;
+  if (used > allowed) {
+    ctx.addIssue({
+      code: "custom",
+      path: [valueKey],
+      message: `${amount.currency.toUpperCase()} amounts support at most ${allowed} decimal places`,
+    });
+  }
+}
+
+export const amountSchema = z
+  .object({
+    value: z.string().regex(/^\d+(\.\d{1,8})?$/, 'Use a decimal string like "50.00"'),
+    currency: z.string().length(3),
+  })
+  .superRefine((amount, ctx) => checkCurrencyDecimals(amount, ctx));
 
 export const merchantSchema = z.object({
   name: z.string().min(1),
@@ -43,7 +77,7 @@ export const credentialsSchema = z.object({
   format: z.literal("card").optional(),
 });
 
-const decimalAmount = z.string().regex(/^\d+(\.\d{1,6})?$/);
+const decimalAmount = z.string().regex(/^\d+(\.\d{1,8})?$/);
 
 /**
  * Body of POST /v1/checkouts. `startUrl` and `task` mirror Crossmint's
@@ -68,6 +102,9 @@ export const createCheckoutSchema = z
         amount: decimalAmount,
         currency: z.string().length(3),
       })
+      .superRefine((cost, ctx) =>
+        checkCurrencyDecimals({ value: cost.amount, currency: cost.currency }, ctx, "amount"),
+      )
       .optional(),
     /** The store's currency, for the default ceiling when there is no maxCost and no agent card. */
     currency: z.string().length(3).optional(),

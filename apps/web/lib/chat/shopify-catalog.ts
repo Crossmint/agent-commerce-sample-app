@@ -1,3 +1,4 @@
+import { currencyFractionDigits } from "@agent-commerce/core";
 import { serverEnv } from "@/lib/env";
 
 /**
@@ -142,7 +143,7 @@ function toFound(p: CatalogProduct): FoundProduct | undefined {
             about.length > 280 ? `${about.slice(0, 277).replace(/\s+\S*$/, "")}…` : about,
         }
       : {}),
-    ...(money ? { price: `${(money.amount / 100).toFixed(2)} ${money.currency}` } : {}),
+    ...(money ? { price: catalogPrice(money) } : {}),
     store: cheapest.seller?.name ?? hostOf(cheapest.url),
     url: cleanUrl(cheapest.url),
     ...(p.rating?.value
@@ -163,6 +164,21 @@ function toFound(p: CatalogProduct): FoundProduct | undefined {
         }
       : {}),
   };
+}
+
+/**
+ * The catalog states prices in minor units (the search filter takes cents
+ * too), so "599" is "$5.99" and "1000" in JPY is "¥1000". The divisor is the
+ * currency's own factor, not always 100.
+ */
+function catalogPrice(money: Money): string {
+  let decimals = 2;
+  try {
+    decimals = currencyFractionDigits(money.currency);
+  } catch {
+    // An unknown code still gets shown, in the shape most currencies use.
+  }
+  return `${(money.amount / 10 ** decimals).toFixed(decimals)} ${money.currency}`;
 }
 
 /**

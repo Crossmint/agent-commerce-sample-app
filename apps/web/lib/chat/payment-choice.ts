@@ -12,6 +12,8 @@
  *   their Shop account when the store asks.
  * - other: any other way the store takes, in the user's words.
  */
+import { toDecimalString } from "@agent-commerce/core";
+
 export const PAYMENT_CHOICE_METHODS = ["agent_card", "card", "shop_pay", "other"] as const;
 export type PaymentChoiceMethod = (typeof PAYMENT_CHOICE_METHODS)[number];
 
@@ -30,7 +32,7 @@ export function budgetFor(price: { amount: string; currency: string }): Money | 
   const amount = Number.parseFloat(price.amount);
   if (!Number.isFinite(amount) || amount <= 0) return undefined;
   const value = Math.ceil(amount + Math.max(amount * 0.25, 10));
-  return { value: value.toFixed(2), currency: price.currency.toUpperCase() };
+  return { value: toDecimalString(value, price.currency), currency: price.currency.toUpperCase() };
 }
 
 /** "35.99 USD", as the catalog writes a price, as an amount and a currency. */

@@ -239,6 +239,55 @@ describe("agent card requests", () => {
     expect(polled.status).toBe("active");
   });
 
+  it("rejects an amount with more decimals than its currency allows", async () => {
+    const { handlers } = makeServer();
+    const res = await call(handlers, "POST", "/v1/agent-card-requests", {
+      body: { ...requestBody, amount: { value: "10000.5", currency: "CLP" } },
+    });
+    expect(res.status).toBe(400);
+    expect((await res.json()).error.code).toBe("invalid_request");
+  });
+
+  it("approve sends a zero-decimal currency without decimals", async () => {
+    const { handlers, store, calls } = makeServer([
+      {
+        method: "PUT",
+        path: "/order-intent-registration",
+        reply: {
+          body: {
+            paymentMethodId: "pm_1",
+            rails: [{ rail: "agentic-token", provider: "vic", status: "enabled" }],
+          },
+        },
+      },
+      {
+        method: "POST",
+        path: "/unstable/order-intents",
+        reply: { status: 201, body: activeOrderIntent() },
+      },
+    ]);
+    // A request stored before per-currency validation kept its padded
+    // decimals; the order intent still goes out in the currency's own.
+    await store.create({
+      id: "acr_clp",
+      userId: "user-test-1",
+      requester: "Claude Code",
+      amount: { value: "10000.00", currency: "CLP" },
+      description: "Mercado Libre order",
+      expiresAt: "2099-01-01T00:00:00.000Z",
+      requestExpiresAt: "2099-01-01T00:00:00.000Z",
+      status: "pending",
+      approvalUrl: "https://wallet.test/approve/acr_clp",
+    });
+
+    const res = await call(handlers, "POST", "/v1/agent-card-requests/acr_clp/approve", {
+      body: { paymentMethodId: "pm_1" },
+    });
+    expect(res.status).toBe(200);
+    const create = findCall(calls, "POST", "/unstable/order-intents")!;
+    expect(create.body).toMatchObject({ amount: { value: "10000", currency: "CLP" } });
+  });
+
   it("approve stays approved when the rail needs verification, then verified flips it", async () => {
     const pending = activeOrderIntent({
       rails: [{ rail: "agentic-token", provider: "vic", status: "pending_verification" }],
