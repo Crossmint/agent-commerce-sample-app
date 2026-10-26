@@ -280,7 +280,7 @@ describe("agent card requests", () => {
       body: { paymentMethodId: "pm_1" },
     });
     expect(res.status).toBe(400);
-    expect((await res.json()).error.code).toBe("invalid_amount");
+    expect((await res.json()).error.code).toBe("invalid_request");
     expect(findCall(calls, "POST", "/unstable/order-intents")).toBeUndefined();
   });
 

@@ -105,9 +105,7 @@ export async function approveRequest(req: Request, ctx: Ctx, params: Params): Pr
       currency: request.amount.currency.toUpperCase(),
     };
   } catch (e) {
-    throw new HttpError(
-      400,
-      "invalid_amount",
+    throw invalidRequest(
       `This request's amount is not usable: ${e instanceof Error ? e.message : e}`,
     );
   }
