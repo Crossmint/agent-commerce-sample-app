@@ -67,6 +67,15 @@ describe("toDecimalString", () => {
     expect(() => toDecimalString("1.234", "USD")).toThrow(/more decimals/);
   });
 
+  it("throws on a fractional unit at any magnitude", () => {
+    expect(() => toDecimalString("500000000.5", "CLP")).toThrow(/more decimals/);
+    expect(() => toDecimalString(500000000.5, "CLP")).toThrow(/more decimals/);
+  });
+
+  it("accepts float dust from number arithmetic", () => {
+    expect(toDecimalString(0.1 + 0.2, "USD")).toBe("0.30");
+  });
+
   it("throws on an unknown currency", () => {
     expect(() => toDecimalString(10, "ZZZ")).toThrow(/Unknown currency/);
   });

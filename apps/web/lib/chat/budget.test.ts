@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { budgetAmounts, parseBudgetAmount } from "./budget";
-import { budgetFor } from "./payment-choice";
+import { budgetFor, parsePrice } from "./payment-choice";
 
 describe("budgetAmounts", () => {
   it("formats each option with the currency's decimals", () => {
@@ -58,6 +58,15 @@ describe("parseBudgetAmount", () => {
     expect(parseBudgetAmount("75", "USD")).toEqual({
       amount: { value: "75.00", currency: "USD" },
     });
+  });
+});
+
+describe("parsePrice", () => {
+  it("parses catalog prices with up to four decimals", () => {
+    expect(parsePrice("35.99 USD")).toEqual({ amount: "35.99", currency: "USD" });
+    expect(parsePrice("1.250 KWD")).toEqual({ amount: "1.250", currency: "KWD" });
+    expect(parsePrice("1.2345 CLF")).toEqual({ amount: "1.2345", currency: "CLF" });
+    expect(parsePrice("1.23456 CLF")).toBeUndefined();
   });
 });
 

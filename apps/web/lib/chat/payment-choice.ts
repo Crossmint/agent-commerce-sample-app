@@ -40,6 +40,6 @@ export function budgetFor(price: { amount: string; currency: string }): Money | 
 export function parsePrice(
   text: string | undefined,
 ): { amount: string; currency: string } | undefined {
-  const match = text?.trim().match(/^(\d+(?:\.\d{1,3})?)\s+([A-Za-z]{3})$/);
+  const match = text?.trim().match(/^(\d+(?:\.\d{1,4})?)\s+([A-Za-z]{3})$/);
   return match ? { amount: match[1]!, currency: match[2]!.toUpperCase() } : undefined;
 }

@@ -77,12 +77,15 @@ export function toDecimalString(input: string | number, currency: string): strin
   if (!Number.isFinite(n) || n < 0) throw new Error(`Invalid amount: ${input}`);
   const digits = currencyFractionDigits(currency);
   const rounded = Number(n.toFixed(digits));
-  // Float dust (0.1 + 0.2) is not a real extra decimal; a genuine digit past
-  // the currency's decimals is, and throws rather than silently rounding.
-  if (
-    significantDecimals(cleaned) > digits &&
-    Math.abs(n - rounded) > 1e-9 * Math.max(1, Math.abs(n))
-  ) {
+  const excess =
+    typeof input === "string"
+      ? // A written-out amount states its decimals exactly; trailing zeros
+        // don't count, any other digit past the currency's does.
+        significantDecimals(cleaned) > digits
+      : // A number only carries float dust (0.1 + 0.2); compare within a few
+        // ulps so real fractions throw at any magnitude.
+        Math.abs(n - rounded) > Number.EPSILON * Math.max(1, Math.abs(n)) * 8;
+  if (excess) {
     throw new Error(`Invalid amount: ${input} has more decimals than ${currency} allows`);
   }
   return rounded.toFixed(digits);
