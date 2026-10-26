@@ -117,7 +117,7 @@ export function registerAgentCommerceTools(
     guard(async (args) => {
       const req = await api.createAgentCardRequest({
         amount: {
-          value: toDecimalString(args.amount),
+          value: toDecimalString(args.amount, args.currency ?? "USD"),
           currency: (args.currency ?? "USD").toUpperCase(),
         },
         description: args.description,
@@ -211,7 +211,7 @@ export function registerAgentCommerceTools(
       if (args.amount !== undefined) {
         const currency =
           args.currency ?? (await api.getAgentCard(args.agentCardId)).amount.currency;
-        amount = { value: toDecimalString(args.amount), currency: currency.toUpperCase() };
+        amount = { value: toDecimalString(args.amount, currency), currency: currency.toUpperCase() };
       }
       const cred = await api.mintCredential(args.agentCardId, {
         amount,
@@ -283,7 +283,7 @@ export function registerAgentCommerceTools(
           ? {}
           : {
               maxCost: {
-                amount: toDecimalString(args.maxCost),
+                amount: toDecimalString(args.maxCost, args.currency ?? "USD"),
                 currency: (args.currency ?? "USD").toUpperCase(),
               },
             }),

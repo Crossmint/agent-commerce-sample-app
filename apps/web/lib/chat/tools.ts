@@ -69,8 +69,10 @@ type ChatTools = Record<ToolNameFor<"chat">, unknown>;
 const amountSchema = z.object({
   value: z
     .string()
-    .regex(/^\d+(\.\d{1,2})?$/, 'Decimal string like "50.00"')
-    .describe('Decimal string, e.g. "50.00".'),
+    .regex(/^\d+(\.\d{1,4})?$/, 'Decimal string like "50.00"')
+    .describe(
+      'Decimal string with the currency\'s decimals, e.g. "50.00" USD, "500" JPY, "1.250" KWD.',
+    ),
   currency: z.string().length(3).describe(PARAM_DOCS.currency),
 });
 
@@ -415,7 +417,6 @@ function budgetPlanFor(messages: ModelMessage[]): { agentCardId?: string } | und
   return plan;
 }
 
-
 /**
  * How the user chose to pay for the store a checkout starts at, as the chat
  * settled it: the newest payment choice for that store, and what happened
@@ -603,7 +604,7 @@ export function createChatTools(api: AgentCommerceClient, opts: { userEmail?: st
           .object({
             amount: z
               .string()
-              .regex(/^\d+(\.\d{1,2})?$/)
+              .regex(/^\d+(\.\d{1,4})?$/)
               .describe('Decimal string, e.g. "35.99".'),
             currency: z.string().length(3).describe(PARAM_DOCS.currency),
           })
@@ -626,7 +627,12 @@ export function createChatTools(api: AgentCommerceClient, opts: { userEmail?: st
       inputSchema: z.object({
         category: z.string().min(1).max(60).describe(paramDoc("await_budget", "category")),
         amount: amountSchema.optional().describe(paramDoc("await_budget", "amount")),
-        purchase: z.string().min(1).max(80).optional().describe(paramDoc("await_budget", "purchase")),
+        purchase: z
+          .string()
+          .min(1)
+          .max(80)
+          .optional()
+          .describe(paramDoc("await_budget", "purchase")),
       }),
       outputSchema: budgetOutcomeSchema,
     }),
@@ -717,7 +723,7 @@ export function createChatTools(api: AgentCommerceClient, opts: { userEmail?: st
           .object({
             amount: z
               .string()
-              .regex(/^\d+(\.\d{1,2})?$/)
+              .regex(/^\d+(\.\d{1,4})?$/)
               .describe('Decimal string, e.g. "50.00".'),
             currency: z.string().length(3).describe(PARAM_DOCS.currency),
           })
@@ -879,6 +885,7 @@ export function createChatTools(api: AgentCommerceClient, opts: { userEmail?: st
           .positive()
           .optional()
           .describe(paramDoc("search_products", "maxPrice")),
+        currency: z.string().length(3).optional().describe(paramDoc("search_products", "currency")),
         shipsTo: z.string().length(2).optional().describe(paramDoc("search_products", "shipsTo")),
       }),
       execute: (input) =>
@@ -947,7 +954,7 @@ export function createChatTools(api: AgentCommerceClient, opts: { userEmail?: st
               label: z.string().min(1).max(60),
               amount: z
                 .string()
-                .regex(/^\d+(\.\d{1,2})?$/)
+                .regex(/^\d+(\.\d{1,4})?$/)
                 .optional()
                 .describe(paramDoc("show_receipt", "itemAmount")),
             }),

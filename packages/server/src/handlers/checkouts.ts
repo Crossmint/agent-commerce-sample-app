@@ -6,6 +6,7 @@ import {
   buyerProfileProblems,
   canPayAtCheckout,
   CrossmintApiError,
+  currencyFractionDigits,
   declineResponse,
   expiresInHours,
   isPaymentRequest,
@@ -207,7 +208,15 @@ async function runCeiling(
   } catch {
     return fallback;
   }
-  const available = Math.floor(Number.parseFloat(card.amount.available) * 100) / 100;
+  const currency = card.amount.currency.toUpperCase();
+  let decimals: number;
+  try {
+    decimals = currencyFractionDigits(currency);
+  } catch {
+    return fallback;
+  }
+  const factor = 10 ** decimals;
+  const available = Math.floor(Number.parseFloat(card.amount.available) * factor) / factor;
   if (!(available > 0)) {
     throw new HttpError(
       409,
@@ -216,12 +225,11 @@ async function runCeiling(
       { agentCardId: body.agentCardId },
     );
   }
-  const currency = card.amount.currency.toUpperCase();
   const limit =
     body.maxCost && body.maxCost.currency.toUpperCase() === currency
       ? Number.parseFloat(body.maxCost.amount)
       : Number.POSITIVE_INFINITY;
-  return { amount: Math.min(available, limit).toFixed(2), currency };
+  return { amount: Math.min(available, limit).toFixed(decimals), currency };
 }
 
 /** GET /v1/checkouts/:id */

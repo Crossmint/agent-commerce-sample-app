@@ -148,7 +148,12 @@ describe("agent card requests", () => {
           body: {
             paymentMethodId: "pm_1",
             rails: [
-              { rail: "agentic-token", provider: "vic", status: "error", error: { code: "CARD_NOT_ELIGIBLE" } },
+              {
+                rail: "agentic-token",
+                provider: "vic",
+                status: "error",
+                error: { code: "CARD_NOT_ELIGIBLE" },
+              },
             ],
           },
         },
@@ -237,6 +242,86 @@ describe("agent card requests", () => {
       await call(handlers, "GET", `/v1/agent-card-requests/${created.id}`)
     ).json();
     expect(polled.status).toBe("active");
+  });
+
+  it("rejects an amount with more decimals than its currency allows", async () => {
+    const { handlers } = makeServer();
+    const res = await call(handlers, "POST", "/v1/agent-card-requests", {
+      body: { ...requestBody, amount: { value: "10000.5", currency: "CLP" } },
+    });
+    expect(res.status).toBe(400);
+    expect((await res.json()).error.code).toBe("invalid_request");
+  });
+
+  it("accepts a zero-padded amount for a zero-decimal currency", async () => {
+    const { handlers } = makeServer();
+    const res = await call(handlers, "POST", "/v1/agent-card-requests", {
+      body: { ...requestBody, amount: { value: "10000.00", currency: "CLP" } },
+    });
+    expect(res.status).toBe(201);
+  });
+
+  it("approve rejects an unusable stored amount before touching Crossmint", async () => {
+    const { handlers, store, calls } = makeServer();
+    await store.create({
+      id: "acr_bad",
+      userId: "user-test-1",
+      requester: "Claude Code",
+      amount: { value: "10000.50", currency: "CLP" },
+      description: "Mercado Libre order",
+      expiresAt: "2099-01-01T00:00:00.000Z",
+      requestExpiresAt: "2099-01-01T00:00:00.000Z",
+      status: "approved",
+      agentCardId: "oi_prev",
+      approvalUrl: "https://wallet.test/approve/acr_bad",
+    });
+
+    const res = await call(handlers, "POST", "/v1/agent-card-requests/acr_bad/approve", {
+      body: { paymentMethodId: "pm_1" },
+    });
+    expect(res.status).toBe(400);
+    expect((await res.json()).error.code).toBe("invalid_request");
+    expect(findCall(calls, "POST", "/unstable/order-intents")).toBeUndefined();
+  });
+
+  it("approve sends a zero-decimal currency without decimals", async () => {
+    const { handlers, store, calls } = makeServer([
+      {
+        method: "PUT",
+        path: "/order-intent-registration",
+        reply: {
+          body: {
+            paymentMethodId: "pm_1",
+            rails: [{ rail: "agentic-token", provider: "vic", status: "enabled" }],
+          },
+        },
+      },
+      {
+        method: "POST",
+        path: "/unstable/order-intents",
+        reply: { status: 201, body: activeOrderIntent() },
+      },
+    ]);
+    // A request stored before per-currency validation kept its padded
+    // decimals; the order intent still goes out in the currency's own.
+    await store.create({
+      id: "acr_clp",
+      userId: "user-test-1",
+      requester: "Claude Code",
+      amount: { value: "10000.00", currency: "CLP" },
+      description: "Mercado Libre order",
+      expiresAt: "2099-01-01T00:00:00.000Z",
+      requestExpiresAt: "2099-01-01T00:00:00.000Z",
+      status: "pending",
+      approvalUrl: "https://wallet.test/approve/acr_clp",
+    });
+
+    const res = await call(handlers, "POST", "/v1/agent-card-requests/acr_clp/approve", {
+      body: { paymentMethodId: "pm_1" },
+    });
+    expect(res.status).toBe(200);
+    const create = findCall(calls, "POST", "/unstable/order-intents")!;
+    expect(create.body).toMatchObject({ amount: { value: "10000", currency: "CLP" } });
   });
 
   it("approve stays approved when the rail needs verification, then verified flips it", async () => {
@@ -543,7 +628,12 @@ describe("POST /v1/agent-cards/:id/credentials", () => {
         reply: {
           body: activeOrderIntent({
             rails: [
-              { rail: "agentic-token", provider: "vic", status: "active", credentialFormats: ["card"] },
+              {
+                rail: "agentic-token",
+                provider: "vic",
+                status: "active",
+                credentialFormats: ["card"],
+              },
               { rail: "encrypted-card", status: "pending_cvc_recollection" },
             ],
           }),
@@ -785,7 +875,13 @@ describe("checkouts", () => {
       {
         method: "GET",
         path: "/unstable/agent-checkouts/run_named",
-        reply: { body: run({ runId: "run_named", status: "awaiting_input", requiredAction: paymentRequest }) },
+        reply: {
+          body: run({
+            runId: "run_named",
+            status: "awaiting_input",
+            requiredAction: paymentRequest,
+          }),
+        },
       },
     ]);
     await call(handlers, "POST", "/v1/checkouts", {
@@ -1000,9 +1096,11 @@ describe("checkouts", () => {
       },
     });
     const sentCeiling = (calls: FakeCall[]) =>
-      (findCall(calls, "POST", /\/unstable\/agent-checkouts$/)!.body as {
-        constraints: { maxCost: unknown };
-      }).constraints.maxCost;
+      (
+        findCall(calls, "POST", /\/unstable\/agent-checkouts$/)!.body as {
+          constraints: { maxCost: unknown };
+        }
+      ).constraints.maxCost;
 
     it("is what the agent card has left, not a higher limit", async () => {
       const { handlers, calls } = makeServer([createRoute, card("42.50")]);
@@ -1227,7 +1325,9 @@ describe("checkouts", () => {
         method: "GET",
         path: "/unstable/agent-checkouts/run_mine",
         once: true,
-        reply: { body: run({ runId: "run_mine", status: "awaiting_input", requiredAction: payStep }) },
+        reply: {
+          body: run({ runId: "run_mine", status: "awaiting_input", requiredAction: payStep }),
+        },
       },
       { method: "GET", path: "/unstable/order-intents/oi_1", reply: { body: activeOrderIntent() } },
       {
@@ -1254,13 +1354,24 @@ describe("checkouts", () => {
       body: { agentCardId: "oi_1" },
     });
     expect(res.status).toBe(200);
-    expect(await res.json()).toMatchObject({ id: "run_mine", status: "running", agentCardId: "oi_1" });
+    expect(await res.json()).toMatchObject({
+      id: "run_mine",
+      status: "running",
+      agentCardId: "oi_1",
+    });
     expect(calls.some((c) => c.path.endsWith("/credentials"))).toBe(false);
     expect(findCall(calls, "POST", "/run_mine/messages")!.body).toMatchObject(
       paidWith("oi_1", "req_pay_existing"),
     );
     // No new agent card request: the user chose a card they had.
-    expect(calls.some((c) => c.method === "POST" && c.path.includes("order-intents") && !c.path.endsWith("/credentials"))).toBe(false);
+    expect(
+      calls.some(
+        (c) =>
+          c.method === "POST" &&
+          c.path.includes("order-intents") &&
+          !c.path.endsWith("/credentials"),
+      ),
+    ).toBe(false);
     vi.restoreAllMocks();
   });
 
@@ -1279,7 +1390,9 @@ describe("checkouts", () => {
         method: "GET",
         path: "/unstable/agent-checkouts/run_retry",
         once: true,
-        reply: { body: run({ runId: "run_retry", status: "awaiting_input", requiredAction: first }) },
+        reply: {
+          body: run({ runId: "run_retry", status: "awaiting_input", requiredAction: first }),
+        },
       },
       { method: "GET", path: "/unstable/order-intents/oi_1", reply: { body: activeOrderIntent() } },
       {
@@ -1290,13 +1403,17 @@ describe("checkouts", () => {
       {
         method: "GET",
         path: "/unstable/agent-checkouts/run_retry",
-        reply: { body: run({ runId: "run_retry", status: "awaiting_input", requiredAction: again }) },
+        reply: {
+          body: run({ runId: "run_retry", status: "awaiting_input", requiredAction: again }),
+        },
       },
     ]);
     await call(handlers, "POST", "/v1/checkouts", {
       body: { startUrl: "https://shop.example/p/1", maxCost: { amount: "30.00", currency: "USD" } },
     });
-    await call(handlers, "POST", "/v1/checkouts/run_retry/agent-card", { body: { agentCardId: "oi_1" } });
+    await call(handlers, "POST", "/v1/checkouts/run_retry/agent-card", {
+      body: { agentCardId: "oi_1" },
+    });
     expect(calls.filter((c) => c.path.endsWith("/run_retry/messages"))).toHaveLength(1);
 
     const view = await (await call(handlers, "GET", "/v1/checkouts/run_retry")).json();
@@ -1330,7 +1447,9 @@ describe("checkouts", () => {
         method: "GET",
         path: "/unstable/agent-checkouts/run_note",
         once: true,
-        reply: { body: run({ runId: "run_note", status: "awaiting_input", requiredAction: question }) },
+        reply: {
+          body: run({ runId: "run_note", status: "awaiting_input", requiredAction: question }),
+        },
       },
       {
         method: "POST",
@@ -1352,7 +1471,14 @@ describe("checkouts", () => {
     expect(res.status).toBe(200);
     const sent = calls.filter((c) => c.method === "POST" && c.path.endsWith("/run_note/messages"));
     expect(sent.map((c) => (c.body as { parts: unknown[] }).parts)).toEqual([
-      [{ type: "input_response", requestId: "req_size", action: "submit", response: { kind: "form", answers: { size: "M" } } }],
+      [
+        {
+          type: "input_response",
+          requestId: "req_size",
+          action: "submit",
+          response: { kind: "form", answers: { size: "M" } },
+        },
+      ],
       [{ type: "text", text: "Gift wrap it, please" }],
     ]);
   });
@@ -1375,7 +1501,13 @@ describe("checkouts", () => {
         reply: {
           body: activeOrderIntent({
             orderIntentId: "oi_spent",
-            amount: { currency: "USD", total: "50.00", available: "0.00", reserved: "0.00", spent: "50.00" },
+            amount: {
+              currency: "USD",
+              total: "50.00",
+              available: "0.00",
+              reserved: "0.00",
+              spent: "50.00",
+            },
           }),
         },
       },
@@ -1532,7 +1664,10 @@ describe("checkouts", () => {
     ]);
     // The form renders with the protected field's descriptor, for Crossmint's field.
     const view = await (await call(handlers, "GET", "/v1/checkouts/run_pw")).json();
-    expect(view.rendered.fields.map((f: { kind: string }) => f.kind)).toEqual(["text", "protected"]);
+    expect(view.rendered.fields.map((f: { kind: string }) => f.kind)).toEqual([
+      "text",
+      "protected",
+    ]);
     expect(view.rendered.fields[1].protectedField).toEqual(password);
     // Where the user answers it, for a caller that cannot show the field itself.
     expect(view.protectedRequest).toEqual({
@@ -1552,7 +1687,9 @@ describe("checkouts", () => {
       expect(refused.status).toBe(409);
       expect((await refused.json()).error.code).toBe("protected_input_required");
     }
-    expect(calls.some((c) => c.method === "POST" && c.path.endsWith("/run_pw/messages"))).toBe(false);
+    expect(calls.some((c) => c.method === "POST" && c.path.endsWith("/run_pw/messages"))).toBe(
+      false,
+    );
 
     // A protected input id on a standard field is refused too.
     const misplaced = await call(handlers, "POST", "/v1/checkouts/run_pw/messages", {
@@ -1563,7 +1700,9 @@ describe("checkouts", () => {
     });
     expect(misplaced.status).toBe(409);
     expect((await misplaced.json()).error.code).toBe("not_a_protected_field");
-    expect(calls.some((c) => c.method === "POST" && c.path.endsWith("/run_pw/messages"))).toBe(false);
+    expect(calls.some((c) => c.method === "POST" && c.path.endsWith("/run_pw/messages"))).toBe(
+      false,
+    );
 
     const reply = await call(handlers, "POST", "/v1/checkouts/run_pw/messages", {
       body: {
@@ -1581,7 +1720,10 @@ describe("checkouts", () => {
           type: "input_response",
           requestId: "req_pw",
           action: "submit",
-          response: { kind: "form", answers: { email: "a@b.co", password: { protectedInputId: "pi_1" } } },
+          response: {
+            kind: "form",
+            answers: { email: "a@b.co", password: { protectedInputId: "pi_1" } },
+          },
         },
       ],
     });
@@ -1604,7 +1746,9 @@ describe("checkouts", () => {
       {
         method: "GET",
         path: "/unstable/agent-checkouts/run_pwf",
-        reply: { body: run({ runId: "run_pwf", status: "awaiting_input", requiredAction: passwordForm }) },
+        reply: {
+          body: run({ runId: "run_pwf", status: "awaiting_input", requiredAction: passwordForm }),
+        },
       },
     ]);
     const view = await (await call(handlers, "GET", "/v1/checkouts/run_pwf")).json();
@@ -1616,7 +1760,9 @@ describe("checkouts", () => {
     });
     expect(res.status).toBe(409);
     expect((await res.json()).error.code).toBe("password_in_form");
-    expect(calls.some((c) => c.method === "POST" && c.path.endsWith("/run_pwf/messages"))).toBe(false);
+    expect(calls.some((c) => c.method === "POST" && c.path.endsWith("/run_pwf/messages"))).toBe(
+      false,
+    );
   });
 
   it("refuses card fields from callers and maps blocked runs to a failure", async () => {
@@ -1663,8 +1809,15 @@ describe("checkouts", () => {
 
 describe("sticky browser sessions", () => {
   const created = { status: 202, body: { runId: "run_1", status: "queued" } };
-  const createRoute = { method: "POST" as const, path: /\/unstable\/agent-checkouts$/, reply: created };
-  const body = { startUrl: "https://shop.example/p/1", maxCost: { amount: "5.00", currency: "USD" } };
+  const createRoute = {
+    method: "POST" as const,
+    path: /\/unstable\/agent-checkouts$/,
+    reply: created,
+  };
+  const body = {
+    startUrl: "https://shop.example/p/1",
+    maxCost: { amount: "5.00", currency: "USD" },
+  };
 
   it("makes the user's profile the first time and reuses it after", async () => {
     let profiles: Array<{ id: string; label: string }> = [];
@@ -1689,7 +1842,10 @@ describe("sticky browser sessions", () => {
     const made = findCall(calls, "POST", "/browser-profiles")!;
     // Server key plus the user id: without the header every end user's logins
     // would pile into the project's own shared profile.
-    expect(made.headers).toMatchObject({ "X-API-KEY": "sk_test", "x-crossmint-user-id": "user-test-1" });
+    expect(made.headers).toMatchObject({
+      "X-API-KEY": "sk_test",
+      "x-crossmint-user-id": "user-test-1",
+    });
     expect(made.body).toEqual({ label: "Merchant logins" });
     expect(findCall(calls, "POST", /\/unstable\/agent-checkouts$/)!.body).toMatchObject({
       browserProfileId: "bp_new",
@@ -1717,7 +1873,10 @@ describe("sticky browser sessions", () => {
       {
         method: "POST",
         path: "/unstable/agent-checkouts/browser-profiles",
-        reply: { status: 409, body: { code: "already_exists", message: "The user already has a browser profile." } },
+        reply: {
+          status: 409,
+          body: { code: "already_exists", message: "The user already has a browser profile." },
+        },
       },
       {
         method: "GET",
@@ -1761,7 +1920,9 @@ describe("sticky browser sessions", () => {
     expect(findCall(calls, "GET", "/browser-profiles")).toBeUndefined();
 
     calls.length = 0;
-    await call(handlers, "POST", "/v1/checkouts", { body: { ...body, browserProfileId: "bp_theirs" } });
+    await call(handlers, "POST", "/v1/checkouts", {
+      body: { ...body, browserProfileId: "bp_theirs" },
+    });
     expect(findCall(calls, "POST", /\/unstable\/agent-checkouts$/)!.body).toMatchObject({
       browserProfileId: "bp_theirs",
     });
@@ -1771,7 +1932,11 @@ describe("sticky browser sessions", () => {
   it("deletes the saved logins and makes a new profile next time", async () => {
     const { handlers, calls } = makeServer([
       createRoute,
-      { method: "DELETE", path: "/unstable/agent-checkouts/browser-profiles/", reply: { status: 204 } },
+      {
+        method: "DELETE",
+        path: "/unstable/agent-checkouts/browser-profiles/",
+        reply: { status: 204 },
+      },
     ]);
     const res = await call(handlers, "DELETE", "/v1/browser-profile");
     expect(res.status).toBe(204);
@@ -1793,8 +1958,15 @@ describe("sticky browser sessions", () => {
 
 describe("saved buyer details", () => {
   const created = { status: 202, body: { runId: "run_1", status: "queued" } };
-  const createRoute = { method: "POST" as const, path: /\/unstable\/agent-checkouts$/, reply: created };
-  const body = { startUrl: "https://shop.example/p/1", maxCost: { amount: "5.00", currency: "USD" } };
+  const createRoute = {
+    method: "POST" as const,
+    path: /\/unstable\/agent-checkouts$/,
+    reply: created,
+  };
+  const body = {
+    startUrl: "https://shop.example/p/1",
+    maxCost: { amount: "5.00", currency: "USD" },
+  };
   const details = {
     label: "Home",
     name: { first: "Ada", last: "Lovelace" },
@@ -1818,7 +1990,12 @@ describe("saved buyer details", () => {
           body: {
             data: [
               { id: "byp_old", ...details, createdAt: "2026-01-01T00:00:00.000Z" },
-              { id: "byp_new", ...details, label: "New flat", createdAt: "2026-06-01T00:00:00.000Z" },
+              {
+                id: "byp_new",
+                ...details,
+                label: "New flat",
+                createdAt: "2026-06-01T00:00:00.000Z",
+              },
             ],
             nextCursor: null,
           },
@@ -1831,8 +2008,12 @@ describe("saved buyer details", () => {
     });
 
     // A caller that names its own profile keeps it.
-    await call(handlers, "POST", "/v1/checkouts", { body: { ...body, buyerProfileId: "byp_mine" } });
-    expect(calls.filter((c) => c.method === "POST" && /agent-checkouts$/.test(c.path)).at(-1)!.body).toMatchObject({
+    await call(handlers, "POST", "/v1/checkouts", {
+      body: { ...body, buyerProfileId: "byp_mine" },
+    });
+    expect(
+      calls.filter((c) => c.method === "POST" && /agent-checkouts$/.test(c.path)).at(-1)!.body,
+    ).toMatchObject({
       buyerProfileId: "byp_mine",
     });
   });
@@ -1941,7 +2122,11 @@ describe("saved buyer details", () => {
         reply: { body: { data: [], nextCursor: null } },
       },
       // One is gone already: that is no reason to fail.
-      { method: "DELETE", path: "/buyer-profiles/byp_old", reply: { status: 404, body: { message: "Not found" } } },
+      {
+        method: "DELETE",
+        path: "/buyer-profiles/byp_old",
+        reply: { status: 404, body: { message: "Not found" } },
+      },
       { method: "DELETE", path: "/buyer-profiles/byp_new", reply: { status: 204 } },
       {
         method: "POST",
@@ -1973,7 +2158,11 @@ describe("saved buyer details", () => {
         path: "/unstable/agent-checkouts/buyer-profiles",
         reply: { body: { data: [{ id: "byp_1", ...details }], nextCursor: null } },
       },
-      { method: "DELETE", path: "/buyer-profiles/byp_1", reply: { status: 403, body: { message: "Missing scope" } } },
+      {
+        method: "DELETE",
+        path: "/buyer-profiles/byp_1",
+        reply: { status: 403, body: { message: "Missing scope" } },
+      },
     ]);
     const res = await call(handlers, "DELETE", "/v1/buyer-profile");
     expect(res.status).toBeGreaterThanOrEqual(400);
@@ -1988,7 +2177,10 @@ describe("saved buyer details", () => {
       },
     ]);
     const res = await call(handlers, "POST", "/v1/buyer-profiles", {
-      body: { ...details, shipping: { ...details.shipping, administrativeAreaCode: "il", countryCode: "us" } },
+      body: {
+        ...details,
+        shipping: { ...details.shipping, administrativeAreaCode: "il", countryCode: "us" },
+      },
     });
     expect(res.status).toBe(201);
     expect(findCall(calls, "POST", "/buyer-profiles")!.body).toMatchObject({

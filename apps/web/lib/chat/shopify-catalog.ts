@@ -1,3 +1,4 @@
+import { currencyFractionDigits } from "@agent-commerce/core";
 import { serverEnv } from "@/lib/env";
 
 /**
@@ -73,18 +74,21 @@ interface CatalogProduct {
 
 export async function searchProducts(opts: {
   query: string;
-  /** Most the buyer wants to pay, in major units of the currency. */
+  /** Most the buyer wants to pay, in major units of `currency`. */
   maxPrice?: number;
+  /** The currency `maxPrice` is stated in; the filter takes minor units. */
+  currency?: string;
   /** ISO 3166-1 alpha-2. Default US. */
   shipsTo?: string;
   limit?: number;
 }): Promise<FoundProduct[]> {
+  const factor = 10 ** currencyFractionDigits(opts.currency ?? "USD", 2);
   return call("search_catalog", {
     query: opts.query,
     filters: {
       available: true,
       ships_to: { country: (opts.shipsTo ?? "US").toUpperCase() },
-      ...(opts.maxPrice ? { price: { max: Math.round(opts.maxPrice * 100) } } : {}),
+      ...(opts.maxPrice ? { price: { max: Math.round(opts.maxPrice * factor) } } : {}),
     },
     pagination: { limit: Math.min(Math.max(opts.limit ?? 5, 1), 10) },
   });
@@ -142,7 +146,7 @@ function toFound(p: CatalogProduct): FoundProduct | undefined {
             about.length > 280 ? `${about.slice(0, 277).replace(/\s+\S*$/, "")}…` : about,
         }
       : {}),
-    ...(money ? { price: `${(money.amount / 100).toFixed(2)} ${money.currency}` } : {}),
+    ...(money ? { price: catalogPrice(money) } : {}),
     store: cheapest.seller?.name ?? hostOf(cheapest.url),
     url: cleanUrl(cheapest.url),
     ...(p.rating?.value
@@ -163,6 +167,17 @@ function toFound(p: CatalogProduct): FoundProduct | undefined {
         }
       : {}),
   };
+}
+
+/**
+ * The catalog states prices in minor units (the search filter takes cents
+ * too), so "599" is "$5.99" and "1000" in JPY is "¥1000". The divisor is the
+ * currency's own factor, not always 100.
+ */
+function catalogPrice(money: Money): string {
+  // An unknown code still gets shown, in the shape most currencies use.
+  const decimals = currencyFractionDigits(money.currency, 2);
+  return `${(money.amount / 10 ** decimals).toFixed(decimals)} ${money.currency}`;
 }
 
 /**

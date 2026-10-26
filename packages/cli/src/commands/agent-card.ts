@@ -51,7 +51,7 @@ export function buildRequestBody(
   ctx: Pick<CliContext, "env" | "hostname">,
 ): CreateAgentCardRequestBody {
   const body: CreateAgentCardRequestBody = {
-    amount: { value: toDecimalString(opts.amount), currency: opts.currency.toUpperCase() },
+    amount: { value: toDecimalString(opts.amount, opts.currency), currency: opts.currency.toUpperCase() },
     description: opts.description,
     expiresInHours: opts.expiresInHours,
     requester: opts.requester ?? detectRequester(ctx.env, ctx.hostname()),
@@ -197,7 +197,7 @@ export function registerAgentCardCommands(program: Command, ctx: CliContext): vo
       const body: MintCredentialBody = { format: "card" };
       if (opts.amount !== undefined)
         body.amount = {
-          value: toDecimalString(opts.amount),
+          value: toDecimalString(opts.amount, opts.currency),
           currency: opts.currency.toUpperCase(),
         };
       const merchant = merchantFromOptions(opts);

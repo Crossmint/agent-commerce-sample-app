@@ -12,6 +12,8 @@
  *   their Shop account when the store asks.
  * - other: any other way the store takes, in the user's words.
  */
+import { currencyFractionDigits } from "@agent-commerce/core";
+
 export const PAYMENT_CHOICE_METHODS = ["agent_card", "card", "shop_pay", "other"] as const;
 export type PaymentChoiceMethod = (typeof PAYMENT_CHOICE_METHODS)[number];
 
@@ -30,11 +32,14 @@ export function budgetFor(price: { amount: string; currency: string }): Money | 
   const amount = Number.parseFloat(price.amount);
   if (!Number.isFinite(amount) || amount <= 0) return undefined;
   const value = Math.ceil(amount + Math.max(amount * 0.25, 10));
-  return { value: value.toFixed(2), currency: price.currency.toUpperCase() };
+  const decimals = currencyFractionDigits(price.currency, 2);
+  return { value: value.toFixed(decimals), currency: price.currency.toUpperCase() };
 }
 
 /** "35.99 USD", as the catalog writes a price, as an amount and a currency. */
-export function parsePrice(text: string | undefined): { amount: string; currency: string } | undefined {
-  const match = text?.trim().match(/^(\d+(?:\.\d{1,2})?)\s+([A-Za-z]{3})$/);
+export function parsePrice(
+  text: string | undefined,
+): { amount: string; currency: string } | undefined {
+  const match = text?.trim().match(/^(\d+(?:\.\d{1,4})?)\s+([A-Za-z]{3})$/);
   return match ? { amount: match[1]!, currency: match[2]!.toUpperCase() } : undefined;
 }
