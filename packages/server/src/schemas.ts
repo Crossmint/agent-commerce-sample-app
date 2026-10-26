@@ -1,10 +1,11 @@
 import { z } from "zod";
-import { currencyFractionDigits } from "@agent-commerce/core";
+import { currencyFractionDigits, significantDecimals } from "@agent-commerce/core";
 
 /**
- * The decimals in an amount's `value` must not exceed what its `currency`
- * allows — Crossmint rejects "10000.00" CLP outright, so a bad amount is a
- * 400 here rather than a 502 there. An unknown currency is rejected too.
+ * The significant decimals in an amount's `value` must not exceed what its
+ * `currency` allows — trailing zeros carry no value, so "10000.00" CLP is
+ * fine while "10000.5" CLP is a 400 here rather than a 502 at Crossmint.
+ * An unknown currency is rejected too.
  */
 function checkCurrencyDecimals(
   amount: { value: string; currency: string },
@@ -22,7 +23,7 @@ function checkCurrencyDecimals(
     });
     return;
   }
-  const used = (amount.value.split(".")[1] ?? "").length;
+  const used = significantDecimals(amount.value);
   if (used > allowed) {
     ctx.addIssue({
       code: "custom",

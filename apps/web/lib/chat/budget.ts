@@ -5,7 +5,7 @@
  * data and arithmetic, so the tool schema on the server and the picker in
  * the chat share one source.
  */
-import { currencyFractionDigits, formatAmount, toDecimalString } from "@agent-commerce/core";
+import { currencyFractionDigits, formatAmount, significantDecimals } from "@agent-commerce/core";
 import type { Money } from "./payment-choice";
 
 /** How long a budget can last, in days, as the picker offers it. */
@@ -34,8 +34,9 @@ export function budgetAmounts(currency: string, floor?: Money): Money[] {
   const min = floor ? Number.parseFloat(floor.value) : 0;
   const fits = STEPS.filter((v) => v >= min).slice(0, 3);
   const values = fits.length ? fits : [Math.ceil(min)];
+  const decimals = currencyFractionDigits(currency, 2);
   return values.map((v) => ({
-    value: toDecimalString(v, currency),
+    value: v.toFixed(decimals),
     currency: currency.toUpperCase(),
   }));
 }
@@ -65,17 +66,27 @@ export function parseBudgetAmount(
   currency: string,
   floor?: Money,
 ): { amount: Money } | { problem: string } {
-  const cleaned = text.replace(/[^\d.,]/g, "").replace(",", ".");
+  // A comma followed by exactly three digits is a thousands separator
+  // ("10,000"), not a decimal mark — reading it as a point would turn ten
+  // thousand into ten in a 3-decimal currency.
+  const cleaned = text
+    .replace(/[^\d.,]/g, "")
+    .replace(/,(?=\d{3}(?:\D|$))/g, "")
+    .replace(",", ".");
   const value = Number.parseFloat(cleaned);
-  const decimals = currencyFractionDigits(currency);
-  const shape = decimals === 0 ? /^\d+$/ : new RegExp(`^\\d+(\\.\\d{1,${decimals}})?$`);
-  if (!shape.test(cleaned) || !(value > 0)) {
+  const decimals = currencyFractionDigits(currency, 2);
+  if (!/^\d+(\.\d+)?$/.test(cleaned) || !(value > 0)) {
     return { problem: "Enter an amount, such as 75." };
   }
-  if (floor && value < Number.parseFloat(floor.value)) {
-    return { problem: `Enter at least ${formatAmount(floor.value, floor.currency)}, so it covers this purchase.` };
+  if (significantDecimals(cleaned) > decimals) {
+    return { problem: `${currency.toUpperCase()} takes at most ${decimals} decimals.` };
   }
-  return { amount: { value: toDecimalString(value, currency), currency: currency.toUpperCase() } };
+  if (floor && value < Number.parseFloat(floor.value)) {
+    return {
+      problem: `Enter at least ${formatAmount(floor.value, floor.currency)}, so it covers this purchase.`,
+    };
+  }
+  return { amount: { value: value.toFixed(decimals), currency: currency.toUpperCase() } };
 }
 
 /** What the agent asks over the picker. */

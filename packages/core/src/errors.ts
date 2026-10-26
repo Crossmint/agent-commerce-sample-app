@@ -49,6 +49,13 @@ function bodyMessage(body: unknown): string | undefined {
     for (const key of keys) {
       const value = rec[key];
       if (typeof value === "string" && value.length > 0) return value;
+      // NestJS-style validation errors carry message: string[].
+      if (Array.isArray(value)) {
+        const joined = value
+          .filter((v): v is string => typeof v === "string" && v.length > 0)
+          .join("; ");
+        if (joined) return joined;
+      }
       if (typeof value === "object" && value !== null) {
         const nested = at(value, "message", "detail", "error");
         if (nested) return nested;

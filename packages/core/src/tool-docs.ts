@@ -224,6 +224,7 @@ export const TOOL_DOCS = {
     params: {
       query: "What to look for, in plain words, e.g. sour gummy candy or a black wool beanie.",
       maxPrice: "Most the user wants to pay per item, in major units, when they said so.",
+      currency: "The currency maxPrice is in. Default USD.",
       shipsTo: "Two-letter country the item must ship to. Default US.",
     },
     surfaces: ["chat"],
@@ -299,7 +300,8 @@ export const TOOL_DOCS = {
       checkoutId: PARAM_DOCS.checkoutId,
       requestId: "The pending request id from get_checkout.",
       action: "submit (default), decline, or alternative.",
-      values: "For submit: an answer for each field, keyed by field key. Text as a string, a number, true or false, a choice's option value, or a list of option values for a choice of many.",
+      values:
+        "For submit: an answer for each field, keyed by field key. Text as a string, a number, true or false, a choice's option value, or a list of option values for a choice of many.",
       text: "Free text: the alternative, or a note for the agent.",
     },
     surfaces: ["mcp", "chat"],

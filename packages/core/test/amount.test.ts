@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { currencyFractionDigits, toDecimalString } from "../src/amount.js";
+import { currencyFractionDigits, significantDecimals, toDecimalString } from "../src/amount.js";
 
 describe("currencyFractionDigits", () => {
   it("returns the currency's decimals", () => {
@@ -10,8 +10,33 @@ describe("currencyFractionDigits", () => {
     expect(currencyFractionDigits("BHD")).toBe(3);
   });
 
+  it("uses ISO minor units where CLDR display digits differ", () => {
+    expect(currencyFractionDigits("COP")).toBe(2);
+    expect(currencyFractionDigits("HUF")).toBe(2);
+    expect(currencyFractionDigits("IDR")).toBe(2);
+    expect(currencyFractionDigits("PKR")).toBe(2);
+    expect(currencyFractionDigits("TWD")).toBe(2);
+    expect(currencyFractionDigits("MGA")).toBe(2);
+    expect(currencyFractionDigits("MRU")).toBe(2);
+    expect(currencyFractionDigits("IQD")).toBe(3);
+  });
+
   it("throws on an unknown currency", () => {
     expect(() => currencyFractionDigits("ZZZ")).toThrow(/Unknown currency/);
+  });
+
+  it("returns the fallback for an unknown currency instead", () => {
+    expect(currencyFractionDigits("ZZZ", 2)).toBe(2);
+  });
+});
+
+describe("significantDecimals", () => {
+  it("ignores trailing zeros", () => {
+    expect(significantDecimals("10000.00")).toBe(0);
+    expect(significantDecimals("1.250")).toBe(2);
+    expect(significantDecimals("1.25")).toBe(2);
+    expect(significantDecimals("10000.5")).toBe(1);
+    expect(significantDecimals("10")).toBe(0);
   });
 });
 
@@ -30,6 +55,11 @@ describe("toDecimalString", () => {
 
   it("accepts zero-padded input beyond the decimals", () => {
     expect(toDecimalString("10000.00", "CLP")).toBe("10000");
+  });
+
+  it("formats currencies CLDR shows without decimals at their ISO minor units", () => {
+    expect(toDecimalString(50000, "COP")).toBe("50000.00");
+    expect(toDecimalString("1500", "IQD")).toBe("1500.000");
   });
 
   it("throws on a non-zero digit past the currency's decimals", () => {

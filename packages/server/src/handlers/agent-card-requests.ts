@@ -94,6 +94,24 @@ export async function approveRequest(req: Request, ctx: Ctx, params: Params): Pr
   const email = await resolveEmail(user, ctx, body.email);
   const jwt = { jwt: user.jwt };
 
+  // Stored amounts from before per-currency validation may still carry extra
+  // decimals; the order intent wants the currency's own precision. Normalized
+  // before any side effects, so an unusable amount is a clean 400 rather
+  // than a revoked card plus a 500.
+  let amount: { value: string; currency: string };
+  try {
+    amount = {
+      value: toDecimalString(request.amount.value, request.amount.currency),
+      currency: request.amount.currency.toUpperCase(),
+    };
+  } catch (e) {
+    throw new HttpError(
+      400,
+      "invalid_amount",
+      `This request's amount is not usable: ${e instanceof Error ? e.message : e}`,
+    );
+  }
+
   await revokePreviousCard(ctx, jwt, request);
 
   // Idempotent. Turns on the network rails the card supports.
@@ -118,19 +136,17 @@ export async function approveRequest(req: Request, ctx: Ctx, params: Params): Pr
   try {
     agentCard = await ctx.crossmint.orderIntents.create(jwt, {
       paymentMethodId: body.paymentMethodId,
-      // Stored amounts from before per-currency validation may still carry
-      // extra decimals; the order intent wants the currency's own precision.
-      amount: {
-        value: toDecimalString(request.amount.value, request.amount.currency),
-        currency: request.amount.currency.toUpperCase(),
-      },
+      amount,
       description: request.description,
       expiresAt: request.expiresAt,
       ...(request.merchant ? { merchant: request.merchant } : {}),
     });
   } catch (e) {
     // No network rail, and Crossmint added no encrypted-card fallback.
-    if (e instanceof CrossmintApiError && e.code === "ORDER_INTENT_PAYMENT_METHOD_NO_ACTIVE_RAILS") {
+    if (
+      e instanceof CrossmintApiError &&
+      e.code === "ORDER_INTENT_PAYMENT_METHOD_NO_ACTIVE_RAILS"
+    ) {
       throw new HttpError(
         409,
         "no_usable_rail",

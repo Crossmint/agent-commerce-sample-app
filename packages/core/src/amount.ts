@@ -10,31 +10,60 @@ export function formatAmount(value: string | number, currency: string, locale = 
 }
 
 /**
+ * Where `Intl`'s display digits differ from ISO 4217 minor units. Amounts
+ * here feed payment rails and minor-unit prices, so the ISO count is the
+ * one that matters: COP displays with no decimals but its minor unit is the
+ * centavo, so 5,000,000 minor units is 50,000.00, not 5,000,000.
+ */
+const ISO_MINOR_UNITS: Record<string, number> = {
+  COP: 2,
+  HUF: 2,
+  IDR: 2,
+  PKR: 2,
+  TWD: 2,
+  MGA: 2,
+  MRU: 2,
+  IQD: 3,
+};
+
+/**
  * The decimals a currency allows: 2 for USD, 0 for CLP or JPY, 3 for KWD.
  * Throws on a code `Intl` does not know, so a typo fails loudly here rather
- * than as a rejected payment downstream.
+ * than as a rejected payment downstream. `fallback` returns instead of
+ * throwing, for display paths that should degrade to the common shape.
  */
-export function currencyFractionDigits(currency: string): number {
+export function currencyFractionDigits(currency: string, fallback?: number): number {
   const code = currency.toUpperCase();
+  const unknown = (): number => {
+    if (fallback !== undefined) return fallback;
+    throw new Error(`Unknown currency: ${currency}`);
+  };
   // NumberFormat only checks the code's shape: "ZZZ" formats without
   // throwing, so membership has to come from the ISO list itself.
   if (SUPPORTED_CURRENCIES !== null && !SUPPORTED_CURRENCIES.has(code)) {
-    throw new Error(`Unknown currency: ${currency}`);
+    return unknown();
   }
+  if (code in ISO_MINOR_UNITS) return ISO_MINOR_UNITS[code]!;
   try {
     const digits = new Intl.NumberFormat("en", {
       style: "currency",
       currency: code,
     }).resolvedOptions().maximumFractionDigits;
-    if (digits === undefined) throw new Error("no fraction digits");
+    if (digits === undefined) return unknown();
     return digits;
   } catch {
-    throw new Error(`Unknown currency: ${currency}`);
+    return unknown();
   }
 }
 
 const SUPPORTED_CURRENCIES =
   typeof Intl.supportedValuesOf === "function" ? new Set(Intl.supportedValuesOf("currency")) : null;
+
+/** Fraction digits that carry a value — trailing zeros don't count: "1.250" → 2, "10000.00" → 0. */
+export function significantDecimals(value: string): number {
+  const frac = value.split(".")[1] ?? "";
+  return frac.replace(/0+$/, "").length;
+}
 
 /**
  * Normalize user input like "50", "50.5", "$50" into Crossmint's decimal
@@ -50,7 +79,10 @@ export function toDecimalString(input: string | number, currency: string): strin
   const rounded = Number(n.toFixed(digits));
   // Float dust (0.1 + 0.2) is not a real extra decimal; a genuine digit past
   // the currency's decimals is, and throws rather than silently rounding.
-  if (Math.abs(n - rounded) > 1e-9 * Math.max(1, Math.abs(n))) {
+  if (
+    significantDecimals(cleaned) > digits &&
+    Math.abs(n - rounded) > 1e-9 * Math.max(1, Math.abs(n))
+  ) {
     throw new Error(`Invalid amount: ${input} has more decimals than ${currency} allows`);
   }
   return rounded.toFixed(digits);

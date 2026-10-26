@@ -30,6 +30,28 @@ describe("parseBudgetAmount", () => {
 
   it("rejects decimals the currency does not allow", () => {
     expect(parseBudgetAmount("10000.5", "CLP")).toHaveProperty("problem");
+    expect(parseBudgetAmount("10.005", "USD")).toHaveProperty("problem");
+  });
+
+  it("accepts zero-padded decimals the currency does not show", () => {
+    expect(parseBudgetAmount("10000.00", "CLP")).toEqual({
+      amount: { value: "10000", currency: "CLP" },
+    });
+  });
+
+  it("reads a comma followed by three digits as a thousands separator", () => {
+    expect(parseBudgetAmount("10,000", "KWD")).toEqual({
+      amount: { value: "10000.000", currency: "KWD" },
+    });
+    expect(parseBudgetAmount("1,234", "USD")).toEqual({
+      amount: { value: "1234.00", currency: "USD" },
+    });
+  });
+
+  it("reads a comma followed by fewer digits as a decimal point", () => {
+    expect(parseBudgetAmount("10,50", "USD")).toEqual({
+      amount: { value: "10.50", currency: "USD" },
+    });
   });
 
   it("keeps USD at two decimals", () => {
@@ -48,6 +70,24 @@ describe("budgetFor", () => {
     expect(budgetFor({ amount: "100", currency: "USD" })).toEqual({
       value: "125.00",
       currency: "USD",
+    });
+  });
+
+  it("formats a three-decimal price and budget", () => {
+    expect(budgetFor({ amount: "1.250", currency: "KWD" })).toEqual({
+      value: "12.000",
+      currency: "KWD",
+    });
+  });
+
+  it("falls back to two decimals for a currency code it does not know", () => {
+    expect(budgetFor({ amount: "100", currency: "ZZZ" })).toEqual({
+      value: "125.00",
+      currency: "ZZZ",
+    });
+    expect(budgetAmounts("ZZZ").map((m) => m.value)).toEqual(["20.00", "50.00", "100.00"]);
+    expect(parseBudgetAmount("75", "ZZZ")).toEqual({
+      amount: { value: "75.00", currency: "ZZZ" },
     });
   });
 });

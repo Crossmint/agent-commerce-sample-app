@@ -29,6 +29,18 @@ describe("CrossmintApiError", () => {
     expect(err.message).toBe("basis theory rejected the amount");
   });
 
+  it("joins a NestJS-style array message", () => {
+    const err = new CrossmintApiError({
+      status: 400,
+      url: "https://api.test/x",
+      body: {
+        message: ["amount.value must be a decimal string", "currency is invalid"],
+        error: "Bad Request",
+      },
+    });
+    expect(err.message).toBe("amount.value must be a decimal string; currency is invalid");
+  });
+
   it("falls back to the status when the body has no message", () => {
     const err = new CrossmintApiError({ status: 502, url: "https://api.test/x", body: {} });
     expect(err.message).toBe("Crossmint request failed with 502");
