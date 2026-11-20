@@ -55,7 +55,8 @@ const POSTAL_CODES: Record<string, { pattern: RegExp; message: string }> = {
 const ANY_POSTAL_CODE = /^[A-Z0-9][A-Z0-9 -]{1,9}$/;
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const PHONE_CHARACTERS = /^\+?[\d\s().-]+$/;
+/** A number in international form: + and its country calling code first. */
+const PHONE_CHARACTERS = /^\+[\d\s().-]+$/;
 
 /**
  * Buyer details as they should be saved: every field trimmed, empty address
@@ -107,7 +108,12 @@ export function buyerProfileProblems(
     if (opts.requirePhone) add("phone", "Enter a phone number. Stores use it for the delivery.");
   } else {
     const digits = contact.phone.replace(/\D/g, "").length;
-    if (!PHONE_CHARACTERS.test(contact.phone) || digits < 7 || digits > 15) {
+    if (!contact.phone.startsWith("+")) {
+      add(
+        "phone",
+        "Enter the phone number with + and its country calling code, such as +1 415 555 0100.",
+      );
+    } else if (!PHONE_CHARACTERS.test(contact.phone) || digits < 7 || digits > 15) {
       add("phone", "Enter a phone number with 7 to 15 digits, such as +1 415 555 0100.");
     }
   }

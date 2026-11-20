@@ -270,7 +270,7 @@ export const TOOL_DOCS = {
       lastName: "Last name.",
       email: "Email address. Default: the signed-in user's.",
       phone:
-        "Phone number, for the delivery. Stores ask for one on most checkouts, so ask the user for it if they have not said.",
+        "Phone number, for the delivery, with + and its country calling code, e.g. +1 415 555 0100. Stores ask for one on most checkouts, so ask the user for it if they have not said.",
       addressLines: "Street address, one line per entry.",
       city: "City or town.",
       region: "State or province as ISO 3166-2, e.g. US-CA, when the country has them.",
