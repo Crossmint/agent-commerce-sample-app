@@ -63,7 +63,27 @@ function bodyMessage(body: unknown): string | undefined {
     }
     return undefined;
   };
-  return at(record, "message") ?? at(record, "error", "provider", "providerError", "details");
+  const message =
+    at(record, "message") ?? at(record, "error", "provider", "providerError", "details");
+  const details = detailMessages(record.details);
+  if (message && details) return `${message}: ${details}`;
+  return message ?? details;
+}
+
+/**
+ * The field-level reasons of a validation error, as Crossmint forwards them
+ * from Universal Checkout: `details: [{ path: "$.contact.phone", message }]`.
+ * The top-level message alone ("Invalid request") does not say what to fix.
+ */
+function detailMessages(details: unknown): string | undefined {
+  if (!Array.isArray(details)) return undefined;
+  const parts = details.flatMap((detail) => {
+    if (typeof detail !== "object" || detail === null) return [];
+    const { path, message } = detail as Record<string, unknown>;
+    if (typeof message !== "string" || !message) return [];
+    return [typeof path === "string" && path ? `${path}: ${message}` : message];
+  });
+  return parts.length ? parts.join("; ") : undefined;
 }
 
 /** Crossmint's code for a mint that needs the security code typed again. */

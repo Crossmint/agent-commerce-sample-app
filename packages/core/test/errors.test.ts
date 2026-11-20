@@ -41,6 +41,24 @@ describe("CrossmintApiError", () => {
     expect(err.message).toBe("amount.value must be a decimal string; currency is invalid");
   });
 
+  it("adds the reasons Universal Checkout forwards in details", () => {
+    const err = new CrossmintApiError({
+      status: 400,
+      url: "https://api.test/x",
+      body: {
+        message: "Invalid request",
+        details: [
+          { path: "$.contact.phone", message: "Start with + and the country calling code" },
+          { path: "$.shipping.postalCode", message: "Not a postal code in US" },
+        ],
+      },
+    });
+    expect(err.message).toBe(
+      "Invalid request: $.contact.phone: Start with + and the country calling code; " +
+        "$.shipping.postalCode: Not a postal code in US",
+    );
+  });
+
   it("falls back to the status when the body has no message", () => {
     const err = new CrossmintApiError({ status: 502, url: "https://api.test/x", body: {} });
     expect(err.message).toBe("Crossmint request failed with 502");

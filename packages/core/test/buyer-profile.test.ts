@@ -112,9 +112,22 @@ describe("buyerProfileProblems", () => {
 
   it("checks the email and phone formats", () => {
     expect(fields(with_({ contact: { email: "ada@example" } }))).toEqual(["email"]);
-    expect(fields(with_({ contact: { phone: "12345" } }))).toEqual(["phone"]);
-    expect(fields(with_({ contact: { phone: "call me" } }))).toEqual(["phone"]);
+    expect(fields(with_({ contact: { phone: "+12345" } }))).toEqual(["phone"]);
+    expect(fields(with_({ contact: { phone: "+call me" } }))).toEqual(["phone"]);
     expect(fields(with_({ contact: { phone: "+44 20 7946 0958" } }))).toEqual([]);
+  });
+
+  it("wants the phone's country calling code", () => {
+    const problems = buyerProfileProblems(
+      normalizeBuyerProfile(with_({ contact: { phone: "(415) 555-0100" } })),
+    );
+    expect(problems).toEqual([
+      {
+        field: "phone",
+        message:
+          "Enter the phone number with + and its country calling code, such as +1 415 555 0100.",
+      },
+    ]);
   });
 
   it("wants a real state and ZIP code in the US", () => {
